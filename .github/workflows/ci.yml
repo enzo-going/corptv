@@ -37,3 +37,27 @@ jobs:
 
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  windows-operations:
+    name: Windows operations scripts
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate PowerShell syntax
+        shell: powershell
+        run: |
+          $allErrors = @()
+          Get-ChildItem -LiteralPath ops -Filter '*.ps1' -File | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [void][Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors)
+            $allErrors += $errors
+          }
+          if ($allErrors.Count) {
+            $allErrors | Format-List
+            throw "PowerShell syntax errors: $($allErrors.Count)"
+          }
