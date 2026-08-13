@@ -1,37 +1,57 @@
 # CorporTV
 
-Sistema leve de TV corporativa com painel de gestão, playlists por grupo e player em tela cheia para TV Box, Smart TV ou navegador em modo quiosque.
+[![CI](https://github.com/enzo-going/corptv/actions/workflows/ci.yml/badge.svg)](https://github.com/enzo-going/corptv/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/enzo-going/corptv?display_name=tag)](https://github.com/enzo-going/corptv/releases)
+[![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
+[![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![License: MIT](https://img.shields.io/github/license/enzo-going/corptv)](LICENSE)
 
-## Funcionalidades
+Digital signage leve para distribuir conteúdo em TVs corporativas. O painel centraliza slides, playlists e agendamentos; cada TV Box abre uma URL permanente e recebe mudanças sem precisar ser reiniciada.
 
-- Slides de texto, imagem e vídeo
-- Grupos com playlists independentes
-- URLs permanentes por tela
-- Agendamento por período, dias da semana e faixa de horário
-- Faixas que atravessam a meia-noite
-- Atualização automática do player sem recarregar a página
-- Cache offline com expiração segura para conteúdo agendado
-- Heartbeat e visão geral das telas
-- Upload com suporte a HTTP Range e cache de mídia
+![Painel do CorporTV](docs/assets/painel.jpg)
+
+## Por que o projeto existe
+
+Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inconsistentes e manutenção repetitiva. O CorporTV concentra a operação em um servidor local e mantém o player simples o bastante para navegadores de TV Box.
+
+## Destaques
+
+- Texto, imagens JPG/PNG/WEBP e vídeos MP4
+- Playlists independentes por grupo de telas
+- URL legível e permanente para cada dispositivo
+- Agendamento por início, expiração, dias da semana e faixa de horário
+- Janelas que atravessam a meia-noite com semântica previsível
+- Atualização automática, heartbeat e visão consolidada da programação
+- Cache offline que respeita o prazo de cada conteúdo
+- HTTP Range e cache imutável para servir vídeos com eficiência
+- Validação de campos, MIME e assinatura real dos uploads
+- Remoção automática da mídia quando um slide é excluído
+
+## Como funciona
+
+```mermaid
+flowchart LR
+    A[Painel web] -->|conteúdo e regras| B[API Express]
+    B --> C[(NeDB)]
+    B --> D[Uploads locais]
+    B -->|playlist ativa| E[Player da TV]
+    E -->|heartbeat| B
+    E --> F[Cache offline com validade]
+```
+
+O servidor é a fonte da programação. A cada consulta ele calcula quais slides estão ativos e por quanto tempo uma cópia offline continua válida. Assim, um conteúdo expirado sai da TV mesmo durante uma queda de rede.
 
 ## Requisitos
 
-- Node.js 18 ou mais recente
+- Node.js 22 ou mais recente
 - npm
 
-## Instalação
+## Início rápido
 
 ```bash
 git clone https://github.com/enzo-going/corptv.git
 cd corptv
 npm ci
-npm start
-```
-
-O serviço usa a porta `3000` por padrão. Para escolher outra:
-
-```powershell
-$env:PORT=3100
 npm start
 ```
 
@@ -41,76 +61,80 @@ Abra:
 - Player: `http://IP_DO_SERVIDOR:3000/player/ID_DA_TELA`
 - Saúde: `http://IP_DO_SERVIDOR:3000/health`
 
-## Fluxo de configuração
+Para escolher outra porta:
+
+```powershell
+$env:PORT=3100
+npm start
+```
+
+## Configuração
+
+As variáveis abaixo são opcionais. O arquivo `.env.example` serve como referência; defina-as no ambiente do processo ou do gerenciador de serviço.
+
+| Variável | Padrão | Finalidade |
+|---|---|---|
+| `PORT` | `3000` | Porta HTTP |
+| `CORPTV_DATA_DIR` | `./data` | Bancos NeDB persistentes |
+| `CORPTV_UPLOADS_DIR` | `./public/uploads` | Imagens e vídeos |
+| `CORPTV_LOG_DIR` | `./logs` | Log de acesso às mídias |
+
+## Fluxo de operação
 
 1. Crie os slides.
 2. Crie um ou mais grupos.
-3. Monte a playlist de cada grupo.
+3. Selecione os slides da playlist de cada grupo.
 4. Cadastre as telas e associe cada uma a um grupo.
-5. Abra a URL da tela na TV Box ou Smart TV em modo quiosque.
+5. Abra a URL da tela no navegador da TV Box em modo quiosque.
 
 ## Agendamento
 
-Todos os campos são opcionais. Um slide sem regra toca sempre.
+Todos os campos são opcionais; sem regra, o slide toca sempre.
 
 | Campo | Comportamento |
 |---|---|
 | `starts_at` | Exibe somente depois da data e hora inicial |
 | `expires_at` | Oculta depois da data e hora final |
-| `days` | Dias da semana, de `0` (domingo) a `6` (sábado) |
+| `days` | Dias de `0` (domingo) a `6` (sábado) |
 | `time_start` / `time_end` | Janela diária no formato `HH:MM` |
 
-Quando a janela atravessa a meia-noite, como `22:00–06:00`, o dia selecionado é o dia em que a janela começa. Portanto, “segunda-feira, 22:00–06:00” continua válida até 06:00 de terça-feira.
+Em uma janela `22:00–06:00`, o dia escolhido é aquele em que a janela começa. Portanto, “segunda-feira, 22:00–06:00” permanece ativa até 06:00 de terça-feira.
 
-O servidor é a fonte da programação. O player consulta alterações periodicamente e substitui, adiciona ou remove conteúdo sem precisar ser reiniciado. Durante uma queda de rede, conteúdo sem prazo continua disponível no cache; conteúdo agendado só permanece até seu limite calculado pelo servidor.
-
-## Estrutura
-
-```text
-corptv/
-├── public/
-│   ├── painel/index.html
-│   ├── player/index.html
-│   └── uploads/            # criado em execução e ignorado pelo Git
-├── src/
-│   ├── db.js
-│   ├── scheduling.js
-│   └── server.js
-├── test/
-│   └── scheduling.test.js
-├── data/                   # criado em execução e ignorado pelo Git
-├── package.json
-└── package-lock.json
-```
-
-## Testes e auditoria
+## Qualidade e testes
 
 ```bash
 npm test
 npm audit --omit=dev
 ```
 
-Os testes cobrem datas, expiração, horários inválidos, dias repetidos, janela que atravessa a meia-noite e validade do cache offline.
+A suíte automatizada cobre API, vínculos entre entidades, uploads falsos, limpeza de mídias, limites de campos, datas, expiração, horários inválidos, duplicação de dias, madrugada e validade do cache offline. O workflow de CI executa a suíte em Node.js 22 e 24.
 
-## API principal
+## Estrutura
 
-| Método | Rota | Finalidade |
-|---|---|---|
-| `GET` | `/api/slides` | Lista slides e seus estados de programação |
-| `POST` | `/api/slides` | Cria texto ou envia imagem/vídeo |
-| `PUT` | `/api/slides/:id` | Atualiza conteúdo e agendamento |
-| `GET` | `/api/groups` | Lista grupos |
-| `GET` | `/api/groups/:id/slides` | Obtém a playlist de um grupo |
-| `GET` | `/api/screens` | Lista telas |
-| `GET` | `/api/player/:id` | Entrega a playlist ativa para uma tela |
-| `GET` | `/api/programacao` | Resume itens programados e ocultos |
-| `POST` | `/api/heartbeat` | Atualiza a presença de uma tela |
-| `GET` | `/health` | Informa saúde e tempo de atividade |
+```text
+corptv/
+├── .github/workflows/ci.yml
+├── public/
+│   ├── painel/index.html
+│   ├── player/index.html
+│   └── uploads/             # execução; ignorado pelo Git
+├── src/
+│   ├── db.js
+│   ├── scheduling.js
+│   ├── server.js
+│   ├── uploads.js
+│   └── validation.js
+├── test/
+├── data/                    # execução; ignorado pelo Git
+└── package.json
+```
 
-## Dados e segurança
+## Segurança e dados
 
-O repositório não inclui bancos, uploads, logs nem arquivos de ambiente. Esses diretórios devem ser preservados separadamente em atualizações.
+Banco, uploads, logs e arquivos de ambiente não entram no repositório. O upload exige uma combinação permitida de extensão e MIME e também confere a assinatura binária do arquivo.
 
-O projeto não possui autenticação integrada. Use apenas em uma rede confiável ou coloque um proxy autenticado na frente do painel e das rotas administrativas antes de expor o serviço à internet.
+O projeto não possui autenticação integrada. Use em uma rede confiável ou adicione um proxy autenticado com HTTPS antes de expor o painel e as rotas administrativas à internet. Consulte [SECURITY.md](SECURITY.md) para reportar vulnerabilidades.
 
-Formatos de upload aceitos: JPG, PNG, WEBP e MP4, com limite padrão de 200 MB.
+## Licença
+
+Distribuído sob a [licença MIT](LICENSE).

@@ -2,7 +2,7 @@ const Datastore = require('nedb-promises');
 const path = require('path');
 const { v4: uuidv4 } = require('uuid');
 
-const dbPath = path.join(__dirname, '../data');
+const dbPath = process.env.CORPTV_DATA_DIR || path.join(__dirname, '../data');
 require('fs').mkdirSync(dbPath, { recursive: true });
 
 const db = {
@@ -19,12 +19,20 @@ const db = {
 // o servico fica lento e pesado com o tempo. Compacta a cada 30 min, reescrevendo
 // so o estado atual. Os dados sao preservados: muda apenas o formato em disco.
 const COMPACTION_MS = 30 * 60 * 1000;
-Object.keys(db).forEach(name => {
+const stores = ['groups', 'slides', 'gslides', 'screens'];
+stores.forEach(name => {
   const store = db[name];
-  if (store && typeof store.setAutocompactionInterval === 'function') {
+  if (process.env.CORPTV_DISABLE_MAINTENANCE !== '1' && store && typeof store.setAutocompactionInterval === 'function') {
     store.setAutocompactionInterval(COMPACTION_MS);
   }
 });
+
+db.stopMaintenance = function stopMaintenance() {
+  stores.forEach(name => {
+    const store = db[name];
+    if (store && typeof store.stopAutocompaction === 'function') store.stopAutocompaction();
+  });
+};
 
 // Gera slug a partir do nome: "Recepção Principal" → "recepcao-principal"
 function toSlug(name) {
@@ -40,7 +48,7 @@ db.toSlug = toSlug;
 
 // Garante slug único: se "recepcao" já existe, tenta "recepcao-2", etc.
 async function uniqueSlug(name) {
-  const base = toSlug(name);
+  const base = toSlug(name) || 'tela';
   let slug = base;
   let i = 2;
   while (await db.screens.findOne({ id: slug })) {
@@ -65,9 +73,9 @@ async function seed() {
   ]);
 
   await db.slides.insert([
-    { id: s1, title: 'Bem-vindos!',   body: 'Reunião geral às 14h na sala principal.', type: 'bv',  duration: 8, bg: '#0a0a1a', url: null, created_at: new Date() },
-    { id: s2, title: 'Meta do mês',   body: '87% atingida — vamos fechar forte!',      type: 'kpi', duration: 8, bg: '#0a1a12', url: null, created_at: new Date() },
-    { id: s3, title: 'Cardápio hoje', body: 'Frango grelhado com arroz integral.',     type: 'msg', duration: 8, bg: '#1a1a2e', url: null, created_at: new Date() },
+    { id: s1, title: 'Bem-vindos!',   body: 'Reunião geral às 14h na sala principal.', type: 'txt', duration: 8, bg: '#0a0a1a', url: null, created_at: new Date() },
+    { id: s2, title: 'Meta do mês',   body: '87% atingida — vamos fechar forte!',      type: 'txt', duration: 8, bg: '#0a1a12', url: null, created_at: new Date() },
+    { id: s3, title: 'Cardápio hoje', body: 'Frango grelhado com arroz integral.',     type: 'txt', duration: 8, bg: '#1a1a2e', url: null, created_at: new Date() },
   ]);
 
   await db.gslides.insert([
@@ -89,6 +97,11 @@ async function seed() {
   console.log('   Player de exemplo: http://localhost:3000/player/recepcao-principal');
 }
 
-seed().catch(console.error);
+db.ready = process.env.CORPTV_DISABLE_SEED === '1'
+  ? Promise.resolve()
+  : seed().catch(error => {
+      console.error(error);
+      throw error;
+    });
 
 module.exports = db;
