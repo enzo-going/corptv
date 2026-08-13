@@ -19,6 +19,19 @@ const { app } = require('../src/server');
 let server;
 let baseUrl;
 
+function addPanelFields(form, title) {
+  form.set('title', title);
+  form.set('body', '');
+  form.set('type', 'img');
+  form.set('duration', '8');
+  form.set('bg', '#111111');
+  form.set('starts_at', '');
+  form.set('expires_at', '');
+  form.set('days', '');
+  form.set('time_start', '');
+  form.set('time_end', '');
+}
+
 async function json(pathname, options) {
   const response = await fetch(baseUrl + pathname, {
     ...options,
@@ -69,10 +82,7 @@ test('API valida relações, entradas e impede cache de programação', async ()
 
 test('upload falso é rejeitado e removido', async () => {
   const form = new FormData();
-  form.set('title', 'Arquivo falso');
-  form.set('type', 'img');
-  form.set('duration', '8');
-  form.set('bg', '#111111');
+  addPanelFields(form, 'Arquivo falso');
   form.set('file', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'falso.png');
   const response = await fetch(baseUrl + '/api/slides', { method: 'POST', body: form });
   assert.equal(response.status, 415);
@@ -82,10 +92,7 @@ test('upload falso é rejeitado e removido', async () => {
 test('exclusão de slide também remove sua mídia', async () => {
   const png = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
   const form = new FormData();
-  form.set('title', 'Aviso');
-  form.set('type', 'img');
-  form.set('duration', '8');
-  form.set('bg', '#111111');
+  addPanelFields(form, 'Aviso');
   form.set('file', new Blob([png], { type: 'image/png' }), 'aviso.png');
   const created = await fetch(baseUrl + '/api/slides', { method: 'POST', body: form });
   assert.equal(created.status, 200);
