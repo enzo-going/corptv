@@ -26,6 +26,9 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 - HTTP Range e cache imutável para servir vídeos com eficiência
 - Validação de campos, MIME e assinatura real dos uploads
 - Remoção automática da mídia quando um slide é excluído
+- Watchdog com confirmação de falha antes de reiniciar o serviço
+- Backup diário consistente de bancos e mídias, com retenção de sete snapshots
+- Rotação automática dos logs operacionais
 
 ## Como funciona
 
@@ -134,6 +137,10 @@ corptv/
 Banco, uploads, logs e arquivos de ambiente não entram no repositório. O upload exige uma combinação permitida de extensão e MIME e também confere a assinatura binária do arquivo.
 
 O projeto não possui autenticação integrada. Use em uma rede confiável ou adicione um proxy autenticado com HTTPS antes de expor o painel e as rotas administrativas à internet. Consulte [SECURITY.md](SECURITY.md) para reportar vulnerabilidades.
+
+## Operação no Windows
+
+A pasta [`ops`](ops/) inclui o iniciador resiliente, watchdog, backup e registro das tarefas agendadas. O backup para o serviço por poucos segundos para copiar os bancos de forma consistente; as mídias imutáveis usam hardlinks NTFS, evitando duplicar gigabytes a cada dia. Consulte [ops/README.md](ops/README.md) para instalação e restauração.
 
 ## Licença
 

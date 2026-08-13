@@ -1,6 +1,6 @@
 {
   "name": "corptv",
-  "version": "1.1.2",
+  "version": "1.2.0",
   "description": "Digital signage leve para gerenciar e agendar conteúdo em TVs corporativas.",
   "main": "src/server.js",
   "scripts": {
