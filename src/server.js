@@ -11,16 +11,27 @@ const {
   slideStatus,
   validarAgendamento
 } = require('./scheduling');
+const {
+  validateGroupInput,
+  validateScreenInput,
+  validateSlideInput
+} = require('./validation');
+const {
+  acceptsUpload,
+  inspectStoredUpload,
+  removeFile,
+  uploadedPathFromUrl
+} = require('./uploads');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const STARTED_AT = Date.now();
-const uploadsDir = path.join(__dirname, '../public/uploads');
-const logDir = 'C:\\ProgramData\\CodexInstallLogs';
+const uploadsDir = path.resolve(process.env.CORPTV_UPLOADS_DIR || path.join(__dirname, '../public/uploads'));
+const logDir = path.resolve(process.env.CORPTV_LOG_DIR || path.join(__dirname, '../logs'));
 const accessLog = path.join(logDir, 'corptv-media-access.log');
 
-// Log com carimbo de tempo no stdout, que o iniciar.bat ja redireciona para
-// C:\ProgramData\CodexInstallLogs\corptv.log
+// Log com carimbo de tempo no stdout. O gerenciador do processo pode redirecionar
+// a saída; o log de mídia fica no diretório configurado por CORPTV_LOG_DIR.
 function log(level, msg, extra) {
   const line = `[${new Date().toISOString()}] ${level} ${msg}` + (extra ? ' ' + JSON.stringify(extra) : '');
   (level === 'ERRO' ? console.error : console.log)(line);
@@ -42,7 +53,21 @@ function log(level, msg, extra) {
   };
 });
 
-app.use(express.json());
+app.disable('x-powered-by');
+app.use(express.json({ limit: '100kb' }));
+app.use((req, res, next) => {
+  res.set({
+    'X-Content-Type-Options': 'nosniff',
+    'X-Frame-Options': 'SAMEORIGIN',
+    'Referrer-Policy': 'no-referrer',
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+  });
+  next();
+});
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  db.ready.then(() => next(), next);
+});
 fs.mkdirSync(uploadsDir, { recursive: true });
 fs.mkdirSync(logDir, { recursive: true });
 
@@ -84,9 +109,17 @@ const storage = multer.diskStorage({
 const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.mp4']);
 const upload = multer({
   storage,
-  limits: { fileSize: 200 * 1024 * 1024 },
+  limits: {
+    fileSize: 200 * 1024 * 1024,
+    files: 1,
+    fields: 10,
+    parts: 11,
+    fieldNameSize: 64,
+    fieldSize: 2048
+  },
   fileFilter: (req, file, cb) => {
-    if (allowedExtensions.has(path.extname(file.originalname).toLowerCase())) return cb(null, true);
+    const extension = path.extname(file.originalname).toLowerCase();
+    if (allowedExtensions.has(extension) && acceptsUpload(file)) return cb(null, true);
     const error = new Error('Formato nao permitido. Use JPG, PNG, WEBP ou MP4.');
     error.code = 'INVALID_FILE_TYPE';
     cb(error);
@@ -98,13 +131,21 @@ function handleUpload(req, res, next) {
   const up = upload.single('file');
   up(req, res, (err) => {
     if (err) {
-      if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ error: 'Arquivo muito grande. Limite: 200MB. Otimize o video antes do envio.' });
-      }
-      if (err.code === 'INVALID_FILE_TYPE') {
-        return res.status(415).json({ error: err.message });
-      }
-      return res.status(500).json({ error: 'Erro no upload: ' + err.message });
+      const respond = () => {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(413).json({ error: 'Arquivo muito grande. Limite: 200MB. Otimize o video antes do envio.' });
+        }
+        if (err.code === 'INVALID_FILE_TYPE') {
+          return res.status(415).json({ error: err.message });
+        }
+        if (err instanceof multer.MulterError) {
+          return res.status(400).json({ error: 'Upload inválido: ' + err.message });
+        }
+        return res.status(500).json({ error: 'Erro no upload: ' + err.message });
+      };
+      return Promise.resolve(req.file && removeFile(req.file.path)).catch(error => {
+        log('ERRO', 'não foi possível limpar upload rejeitado', { msg: error.message });
+      }).finally(respond);
     }
     next();
   });
@@ -117,19 +158,24 @@ app.get('/api/groups', async (req, res) => {
 });
 
 app.post('/api/groups', async (req, res) => {
-  const { name, color } = req.body;
-  if (!name) return res.status(400).json({ error: 'Nome obrigatório' });
-  const doc = { id: uuidv4(), name, color: color || '#378ADD', created_at: new Date() };
+  const fields = validateGroupInput(req.body);
+  if (fields.error) return res.status(400).json({ error: fields.error });
+  const doc = { id: uuidv4(), ...fields.value, created_at: new Date() };
   await db.groups.insert(doc);
   res.json(doc);
 });
 
 app.put('/api/groups/:id', async (req, res) => {
-  await db.groups.update({ id: req.params.id }, { $set: { name: req.body.name, color: req.body.color } });
+  const fields = validateGroupInput(req.body);
+  if (fields.error) return res.status(400).json({ error: fields.error });
+  const affected = await db.groups.update({ id: req.params.id }, { $set: fields.value });
+  if (!affected) return res.status(404).json({ error: 'Grupo não encontrado' });
   res.json({ ok: true });
 });
 
 app.delete('/api/groups/:id', async (req, res) => {
+  const group = await db.groups.findOne({ id: req.params.id });
+  if (!group) return res.status(404).json({ error: 'Grupo não encontrado' });
   const screens = await db.screens.find({ group_id: req.params.id });
   if (screens.length) return res.status(400).json({ error: 'Mova as telas antes de remover o grupo' });
   await db.gslides.remove({ group_id: req.params.id }, { multi: true });
@@ -151,41 +197,77 @@ app.get('/api/slides', async (req, res) => {
 });
 
 app.post('/api/slides', handleUpload, async (req, res) => {
-  const { title, body, type, duration, bg } = req.body;
-  if (!title && !req.file) return res.status(400).json({ error: 'Título ou arquivo obrigatório' });
+  const cleanupUpload = () => req.file && removeFile(req.file.path);
+  let uploadedType = null;
+  if (req.file) {
+    let result;
+    try {
+      result = await inspectStoredUpload(req.file.path, req.file);
+    } catch (error) {
+      await cleanupUpload();
+      throw error;
+    }
+    if (!result.ok) {
+      await cleanupUpload();
+      return res.status(415).json({ error: result.error });
+    }
+    uploadedType = result.type;
+  }
+  const fields = validateSlideInput(req.body, { hasFile: Boolean(req.file), fileType: uploadedType });
+  if (fields.error) {
+    await cleanupUpload();
+    return res.status(400).json({ error: fields.error });
+  }
   const agendamento = scheduleFromBody(req.body);
   const invalido = validarAgendamento(agendamento, req.body);
-  if (invalido) return res.status(400).json({ error: invalido });
+  if (invalido) {
+    await cleanupUpload();
+    return res.status(400).json({ error: invalido });
+  }
   const doc = {
-    id: uuidv4(), title: title || '', body: body || '',
-    type: type || 'txt', duration: parseInt(duration) || 8,
-    bg: bg || '#111111', url: req.file ? '/uploads/' + req.file.filename : null,
+    id: uuidv4(), ...fields.value,
+    url: req.file ? '/uploads/' + req.file.filename : null,
     created_at: new Date(),
     ...agendamento
   };
-  await db.slides.insert(doc);
+  try {
+    await db.slides.insert(doc);
+  } catch (error) {
+    await cleanupUpload();
+    throw error;
+  }
   res.json(doc);
 });
 
 // Edita texto/duracao e, principalmente, o agendamento de um slide ja existente
 // (ex: colocar prazo num video de evento sem precisar reenviar o arquivo).
 app.put('/api/slides/:id', async (req, res) => {
+  const current = await db.slides.findOne({ id: req.params.id });
+  if (!current) return res.status(404).json({ error: 'Slide não encontrado' });
+  const fields = validateSlideInput(req.body, { partial: true, current });
+  if (fields.error) return res.status(400).json({ error: fields.error });
   const set = scheduleFromBody(req.body);
   const invalido = validarAgendamento(set, req.body);
   if (invalido) return res.status(400).json({ error: invalido });
-  if (req.body.title !== undefined) set.title = req.body.title;
-  if (req.body.body !== undefined) set.body = req.body.body;
-  if (req.body.duration !== undefined) set.duration = parseInt(req.body.duration) || 8;
-  if (req.body.bg !== undefined) set.bg = req.body.bg;
+  Object.assign(set, fields.value);
   const affected = await db.slides.update({ id: req.params.id }, { $set: set });
-  if (!affected) return res.status(404).json({ error: 'Slide não encontrado' });
   const atualizado = await db.slides.findOne({ id: req.params.id });
   res.json({ ok: true, status: slideStatus(atualizado) });
 });
 
 app.delete('/api/slides/:id', async (req, res) => {
+  const slide = await db.slides.findOne({ id: req.params.id });
+  if (!slide) return res.status(404).json({ error: 'Slide não encontrado' });
   await db.gslides.remove({ slide_id: req.params.id }, { multi: true });
   await db.slides.remove({ id: req.params.id }, {});
+  const mediaPath = uploadedPathFromUrl(slide.url, uploadsDir);
+  if (mediaPath) {
+    try {
+      await removeFile(mediaPath);
+    } catch (error) {
+      log('ERRO', 'não foi possível remover mídia órfã', { slide: slide.id, msg: error.message });
+    }
+  }
   res.json({ ok: true });
 });
 
@@ -198,6 +280,12 @@ app.get('/api/groups/:id/slides', async (req, res) => {
 
 app.post('/api/groups/:id/slides', async (req, res) => {
   const { slide_id } = req.body;
+  const [group, slide] = await Promise.all([
+    db.groups.findOne({ id: req.params.id }),
+    db.slides.findOne({ id: slide_id })
+  ]);
+  if (!group) return res.status(404).json({ error: 'Grupo não encontrado' });
+  if (!slide) return res.status(404).json({ error: 'Slide não encontrado' });
   const exists = await db.gslides.findOne({ group_id: req.params.id, slide_id });
   if (exists) return res.status(400).json({ error: 'Slide já na playlist' });
   const all = await db.gslides.find({ group_id: req.params.id });
@@ -217,21 +305,29 @@ app.get('/api/screens', async (req, res) => {
 });
 
 app.post('/api/screens', async (req, res) => {
-  const { name, group_id } = req.body;
-  if (!name || !group_id) return res.status(400).json({ error: 'Nome e grupo obrigatórios' });
-  const slug = await db.uniqueSlug(name);
-  const doc = { id: slug, name, group_id, last_seen: null, created_at: new Date() };
+  const fields = validateScreenInput(req.body);
+  if (fields.error) return res.status(400).json({ error: fields.error });
+  const group = await db.groups.findOne({ id: fields.value.group_id });
+  if (!group) return res.status(404).json({ error: 'Grupo não encontrado' });
+  const slug = await db.uniqueSlug(fields.value.name);
+  const doc = { id: slug, ...fields.value, last_seen: null, created_at: new Date() };
   await db.screens.insert(doc);
   res.json(doc);
 });
 
 app.put('/api/screens/:id', async (req, res) => {
-  await db.screens.update({ id: req.params.id }, { $set: { name: req.body.name, group_id: req.body.group_id } });
+  const fields = validateScreenInput(req.body);
+  if (fields.error) return res.status(400).json({ error: fields.error });
+  const group = await db.groups.findOne({ id: fields.value.group_id });
+  if (!group) return res.status(404).json({ error: 'Grupo não encontrado' });
+  const affected = await db.screens.update({ id: req.params.id }, { $set: fields.value });
+  if (!affected) return res.status(404).json({ error: 'Tela não encontrada' });
   res.json({ ok: true });
 });
 
 app.delete('/api/screens/:id', async (req, res) => {
-  await db.screens.remove({ id: req.params.id }, {});
+  const removed = await db.screens.remove({ id: req.params.id }, {});
+  if (!removed) return res.status(404).json({ error: 'Tela não encontrada' });
   res.json({ ok: true });
 });
 
@@ -245,7 +341,10 @@ app.get('/api/player/:slug', async (req, res) => {
   const activeSlides = slides
     .filter(Boolean)
     .filter(slide => slideActive(slide, now))
-    .map(slide => Object.assign({}, slide, { cache_for_ms: activeForMs(slide, now) }));
+    .map(slide => Object.assign({}, slide, {
+      url: uploadedPathFromUrl(slide.url, uploadsDir) ? slide.url : null,
+      cache_for_ms: activeForMs(slide, now)
+    }));
   res.json({ screen, slides: activeSlides, server_time: now.toISOString() });
 });
 
@@ -256,16 +355,19 @@ const lastBeat = new Map();
 
 app.post('/api/heartbeat', async (req, res) => {
   const { screen_id } = req.body;
-  if (screen_id) {
-    const now = Date.now();
-    const previous = lastBeat.get(screen_id);
-    if (!previous) log('INFO', 'tela conectou', { screen: screen_id });
-    else if (now - previous > OFFLINE_MS) {
-      log('INFO', 'tela reconectou', { screen: screen_id, fora_s: Math.round((now - previous) / 1000) });
-    }
-    lastBeat.set(screen_id, now);
-    await db.screens.update({ id: screen_id }, { $set: { last_seen: new Date().toISOString() } });
+  if (!screen_id || typeof screen_id !== 'string') {
+    return res.status(400).json({ error: 'Tela obrigatória' });
   }
+  const screen = await db.screens.findOne({ id: screen_id });
+  if (!screen) return res.status(404).json({ error: 'Tela não encontrada' });
+  const now = Date.now();
+  const previous = lastBeat.get(screen_id);
+  if (!previous) log('INFO', 'tela conectou', { screen: screen_id });
+  else if (now - previous > OFFLINE_MS) {
+    log('INFO', 'tela reconectou', { screen: screen_id, fora_s: Math.round((now - previous) / 1000) });
+  }
+  lastBeat.set(screen_id, now);
+  await db.screens.update({ id: screen_id }, { $set: { last_seen: new Date().toISOString() } });
   res.json({ ok: true, ts: Date.now() });
 });
 
@@ -358,31 +460,56 @@ app.use((err, req, res, next) => {
      .json({ error: doCliente ? (err.message || 'Requisição inválida') : 'Erro interno no servidor' });
 });
 
-const server = app.listen(PORT, () => {
-  log('INFO', 'CorporTV iniciado', { porta: PORT, pid: process.pid });
-  console.log(`\n🖥️  CorporTV rodando em http://localhost:${PORT}`);
-  console.log(`   Painel : http://localhost:${PORT}/painel`);
-  console.log(`   Player : http://localhost:${PORT}/player/<slug-da-tela>\n`);
-});
+let server = null;
+
+function startServer(port = PORT) {
+  if (server) return server;
+  server = app.listen(port, () => {
+    const actualPort = server.address().port;
+    log('INFO', 'CorporTV iniciado', { porta: actualPort, pid: process.pid });
+    console.log(`\n🖥️  CorporTV rodando em http://localhost:${actualPort}`);
+    console.log(`   Painel : http://localhost:${actualPort}/painel`);
+    console.log(`   Player : http://localhost:${actualPort}/player/<slug-da-tela>\n`);
+  });
+  return server;
+}
 
 // Encerramento gracioso: para de aceitar conexoes e deixa as respostas em
 // andamento terminarem antes de sair (evita cortar o download de um video).
-function shutdown(signal) {
+function shutdown(signal, exitProcess = true) {
   log('INFO', 'encerrando', { signal });
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 10000).unref();
+  if (!server) {
+    db.stopMaintenance();
+    if (exitProcess) process.exit(0);
+    return;
+  }
+  server.close(() => {
+    server = null;
+    db.stopMaintenance();
+    if (exitProcess) process.exit(0);
+  });
+  if (exitProcess) setTimeout(() => process.exit(0), 10000).unref();
 }
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Rede de seguranca. Com as rotas ja encaminhando erros para o middleware
 // acima, cair aqui indica falha inesperada: registra e sai com codigo != 0
 // para a tarefa agendada reiniciar o servico em vez de ficar num estado ruim.
-process.on('unhandledRejection', reason => {
-  log('ERRO', 'unhandledRejection', { msg: reason && reason.message ? reason.message : String(reason) });
-});
-process.on('uncaughtException', err => {
-  log('ERRO', 'uncaughtException - encerrando para reiniciar', { msg: err.message });
-  console.error(err.stack);
-  process.exit(1);
-});
+function registerProcessHandlers() {
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+  process.on('unhandledRejection', reason => {
+    log('ERRO', 'unhandledRejection', { msg: reason && reason.message ? reason.message : String(reason) });
+  });
+  process.on('uncaughtException', err => {
+    log('ERRO', 'uncaughtException - encerrando para reiniciar', { msg: err.message });
+    console.error(err.stack);
+    process.exit(1);
+  });
+}
+
+if (require.main === module) {
+  startServer();
+  registerProcessHandlers();
+}
+
+module.exports = { app, shutdown, startServer };

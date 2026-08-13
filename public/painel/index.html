@@ -263,6 +263,9 @@ let pendingFile=null;
 const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade80',msg:'#6c63ff',aviso:'#f87171'};
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function esc(value){return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
+function safeColor(value,fallback='#333333'){return /^#[0-9a-f]{6}$/i.test(value||'')?value:fallback}
+function safeMediaUrl(value){return /^\/uploads\/[0-9a-f-]+\.(?:jpe?g|png|webp|mp4)$/i.test(value||'')?value:''}
 function goTo(p,btn){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
@@ -380,18 +383,19 @@ function renderSlides(){
   const el=document.getElementById('slide-list');
   if(!slides.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum slide ainda.</div>';return;}
   el.innerHTML=slides.map(s=>{
-    const thumb=s.url?(s.type==='vid'?`<video src="${s.url}" style="width:100%;height:100%;object-fit:cover"></video>`:`<img src="${s.url}" style="width:100%;height:100%;object-fit:cover">`):
-      `<div style="background:${s.bg||'#111'};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,.4)">${s.type}</div>`;
+    const media=safeMediaUrl(s.url);
+    const thumb=media?(s.type==='vid'?`<video src="${esc(media)}" style="width:100%;height:100%;object-fit:cover"></video>`:`<img src="${esc(media)}" alt="" style="width:100%;height:100%;object-fit:cover">`):
+      `<div style="background:${safeColor(s.bg,'#111111')};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,.4)">${esc(s.type)}</div>`;
     const st=s.status||{active:true};
     const estado=st.active
       ? '<span class="state state-on">● No ar</span>'
-      : `<span class="state state-off">● Oculto — ${st.detail||'fora da programação'}</span>`;
-    const regra=isScheduled(s)?`<span class="sched-badge">⏱ ${scheduleLabel(s)}</span>`:'';
-    const meta=[s.body||'',s.duration+'s'].filter(Boolean).join(' · ');
+      : `<span class="state state-off">● Oculto — ${esc(st.detail||'fora da programação')}</span>`;
+    const regra=isScheduled(s)?`<span class="sched-badge">⏱ ${esc(scheduleLabel(s))}</span>`:'';
+    const meta=[s.body||'',s.duration+'s'].filter(Boolean).map(esc).join(' · ');
     return `<div class="item${st.active?'':' item-off'}">
       <div class="item-thumb">${thumb}</div>
       <div class="item-info">
-        <div class="item-name">${s.title||'Sem título'}${regra}</div>
+        <div class="item-name">${esc(s.title||'Sem título')}${regra}</div>
         <div class="item-meta">${estado}${meta?' · '+meta:''}</div>
       </div>
       <div class="item-actions">
@@ -401,7 +405,7 @@ function renderSlides(){
     </div>`;
   }).join('');
 }
-async function delSlide(id){await api('DELETE','/api/slides/'+id);await load();toast('Slide removido')}
+async function delSlide(id){if(!confirm('Remover este slide e sua mídia?'))return;await api('DELETE','/api/slides/'+id);await load();toast('Slide removido')}
 
 // ── AGENDAMENTO (prazo / dias / horario por slide) ──────────
 const WEEKDAYS=[{v:1,l:'Seg'},{v:2,l:'Ter'},{v:3,l:'Qua'},{v:4,l:'Qui'},{v:5,l:'Sex'},{v:6,l:'Sáb'},{v:0,l:'Dom'}];
@@ -551,7 +555,8 @@ function clearSched(){
 async function addGroup(){
   const name=document.getElementById('gr-name').value.trim();
   if(!name){toast('Digite o nome do grupo');return;}
-  await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
+  const result=await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
+  if(result.error){toast(result.error);return;}
   document.getElementById('gr-name').value='';
   await load();toast('Grupo criado!');
 }
@@ -567,11 +572,11 @@ async function renderGroups(){
   const pls=await Promise.all(groups.map(g=>api('GET','/api/groups/'+g.id+'/slides')));
   el.innerHTML=groups.map((g,i)=>{
     const pl=pls[i];
-    const pills=slides.map(s=>`<span class="pill ${pl.find(p=>p.id===s.id)?'on':''}" onclick="toggleSlide('${g.id}','${s.id}')"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${s.title||s.type}</span>`).join('');
-    const plPills=pl.map(s=>`<span class="pill on"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${s.title} <span style="opacity:.5">${s.duration}s</span></span>`).join('');
+    const pills=slides.map(s=>`<span class="pill ${pl.find(p=>p.id===s.id)?'on':''}" onclick="toggleSlide('${g.id}','${s.id}')"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${esc(s.title||s.type)}</span>`).join('');
+    const plPills=pl.map(s=>`<span class="pill on"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${esc(s.title||'Sem título')} <span style="opacity:.5">${esc(s.duration)}s</span></span>`).join('');
     return `<div class="card">
       <div class="card-row" style="margin-bottom:14px">
-        <div class="flex-gap"><span class="cdot" style="background:${g.color}"></span><span class="card-title">${g.name}</span></div>
+        <div class="flex-gap"><span class="cdot" style="background:${safeColor(g.color)}"></span><span class="card-title">${esc(g.name)}</span></div>
         <button class="btn btn-danger btn-sm" onclick="delGroup('${g.id}')">Remover</button>
       </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Clique para adicionar à playlist:</div>
@@ -583,6 +588,7 @@ async function renderGroups(){
   }).join('');
 }
 async function delGroup(id){
+  if(!confirm('Remover este grupo?'))return;
   const r=await api('DELETE','/api/groups/'+id);
   if(r.error){toast(r.error);return;}
   await load();toast('Grupo removido');
@@ -593,7 +599,8 @@ async function addScreen(){
   const name=document.getElementById('sc-name').value.trim();
   const group_id=document.getElementById('sc-group').value;
   if(!name||!group_id){toast('Nome e grupo são obrigatórios');return;}
-  await api('POST','/api/screens',{name,group_id});
+  const result=await api('POST','/api/screens',{name,group_id});
+  if(result.error){toast(result.error);return;}
   document.getElementById('sc-name').value='';
   document.getElementById('slug-preview').style.display='none';
   await load();toast('Tela adicionada!');
@@ -601,7 +608,7 @@ async function addScreen(){
 async function renderScreens(){
   const el=document.getElementById('screen-list');
   const sel=document.getElementById('sc-group');
-  sel.innerHTML=groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  sel.innerHTML=groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
   if(!screens.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhuma tela cadastrada.</div>';return;}
   const origin=publicOrigin();
   el.innerHTML=screens.map(s=>{
@@ -612,7 +619,7 @@ async function renderScreens(){
       <div class="card-row">
         <div class="flex-gap">
           <span class="online-dot ${online?'on':'off'}"></span>
-          <div><div class="card-title">${s.name}</div><div class="card-sub">${g?g.name:'Sem grupo'}</div></div>
+          <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(g?g.name:'Sem grupo')}</div></div>
         </div>
         <div class="flex-gap">
           <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
@@ -622,14 +629,14 @@ async function renderScreens(){
       <div class="sep" style="margin:12px 0"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
       <div class="url-box">
-        <span>${playerUrl}</span>
+        <span>${esc(playerUrl)}</span>
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}')">Copiar</button>
         <a href="${playerUrl}" target="_blank" class="btn btn-ghost btn-sm">Abrir</a>
       </div>
     </div>`;
   }).join('');
 }
-async function delScreen(id){await api('DELETE','/api/screens/'+id);await load();toast('Tela removida')}
+async function delScreen(id){if(!confirm('Remover esta tela?'))return;await api('DELETE','/api/screens/'+id);await load();toast('Tela removida')}
 function copyUrl(url){navigator.clipboard.writeText(url);toast('URL copiada!')}
 
 // DASHBOARD
@@ -643,14 +650,14 @@ async function renderDash(){
   el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+screens.map(s=>{
     const g=groups.find(g=>g.id===s.group_id);
     const online=s.last_seen&&(Date.now()-new Date(s.last_seen).getTime())<60000;
-    return `<div class="card" style="border-left:3px solid ${g?.color||'#333'}">
+    return `<div class="card" style="border-left:3px solid ${safeColor(g?.color)}">
       <div class="card-row">
-        <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${s.name}</span></div>
+        <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${esc(s.name)}</span></div>
         <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
       </div>
-      <div class="card-sub mt8">${g?g.name:'Sem grupo'}</div>
+      <div class="card-sub mt8">${esc(g?g.name:'Sem grupo')}</div>
       <div class="url-box mt8" style="font-size:11px">
-        <span>${origin}/player/${s.id}</span>
+        <span>${esc(origin+'/player/'+s.id)}</span>
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}')">Copiar</button>
       </div>
     </div>`;
@@ -668,14 +675,14 @@ async function renderProgramacao(){
   el.innerHTML='<div class="page-title" style="font-size:15px;margin:24px 0 10px">Programação agora</div>'+
     prog.map(t=>{
       const noAr=t.no_ar.length
-            ? t.no_ar.map(i=>`<div class="prog-line"><span class="tag tag-on">programado</span><span>${i.title}</span></div>`).join('')
+            ? t.no_ar.map(i=>`<div class="prog-line"><span class="tag tag-on">programado</span><span>${esc(i.title)}</span></div>`).join('')
             : '<div class="prog-line" style="color:var(--danger)"><span class="tag tag-off">vazio</span><span>Nenhum conteúdo programado para esta tela</span></div>';
       const ocultos=t.ocultos.map(i=>
-        `<div class="prog-line"><span class="tag tag-off">oculto</span><span>${i.title} — ${i.status.detail||'fora da programação'}</span></div>`).join('');
+        `<div class="prog-line"><span class="tag tag-off">oculto</span><span>${esc(i.title)} — ${esc(i.status.detail||'fora da programação')}</span></div>`).join('');
       return `<div class="prog-screen">
         <div class="card-row">
-          <div class="flex-gap"><span class="online-dot ${t.online?'on':'off'}"></span><span class="card-title">${t.screen_name}</span></div>
-          <span class="card-sub">${t.group_name}</span>
+          <div class="flex-gap"><span class="online-dot ${t.online?'on':'off'}"></span><span class="card-title">${esc(t.screen_name)}</span></div>
+          <span class="card-sub">${esc(t.group_name)}</span>
         </div>
         ${noAr}${ocultos}
       </div>`;
