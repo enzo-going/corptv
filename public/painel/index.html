@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CorporTV — Painel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:#0e0e10;--bg2:#18181c;--bg3:#222228;
+    --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+    --text:#e8e8ea;--muted:#888890;
+    --accent:#6c63ff;--accent2:#4ade80;
+    --danger:#f87171;--warning:#fbbf24;
+    --radius:10px;--radius-lg:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  .shell{display:flex;height:100vh;overflow:hidden}
+  .sidebar{width:220px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
+  .logo{padding:24px 20px 16px;font-size:16px;font-weight:600;letter-spacing:.5px;display:flex;align-items:center;gap:8px}
+  .logo span{font-size:10px;color:var(--muted);font-weight:400;letter-spacing:1.5px;text-transform:uppercase;display:block}
+  .nav{flex:1;padding:8px}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;color:var(--muted);cursor:pointer;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left}
+  .nav-item:hover{background:var(--bg3);color:var(--text)}
+  .nav-item.active{background:rgba(108,99,255,.15);color:var(--accent)}
+  .nav-item svg{width:16px;height:16px;flex-shrink:0}
+  .main{flex:1;overflow-y:auto}
+  .page{display:none;padding:28px 32px;max-width:960px}
+  .page.active{display:block}
+  .page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+  .page-title{font-size:20px;font-weight:600}
+  .page-sub{font-size:13px;color:var(--muted);margin-top:2px}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;margin-bottom:12px}
+  .card-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .card-title{font-size:14px;font-weight:500}
+  .card-sub{font-size:12px;color:var(--muted);margin-top:2px}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .form-full{grid-column:span 2}
+  label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase}
+  input[type=text],input[type=number],input[type=datetime-local],input[type=time],select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s}
+  input[type=datetime-local]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{filter:invert(.7)}
+  input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+  select option{background:var(--bg3)}
+  input[type=color]{padding:3px;height:36px;cursor:pointer}
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:13px;font-family:inherit;font-weight:500;cursor:pointer;border:none;transition:all .15s}
+  .btn-primary{background:var(--accent);color:#fff}
+  .btn-primary:hover{opacity:.88}
+  .btn-ghost{background:var(--bg3);color:var(--muted);border:1px solid var(--border)}
+  .btn-ghost:hover{color:var(--text);border-color:var(--border2)}
+  .btn-danger{background:rgba(248,113,113,.12);color:var(--danger);border:1px solid rgba(248,113,113,.2)}
+  .btn-danger:hover{background:rgba(248,113,113,.2)}
+  .btn-sm{padding:5px 10px;font-size:12px}
+  .btn-icon{padding:6px;border-radius:6px}
+  .badge{font-size:11px;padding:2px 8px;border-radius:20px;font-weight:500;display:inline-flex;align-items:center;gap:4px}
+  .badge-online{background:rgba(74,222,128,.12);color:var(--accent2)}
+  .badge-offline{background:rgba(255,255,255,.05);color:var(--muted)}
+  .item-list{display:flex;flex-direction:column;gap:6px}
+  .item{display:flex;align-items:center;gap:12px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 14px}
+  .item-thumb{width:52px;height:32px;border-radius:6px;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+  .item-thumb img,.item-thumb video{width:100%;height:100%;object-fit:cover}
+  .item-info{flex:1;min-width:0}
+  .item-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item-meta{font-size:11px;color:var(--muted);margin-top:2px}
+  .item-actions{display:flex;gap:6px;flex-shrink:0}
+  .pill-area{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:8px;background:var(--bg);border:1px dashed var(--border2);border-radius:8px;margin-top:8px}
+  .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;transition:all .15s}
+  .pill:hover{border-color:var(--border2);color:var(--text)}
+  .pill.on{background:rgba(108,99,255,.15);border-color:rgba(108,99,255,.4);color:var(--accent)}
+  .pill-dot{width:6px;height:6px;border-radius:50%}
+  .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+  .stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+  .stat-val{font-size:24px;font-weight:600}
+  .stat-label{font-size:11px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
+  .url-box{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-family:'DM Mono',monospace}
+  .url-box span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent2)}
+  .slug-box{display:flex;align-items:center;gap:6px;background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:6px 12px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent);margin-top:6px}
+  .dropzone{border:1.5px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s}
+  .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:rgba(108,99,255,.05)}
+  .dropzone input{display:none}
+  .cdot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .online-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+  .online-dot.on{background:var(--accent2)}
+  .online-dot.off{background:var(--border2)}
+  #toast{position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13px;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;z-index:999}
+  #toast.show{opacity:1;transform:translateY(0)}
+  .sep{height:1px;background:var(--border);margin:20px 0}
+  .mt8{margin-top:8px}
+  .flex-gap{display:flex;gap:8px;align-items:center}
+  .preview-img{margin-top:8px;border-radius:8px;overflow:hidden;max-height:120px;background:#000;display:flex;align-items:center;justify-content:center}
+  details.sched{grid-column:span 2;margin-top:4px;border-top:1px solid var(--border);padding-top:12px}
+  details.sched summary{cursor:pointer;font-size:12px;color:var(--muted);list-style:none;user-select:none}
+  details.sched summary::-webkit-details-marker{display:none}
+  details.sched[open] summary{color:var(--text)}
+  .days-row{display:flex;flex-wrap:wrap;gap:6px}
+  .day{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--text);text-transform:none;letter-spacing:0;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:6px 10px;cursor:pointer;margin:0}
+  .day input{width:auto;margin:0;accent-color:var(--accent)}
+  .sched-badge{font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(251,191,36,.14);color:var(--warning);margin-left:8px;vertical-align:middle}
+  .state{font-size:11px;font-weight:500}
+  .state-on{color:var(--accent2)}
+  .state-off{color:var(--warning)}
+  .item-off{opacity:.62}
+  .sched-hint{font-size:12px;line-height:1.5;border-radius:8px;padding:10px 12px;margin-top:10px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)}
+  .sched-hint.bad{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:var(--danger)}
+  .sched-hint.warn{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:var(--warning)}
+  .sched-hint b{color:var(--text);font-weight:500}
+  .prog-screen{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:8px}
+  .prog-line{font-size:12px;color:var(--muted);margin-top:6px;display:flex;gap:8px;align-items:flex-start}
+  .prog-line .tag{flex-shrink:0;font-size:10px;padding:1px 7px;border-radius:5px;margin-top:1px}
+  .tag-on{background:rgba(74,222,128,.14);color:var(--accent2)}
+  .tag-off{background:rgba(251,191,36,.14);color:var(--warning)}
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500;padding:20px}
+  .modal-back.show{display:flex}
+  .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:24px;width:min(560px,92vw);max-height:90vh;overflow:auto}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="sidebar">
+    <div class="logo">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <div>CorporTV<span>Painel de gestão</span></div>
+    </div>
+    <nav class="nav">
+      <button class="nav-item active" onclick="goTo('dash',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Visão geral
+      </button>
+      <button class="nav-item" onclick="goTo('slides',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 12h10M7 8h10M7 16h6"/></svg>Slides
+      </button>
+      <button class="nav-item" onclick="goTo('grupos',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/></svg>Grupos
+      </button>
+      <button class="nav-item" onclick="goTo('telas',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Telas
+      </button>
+    </nav>
+  </aside>
+
+  <main class="main">
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dash">
+      <div class="page-header"><div><div class="page-title">Visão geral</div><div class="page-sub">Status do sistema em tempo real</div></div></div>
+      <div class="stats-row">
+        <div class="stat"><div class="stat-val" id="st-slides">—</div><div class="stat-label">Slides</div></div>
+        <div class="stat"><div class="stat-val" id="st-grupos">—</div><div class="stat-label">Grupos</div></div>
+        <div class="stat"><div class="stat-val" id="st-telas">—</div><div class="stat-label">Telas</div></div>
+      </div>
+      <div id="dash-screens"></div>
+      <div id="dash-prog"></div>
+    </div>
+
+    <!-- SLIDES -->
+    <div class="page" id="page-slides">
+      <div class="page-header"><div><div class="page-title">Slides</div><div class="page-sub">Biblioteca de conteúdo</div></div></div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px">Novo slide</div>
+        <div class="form-grid">
+          <div><label>Tipo</label>
+            <select id="sl-type" onchange="slTypeChange()">
+              <option value="txt">Texto</option>
+              <option value="img">Imagem</option>
+              <option value="vid">Vídeo</option>
+            </select>
+          </div>
+          <div><label>Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300"></div>
+          <div class="form-full"><label>Título</label><input type="text" id="sl-title" placeholder="Ex: Bom dia, equipe!"></div>
+          <div class="form-full" id="sl-body-wrap"><label>Texto</label><input type="text" id="sl-body" placeholder="Ex: Reunião às 14h"></div>
+          <div class="form-full" id="sl-file-wrap" style="display:none">
+            <label>Arquivo</label>
+            <label class="dropzone" id="sl-dropzone" ondragover="doDragOver(event)" ondragleave="doDragLeave()" ondrop="doDrop(event)">
+              <input type="file" id="sl-file" accept="image/*,video/*" onchange="onFile(this)">
+              <div style="font-size:28px;margin-bottom:8px">⬆</div>
+              <div style="font-size:13px;color:var(--muted)">Clique ou arraste uma imagem ou vídeo</div>
+            </label>
+            <div id="sl-preview" class="preview-img" style="display:none"></div>
+            <button class="btn btn-danger btn-sm" id="sl-cancel" style="display:none;margin-top:8px" onclick="cancelFile()">✕ Cancelar arquivo</button>
+          </div>
+          <div><label>Cor de fundo</label>
+            <select id="sl-bg">
+              <option value="#0a0a1a">Azul escuro</option>
+              <option value="#0a1a12">Verde escuro</option>
+              <option value="#1a0a0a">Vermelho escuro</option>
+              <option value="#1a1a2e">Roxo escuro</option>
+              <option value="#111111">Preto</option>
+            </select>
+          </div>
+          <details class="sched">
+            <summary>⏱ Agendamento (opcional) — prazo, dias e horários</summary>
+            <div class="form-grid" style="margin-top:12px">
+              <div><label>Exibir a partir de</label><input type="datetime-local" id="nsl-starts"></div>
+              <div><label>Expira em</label><input type="datetime-local" id="nsl-expires"></div>
+              <div class="form-full"><label>Dias da semana</label><div id="nsl-days" class="days-row"></div></div>
+              <div><label>Horário — início</label><input type="time" id="nsl-tstart"></div>
+              <div><label>Horário — fim</label><input type="time" id="nsl-tend"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:6px">Deixe em branco para exibir sempre. Sem dias marcados = todos os dias. Se o horário virar a noite, marque o dia em que ele começa.</div>
+          </details>
+        </div>
+        <button class="btn btn-primary" onclick="addSlide()">Adicionar slide</button>
+      </div>
+      <div id="slide-list" class="item-list"></div>
+    </div>
+
+    <!-- GRUPOS -->
+    <div class="page" id="page-grupos">
+      <div class="page-header"><div><div class="page-title">Grupos</div><div class="page-sub">Configure playlists por grupo de telas</div></div></div>
+      <div class="card">
+        <div class="form-grid">
+          <div><label>Nome do grupo</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
+          <div><label>Cor</label><input type="color" id="gr-color" value="#6c63ff"></div>
+        </div>
+        <button class="btn btn-primary" onclick="addGroup()">Criar grupo</button>
+      </div>
+      <div id="group-list"></div>
+    </div>
+
+    <!-- TELAS -->
+    <div class="page" id="page-telas">
+      <div class="page-header"><div><div class="page-title">Telas</div><div class="page-sub">Smart TVs e dispositivos cadastrados</div></div></div>
+      <div class="card">
+        <div class="form-grid">
+          <div><label>Nome da tela</label><input type="text" id="sc-name" placeholder="Ex: Recepção Principal" oninput="previewSlug(this.value)"></div>
+          <div><label>Grupo</label><select id="sc-group"></select></div>
+        </div>
+        <div id="slug-preview" style="display:none" class="slug-box">
+          <span style="color:var(--muted)">URL:</span>
+          <span id="slug-preview-text"></span>
+        </div>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="addScreen()">Adicionar tela</button>
+      </div>
+      <div id="screen-list"></div>
+    </div>
+  </main>
+</div>
+
+<div class="modal-back" id="sched-modal">
+  <div class="modal">
+    <div class="card-title" style="margin-bottom:2px">Agendar slide</div>
+    <div class="card-sub" id="ed-slide-name" style="margin-bottom:16px"></div>
+    <div class="form-grid">
+      <div><label>Exibir a partir de</label><input type="datetime-local" id="ed-starts"></div>
+      <div><label>Expira em</label><input type="datetime-local" id="ed-expires"></div>
+      <div class="form-full"><label>Dias da semana</label><div id="ed-days" class="days-row"></div></div>
+      <div><label>Horário — início</label><input type="time" id="ed-tstart"></div>
+      <div><label>Horário — fim</label><input type="time" id="ed-tend"></div>
+    </div>
+    <div id="ed-hint" class="sched-hint"></div>
+    <div style="font-size:11px;color:var(--muted);margin:8px 0 18px">Deixe em branco para exibir sempre. Sem dias marcados = todos os dias. Se o horário virar a noite, marque o dia em que ele começa.</div>
+    <div class="flex-gap" style="justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeSched()">Cancelar</button>
+      <button class="btn btn-danger" onclick="clearSched()">Limpar agendamento</button>
+      <button class="btn btn-primary" onclick="saveSched()">Salvar</button>
+    </div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+const BASE='';
+let slides=[],groups=[],screens=[];
+let pendingFile=null;
+const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade80',msg:'#6c63ff',aviso:'#f87171'};
+
+function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function goTo(p,btn){
+  document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  btn.classList.add('active');
+  if(p==='dash')renderDash();
+}
+async function api(method,url,body,isForm=false){
+  const opts={method,headers:{}};
+  if(body&&!isForm){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
+  else if(isForm){opts.body=body;}
+  const r=await fetch(BASE+url,opts);return r.json();
+}
+// O painel recarrega sozinho a cada 30s. Se o servidor estiver reiniciando
+// (deploy, queda), avisa em vez de estourar erro no console e mantém a tela
+// com os últimos dados; a próxima passagem se recupera sozinha.
+async function load(){
+  try{
+    [slides,groups,screens]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens')]);
+  }catch(e){
+    toast('Sem conexão com o servidor — tentando de novo em 30s');
+    return;
+  }
+  renderSlides();renderGroups();renderScreens();renderDash();
+}
+
+// slug preview ao digitar nome da tela
+function toSlug(name){
+  return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-');
+}
+const NETWORK_ORIGIN=location.origin;
+function publicOrigin(){
+  return ['localhost','127.0.0.1','::1'].includes(location.hostname) ? NETWORK_ORIGIN : location.origin;
+}
+function previewSlug(name){
+  const el=document.getElementById('slug-preview');
+  const txt=document.getElementById('slug-preview-text');
+  if(!name){el.style.display='none';return;}
+  const slug=toSlug(name);
+  txt.textContent=publicOrigin()+'/player/'+slug;
+  el.style.display='flex';
+}
+
+// SLIDES
+function slTypeChange(){
+  const t=document.getElementById('sl-type').value;
+  document.getElementById('sl-file-wrap').style.display=t!=='txt'?'block':'none';
+  document.getElementById('sl-body-wrap').style.display=t==='txt'?'block':'none';
+  document.getElementById('sl-dur').value=t==='vid'?'0':'8';
+  if(t==='txt') cancelFile();
+}
+
+function cancelFile(){
+  pendingFile=null;
+  const preview=document.getElementById('sl-preview');
+  preview.style.display='none';
+  preview.innerHTML='';
+  document.getElementById('sl-cancel').style.display='none';
+  document.getElementById('sl-file').value='';
+}
+function doDragOver(e){e.preventDefault();document.getElementById('sl-dropzone').classList.add('drag')}
+function doDragLeave(){document.getElementById('sl-dropzone').classList.remove('drag')}
+function doDrop(e){e.preventDefault();doDragLeave();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])}
+function onFile(inp){if(inp.files[0])handleFile(inp.files[0])}
+function handleFile(f){
+  pendingFile=f;
+  const url=URL.createObjectURL(f);
+  const wrap=document.getElementById('sl-preview');
+  wrap.style.display='flex';
+  wrap.innerHTML=f.type.startsWith('video')?`<video src="${url}" style="max-height:120px" controls></video>`:`<img src="${url}" style="max-height:120px;object-fit:contain">`;
+  document.getElementById('sl-cancel').style.display='inline-flex';
+  document.getElementById('sl-type').value=f.type.startsWith('video')?'vid':'img';
+  slTypeChange();
+  // não chamar slTypeChange pra não limpar o arquivo
+  document.getElementById('sl-file-wrap').style.display='block';
+  document.getElementById('sl-body-wrap').style.display='none';
+}
+async function addSlide(){
+  const type=document.getElementById('sl-type').value;
+  const title=document.getElementById('sl-title').value.trim();
+  const body=document.getElementById('sl-body').value.trim();
+  const dur=document.getElementById('sl-dur').value;
+  const bg=document.getElementById('sl-bg').value;
+  if(!title&&!pendingFile){toast('Adicione um título ou arquivo');return;}
+
+  const btn=document.querySelector('[onclick="addSlide()"]');
+  btn.disabled=true;
+  btn.textContent=pendingFile?'Enviando arquivo...':'Adicionando...';
+
+  try{
+    const fd=new FormData();
+    fd.append('title',title);fd.append('body',body);fd.append('type',type);fd.append('duration',dur);fd.append('bg',bg);
+    fd.append('starts_at',document.getElementById('nsl-starts').value||'');
+    fd.append('expires_at',document.getElementById('nsl-expires').value||'');
+    fd.append('days',getDays('nsl-days'));
+    fd.append('time_start',document.getElementById('nsl-tstart').value||'');
+    fd.append('time_end',document.getElementById('nsl-tend').value||'');
+    if(pendingFile)fd.append('file',pendingFile);
+    const r=await fetch('/api/slides',{method:'POST',body:fd});
+    const data=await r.json();
+    if(data.error){toast('Erro: '+data.error);return;}
+    document.getElementById('sl-title').value='';
+    document.getElementById('sl-body').value='';
+    resetScheduleForm();
+    cancelFile();
+    await load();toast('Slide adicionado!');
+  }catch(e){
+    toast('Erro ao enviar. Verifique o servidor.');
+  }finally{
+    btn.disabled=false;
+    btn.textContent='Adicionar slide';
+  }
+}
+function renderSlides(){
+  const el=document.getElementById('slide-list');
+  if(!slides.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum slide ainda.</div>';return;}
+  el.innerHTML=slides.map(s=>{
+    const thumb=s.url?(s.type==='vid'?`<video src="${s.url}" style="width:100%;height:100%;object-fit:cover"></video>`:`<img src="${s.url}" style="width:100%;height:100%;object-fit:cover">`):
+      `<div style="background:${s.bg||'#111'};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,.4)">${s.type}</div>`;
+    const st=s.status||{active:true};
+    const estado=st.active
+      ? '<span class="state state-on">● No ar</span>'
+      : `<span class="state state-off">● Oculto — ${st.detail||'fora da programação'}</span>`;
+    const regra=isScheduled(s)?`<span class="sched-badge">⏱ ${scheduleLabel(s)}</span>`:'';
+    const meta=[s.body||'',s.duration+'s'].filter(Boolean).join(' · ');
+    return `<div class="item${st.active?'':' item-off'}">
+      <div class="item-thumb">${thumb}</div>
+      <div class="item-info">
+        <div class="item-name">${s.title||'Sem título'}${regra}</div>
+        <div class="item-meta">${estado}${meta?' · '+meta:''}</div>
+      </div>
+      <div class="item-actions">
+        <button class="btn btn-ghost btn-sm" onclick="openSched('${s.id}')">Agendar</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function delSlide(id){await api('DELETE','/api/slides/'+id);await load();toast('Slide removido')}
+
+// ── AGENDAMENTO (prazo / dias / horario por slide) ──────────
+const WEEKDAYS=[{v:1,l:'Seg'},{v:2,l:'Ter'},{v:3,l:'Qua'},{v:4,l:'Qui'},{v:5,l:'Sex'},{v:6,l:'Sáb'},{v:0,l:'Dom'}];
+let schedEditId=null;
+function fillDays(containerId){
+  document.getElementById(containerId).innerHTML=WEEKDAYS.map(d=>
+    `<label class="day"><input type="checkbox" value="${d.v}">${d.l}</label>`).join('');
+}
+function getDays(containerId){
+  return Array.from(document.querySelectorAll('#'+containerId+' input:checked')).map(c=>c.value).join(',');
+}
+function setDays(containerId,days){
+  const set=new Set((days||[]).map(String));
+  document.querySelectorAll('#'+containerId+' input').forEach(c=>{c.checked=set.has(c.value);});
+}
+function toLocalInput(iso){
+  if(!iso)return '';
+  const d=new Date(iso);
+  if(isNaN(d.getTime()))return '';
+  const p=n=>String(n).padStart(2,'0');
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+}
+function fmtDate(iso){
+  const d=new Date(iso);
+  if(isNaN(d.getTime()))return '';
+  const p=n=>String(n).padStart(2,'0');
+  return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
+function daysLabel(days){
+  const order=[1,2,3,4,5,6,0];
+  const map={0:'Dom',1:'Seg',2:'Ter',3:'Qua',4:'Qui',5:'Sex',6:'Sáb'};
+  return order.filter(d=>days.indexOf(d)!==-1).map(d=>map[d]).join('/');
+}
+function isScheduled(s){
+  return !!(s.starts_at||s.expires_at||(s.days&&s.days.length)||(s.time_start&&s.time_end));
+}
+function scheduleLabel(s){
+  const parts=[];
+  if(s.starts_at)parts.push('de '+fmtDate(s.starts_at));
+  if(s.expires_at)parts.push('até '+fmtDate(s.expires_at));
+  if(s.days&&s.days.length)parts.push(daysLabel(s.days));
+  if(s.time_start&&s.time_end)parts.push(s.time_start+'–'+s.time_end);
+  return parts.join(' · ');
+}
+function resetScheduleForm(){
+  document.getElementById('nsl-starts').value='';
+  document.getElementById('nsl-expires').value='';
+  document.getElementById('nsl-tstart').value='';
+  document.getElementById('nsl-tend').value='';
+  setDays('nsl-days',[]);
+}
+function openSched(id){
+  const s=slides.find(x=>x.id===id);
+  if(!s)return;
+  schedEditId=id;
+  document.getElementById('ed-slide-name').textContent=s.title||(s.type==='vid'?'Vídeo':s.type==='img'?'Imagem':'Slide sem título');
+  document.getElementById('ed-starts').value=toLocalInput(s.starts_at);
+  document.getElementById('ed-expires').value=toLocalInput(s.expires_at);
+  document.getElementById('ed-tstart').value=s.time_start||'';
+  document.getElementById('ed-tend').value=s.time_end||'';
+  setDays('ed-days',s.days||[]);
+  document.getElementById('sched-modal').classList.add('show');
+  updateSchedHint();
+}
+function closeSched(){document.getElementById('sched-modal').classList.remove('show');schedEditId=null;}
+
+// Lê o formulário do modal
+function schedForm(){
+  return {
+    starts_at:document.getElementById('ed-starts').value||'',
+    expires_at:document.getElementById('ed-expires').value||'',
+    days:getDays('ed-days'),
+    time_start:document.getElementById('ed-tstart').value||'',
+    time_end:document.getElementById('ed-tend').value||''
+  };
+}
+
+// Mesmas regras do servidor (validarAgendamento). Aqui servem só para avisar
+// antes de salvar; quem decide de verdade continua sendo o servidor.
+function schedProblema(b){
+  if(b.starts_at&&b.expires_at){
+    const i=new Date(b.starts_at),f=new Date(b.expires_at);
+    if(f<i)return 'A expiração é anterior ao início — o slide nunca apareceria.';
+    if(f.getTime()===i.getTime())return 'Início e expiração iguais — o slide nunca apareceria.';
+  }
+  if(b.time_start&&!b.time_end)return 'Falta o horário de fim.';
+  if(b.time_end&&!b.time_start)return 'Falta o horário de início.';
+  if(b.time_start&&b.time_end&&b.time_start===b.time_end)return 'Horário de início e fim iguais — o slide nunca apareceria.';
+  return null;
+}
+
+// Traduz o agendamento para uma frase, para o usuário saber o que vai acontecer
+// ANTES de salvar. Era exatamente isso que faltava.
+function updateSchedHint(){
+  const el=document.getElementById('ed-hint');
+  const b=schedForm();
+  const problema=schedProblema(b);
+  const btn=document.querySelector('[onclick="saveSched()"]');
+  if(problema){
+    el.className='sched-hint bad';
+    el.innerHTML='⚠ '+problema;
+    if(btn)btn.disabled=true;
+    return;
+  }
+  if(btn)btn.disabled=false;
+  if(!b.starts_at&&!b.expires_at&&!b.days&&!b.time_start){
+    el.className='sched-hint';
+    el.innerHTML='Sem agendamento: <b>toca sempre</b>, em toda passagem da playlist.';
+    return;
+  }
+  const partes=[];
+  partes.push(b.days?'<b>'+daysLabel(b.days.split(',').map(Number))+'</b>':'<b>todos os dias</b>');
+  if(b.time_start&&b.time_end){
+    partes.push('das <b>'+b.time_start+'</b> às <b>'+b.time_end+'</b>'+
+      (b.time_end<b.time_start?' (vira a noite)':''));
+  }else partes.push('o dia todo');
+  if(b.starts_at)partes.push('a partir de <b>'+fmtDate(b.starts_at)+'</b>');
+  if(b.expires_at)partes.push('até <b>'+fmtDate(b.expires_at)+'</b>');
+  const frase='Vai tocar '+partes.join(', ')+'.';
+  const jaPassou=b.expires_at&&new Date(b.expires_at)<new Date();
+  el.className='sched-hint'+(jaPassou?' warn':'');
+  el.innerHTML=frase+(jaPassou?'<br>⚠ Essa data já passou: o slide <b>sai da tela assim que salvar</b>.':'');
+}
+
+async function saveSched(){
+  if(!schedEditId)return;
+  const body=schedForm();
+  const problema=schedProblema(body);
+  if(problema){toast(problema);return;}
+  const r=await api('PUT','/api/slides/'+schedEditId,body);
+  if(r&&r.error){toast(r.error);return;}
+  closeSched();await load();
+  toast(r&&r.status&&r.status.active===false
+    ? 'Salvo — o slide está oculto: '+(r.status.detail||'fora da programação')
+    : 'Agendamento salvo — slide no ar');
+}
+function clearSched(){
+  document.getElementById('ed-starts').value='';
+  document.getElementById('ed-expires').value='';
+  document.getElementById('ed-tstart').value='';
+  document.getElementById('ed-tend').value='';
+  setDays('ed-days',[]);
+  saveSched();
+}
+
+// GRUPOS
+async function addGroup(){
+  const name=document.getElementById('gr-name').value.trim();
+  if(!name){toast('Digite o nome do grupo');return;}
+  await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
+  document.getElementById('gr-name').value='';
+  await load();toast('Grupo criado!');
+}
+async function toggleSlide(gid,sid){
+  const pl=await api('GET','/api/groups/'+gid+'/slides');
+  if(pl.find(s=>s.id===sid))await api('DELETE','/api/groups/'+gid+'/slides/'+sid);
+  else await api('POST','/api/groups/'+gid+'/slides',{slide_id:sid});
+  await renderGroups();
+}
+async function renderGroups(){
+  const el=document.getElementById('group-list');
+  if(!groups.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum grupo ainda.</div>';return;}
+  const pls=await Promise.all(groups.map(g=>api('GET','/api/groups/'+g.id+'/slides')));
+  el.innerHTML=groups.map((g,i)=>{
+    const pl=pls[i];
+    const pills=slides.map(s=>`<span class="pill ${pl.find(p=>p.id===s.id)?'on':''}" onclick="toggleSlide('${g.id}','${s.id}')"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${s.title||s.type}</span>`).join('');
+    const plPills=pl.map(s=>`<span class="pill on"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${s.title} <span style="opacity:.5">${s.duration}s</span></span>`).join('');
+    return `<div class="card">
+      <div class="card-row" style="margin-bottom:14px">
+        <div class="flex-gap"><span class="cdot" style="background:${g.color}"></span><span class="card-title">${g.name}</span></div>
+        <button class="btn btn-danger btn-sm" onclick="delGroup('${g.id}')">Remover</button>
+      </div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Clique para adicionar à playlist:</div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${pills||'<span style="font-size:12px;color:var(--muted)">Crie slides primeiro</span>'}</div>
+      <div class="sep"></div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Playlist atual (${pl.length} slide${pl.length!==1?'s':''}):</div>
+      <div class="pill-area">${plPills||'<span style="font-size:12px;color:var(--muted)">Nenhum slide selecionado</span>'}</div>
+    </div>`;
+  }).join('');
+}
+async function delGroup(id){
+  const r=await api('DELETE','/api/groups/'+id);
+  if(r.error){toast(r.error);return;}
+  await load();toast('Grupo removido');
+}
+
+// TELAS
+async function addScreen(){
+  const name=document.getElementById('sc-name').value.trim();
+  const group_id=document.getElementById('sc-group').value;
+  if(!name||!group_id){toast('Nome e grupo são obrigatórios');return;}
+  await api('POST','/api/screens',{name,group_id});
+  document.getElementById('sc-name').value='';
+  document.getElementById('slug-preview').style.display='none';
+  await load();toast('Tela adicionada!');
+}
+async function renderScreens(){
+  const el=document.getElementById('screen-list');
+  const sel=document.getElementById('sc-group');
+  sel.innerHTML=groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  if(!screens.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhuma tela cadastrada.</div>';return;}
+  const origin=publicOrigin();
+  el.innerHTML=screens.map(s=>{
+    const g=groups.find(g=>g.id===s.group_id);
+    const online=s.last_seen&&(Date.now()-new Date(s.last_seen).getTime())<60000;
+    const playerUrl=`${origin}/player/${s.id}`;
+    return `<div class="card">
+      <div class="card-row">
+        <div class="flex-gap">
+          <span class="online-dot ${online?'on':'off'}"></span>
+          <div><div class="card-title">${s.name}</div><div class="card-sub">${g?g.name:'Sem grupo'}</div></div>
+        </div>
+        <div class="flex-gap">
+          <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="delScreen('${s.id}')">✕</button>
+        </div>
+      </div>
+      <div class="sep" style="margin:12px 0"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
+      <div class="url-box">
+        <span>${playerUrl}</span>
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}')">Copiar</button>
+        <a href="${playerUrl}" target="_blank" class="btn btn-ghost btn-sm">Abrir</a>
+      </div>
+    </div>`;
+  }).join('');
+}
+async function delScreen(id){await api('DELETE','/api/screens/'+id);await load();toast('Tela removida')}
+function copyUrl(url){navigator.clipboard.writeText(url);toast('URL copiada!')}
+
+// DASHBOARD
+async function renderDash(){
+  document.getElementById('st-slides').textContent=slides.length;
+  document.getElementById('st-grupos').textContent=groups.length;
+  document.getElementById('st-telas').textContent=screens.length;
+  const origin=publicOrigin();
+  const el=document.getElementById('dash-screens');
+  if(!screens.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhuma tela cadastrada ainda.</div>';return;}
+  el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+screens.map(s=>{
+    const g=groups.find(g=>g.id===s.group_id);
+    const online=s.last_seen&&(Date.now()-new Date(s.last_seen).getTime())<60000;
+    return `<div class="card" style="border-left:3px solid ${g?.color||'#333'}">
+      <div class="card-row">
+        <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${s.name}</span></div>
+        <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
+      </div>
+      <div class="card-sub mt8">${g?g.name:'Sem grupo'}</div>
+      <div class="url-box mt8" style="font-size:11px">
+        <span>${origin}/player/${s.id}</span>
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}')">Copiar</button>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+  renderProgramacao();
+}
+
+// "O que está tocando, onde, e o que está oculto e por quê."
+async function renderProgramacao(){
+  const el=document.getElementById('dash-prog');
+  let prog;
+  try{ prog=await api('GET','/api/programacao'); }
+  catch(e){ el.innerHTML=''; return; }
+  if(!Array.isArray(prog)||!prog.length){el.innerHTML='';return;}
+  el.innerHTML='<div class="page-title" style="font-size:15px;margin:24px 0 10px">Programação agora</div>'+
+    prog.map(t=>{
+      const noAr=t.no_ar.length
+            ? t.no_ar.map(i=>`<div class="prog-line"><span class="tag tag-on">programado</span><span>${i.title}</span></div>`).join('')
+            : '<div class="prog-line" style="color:var(--danger)"><span class="tag tag-off">vazio</span><span>Nenhum conteúdo programado para esta tela</span></div>';
+      const ocultos=t.ocultos.map(i=>
+        `<div class="prog-line"><span class="tag tag-off">oculto</span><span>${i.title} — ${i.status.detail||'fora da programação'}</span></div>`).join('');
+      return `<div class="prog-screen">
+        <div class="card-row">
+          <div class="flex-gap"><span class="online-dot ${t.online?'on':'off'}"></span><span class="card-title">${t.screen_name}</span></div>
+          <span class="card-sub">${t.group_name}</span>
+        </div>
+        ${noAr}${ocultos}
+      </div>`;
+    }).join('');
+}
+
+fillDays('nsl-days');
+fillDays('ed-days');
+document.getElementById('sched-modal').addEventListener('click',e=>{if(e.target.id==='sched-modal')closeSched();});
+// A frase do modal acompanha o que o usuário digita, em tempo real
+['ed-starts','ed-expires','ed-tstart','ed-tend'].forEach(id=>{
+  document.getElementById(id).addEventListener('input',updateSchedHint);
+});
+document.getElementById('ed-days').addEventListener('change',updateSchedHint);
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&document.getElementById('sched-modal').classList.contains('show'))closeSched();
+});
+load();
+setInterval(load,30000);
+</script>
+</body>
+</html>

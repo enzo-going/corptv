@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CorporTV — Player</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #000; font-family: Arial, Helvetica, sans-serif;
+    cursor: none;
+  }
+
+  #screen {
+    width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    position: relative; overflow: hidden;
+    transition: background 0.8s ease;
+  }
+
+  /* MÍDIA (img/video) */
+  #media-layer {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #media-layer img, #media-layer video {
+    width: 100%; height: 100%; object-fit: contain;
+  }
+
+  /* OVERLAY GRADIENTE sobre mídia */
+  #overlay {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.7) 0%, transparent 50%, rgba(0,0,0,.2) 100%);
+    pointer-events: none;
+  }
+
+  /* CONTEÚDO TEXTUAL */
+  #content {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 80px;
+    text-align: center;
+    z-index: 2;
+  }
+  #slide-title {
+    font-size: 48px;
+    font-size: clamp(32px, 5vw, 72px);
+    font-weight: 600;
+    color: #fff;
+    text-shadow: 0 2px 20px rgba(0,0,0,.6);
+    line-height: 1.15;
+    max-width: 900px;
+  }
+  #slide-body {
+    font-size: 26px;
+    font-size: clamp(18px, 2.5vw, 36px);
+    font-weight: 300;
+    color: rgba(255,255,255,.8);
+    margin-top: 16px;
+    text-shadow: 0 1px 10px rgba(0,0,0,.5);
+    max-width: 700px;
+    line-height: 1.4;
+  }
+
+  /* BARRA SUPERIOR */
+  #topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 32px;
+    z-index: 10;
+  }
+  #logo {
+    font-size: 13px; font-weight: 500; letter-spacing: 2px;
+    color: rgba(255,255,255,.4); text-transform: uppercase;
+  }
+  #clock {
+    font-size: 15px; font-weight: 400;
+    color: rgba(255,255,255,.5);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* BARRA DE PROGRESSO */
+  #progress-wrap {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
+  }
+  #progress-bar {
+    height: 3px; background: rgba(255,255,255,.12);
+  }
+  #progress-fill {
+    height: 100%; width: 0%;
+    background: rgba(255,255,255,.6);
+    transition: width 1s linear;
+  }
+
+  /* TICKER */
+  #ticker-wrap {
+    position: absolute; bottom: 3px; left: 0; right: 0;
+    background: rgba(0,0,0,.5);
+    padding: 10px 0;
+    z-index: 10;
+    overflow: hidden;
+  }
+  #ticker-text {
+    display: inline-block;
+    white-space: nowrap;
+    font-size: 14px;
+    color: rgba(255,255,255,.55);
+    animation: ticker 30s linear infinite;
+    padding-left: 100%;
+  }
+  @keyframes ticker {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  /* DOTS DE NAVEGAÇÃO */
+  #dots {
+    position: absolute; bottom: 52px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 8px; z-index: 10;
+  }
+  .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(255,255,255,.25);
+    transition: all .3s;
+  }
+  .dot.active {
+    background: rgba(255,255,255,.8);
+    width: 20px; border-radius: 3px;
+  }
+
+  /* STATUS DE CONEXÃO */
+  #conn-status {
+    position: absolute; top: 20px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(248,113,113,.15);
+    border: 1px solid rgba(248,113,113,.3);
+    color: rgba(255,255,255,.7);
+    font-size: 12px; padding: 6px 14px; border-radius: 20px;
+    z-index: 20; display: none;
+  }
+
+  /* TELA VAZIA */
+  #empty {
+    position: absolute; top: 0; right: 0; bottom: 0; left: 0;
+    display: none; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: rgba(255,255,255,.2);
+    font-size: 14px; gap: 10px;
+  }
+  #empty svg { opacity: .2; }
+
+  /* ANIMAÇÃO DE ENTRADA */
+  .fade-in { animation: fadeIn .6s ease; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(1.02); }
+    to { opacity: 1; transform: scale(1); }
+  }
+</style>
+</head>
+<body>
+
+<div id="screen">
+  <div id="media-layer"></div>
+  <div id="overlay"></div>
+  <div id="content">
+    <div id="slide-title"></div>
+    <div id="slide-body"></div>
+  </div>
+  <div id="topbar">
+    <div id="logo">CorporTV</div>
+    <div id="clock"></div>
+  </div>
+  <div id="dots"></div>
+  <div id="progress-wrap">
+    <div id="ticker-wrap">
+      <span id="ticker-text">Bem-vindo ao CorporTV</span>
+    </div>
+    <div id="progress-bar"><div id="progress-fill"></div></div>
+  </div>
+  <div id="conn-status">⚠ Sem conexão — usando cache local</div>
+  <div id="empty">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+    Nenhum slide configurado para esta tela
+  </div>
+</div>
+
+<script type="text/plain" id="modern-player-disabled">
+  // Pega o screen_id da URL: /player/:screen_id
+  const SCREEN_ID = location.pathname.split('/').pop();
+  const API = '/api/player/' + SCREEN_ID;
+  const HEARTBEAT = '/api/heartbeat';
+  const POLL_INTERVAL = 30000; // busca atualizações a cada 30s
+  const HB_INTERVAL  = 20000; // heartbeat a cada 20s
+
+  let slides = [];
+  let current = 0;
+  let elapsed = 0;
+  let timer = null;
+  let cachedSlides = JSON.parse(localStorage.getItem('corptv_slides_' + SCREEN_ID) || '[]');
+
+  // ── BUSCA PLAYLIST ──────────────────────────────────────
+  async function fetchPlaylist() {
+    try {
+      const res = await fetch(API);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      slides = data.slides || [];
+      if (slides.length) {
+        localStorage.setItem('corptv_slides_' + SCREEN_ID, JSON.stringify(slides));
+        cachedSlides = slides;
+      }
+      document.getElementById('conn-status').style.display = 'none';
+      if (!timer) { current = 0; renderSlide(); startTimer(); }
+    } catch (e) {
+      console.warn('Offline — usando cache local');
+      document.getElementById('conn-status').style.display = 'block';
+      if (!slides.length && cachedSlides.length) {
+        slides = cachedSlides;
+        if (!timer) { current = 0; renderSlide(); startTimer(); }
+      }
+    }
+  }
+
+  // ── HEARTBEAT ──────────────────────────────────────────
+  async function heartbeat() {
+    try {
+      await fetch(HEARTBEAT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ screen_id: SCREEN_ID })
+      });
+    } catch(e) { /* silencioso */ }
+  }
+
+  // ── RENDERIZA SLIDE ─────────────────────────────────────
+  function renderSlide() {
+    if (!slides.length) {
+      document.getElementById('empty').style.display = 'flex';
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('media-layer').innerHTML = '';
+      return;
+    }
+    document.getElementById('empty').style.display = 'none';
+    document.getElementById('content').style.display = 'flex';
+
+    const s = slides[current];
+    const screen = document.getElementById('screen');
+
+    // Fundo
+    screen.style.background = s.bg || '#111';
+    screen.classList.remove('fade-in');
+    void screen.offsetWidth; // reflow para reiniciar animação
+    screen.classList.add('fade-in');
+
+    // Mídia
+    const ml = document.getElementById('media-layer');
+    const overlay = document.getElementById('overlay');
+    if (s.url && s.type === 'img') {
+      ml.innerHTML = `<img src="${s.url}" alt="${s.title || ''}">`;
+      overlay.style.display = 'block';
+    } else if (s.url && s.type === 'vid') {
+      ml.innerHTML = `<video src="${s.url}" id="tv-video" autoplay muted playsinline></video>`;
+      overlay.style.display = 'block';
+      const vid = document.getElementById('tv-video');
+      vid.onended = () => nextSlide();
+    } else {
+      ml.innerHTML = '';
+      overlay.style.display = 'none';
+    }
+
+    // Texto
+    document.getElementById('slide-title').textContent = s.title || '';
+    document.getElementById('slide-body').textContent  = s.body  || '';
+
+    // Esconde texto se só tem vídeo sem título
+    const hasText = s.title || s.body;
+    document.getElementById('content').style.opacity = hasText ? '1' : '0';
+
+    // Dots
+    renderDots();
+    resetProgress();
+  }
+
+  function renderDots() {
+    document.getElementById('dots').innerHTML = slides.map((_, i) =>
+      `<div class="dot ${i === current ? 'active' : ''}"></div>`
+    ).join('');
+  }
+
+  // ── TIMER E PROGRESSO ───────────────────────────────────
+  function startTimer() {
+    clearInterval(timer);
+    elapsed = 0;
+    if (!slides.length) return;
+    const s = slides[current];
+    if (s.type === 'vid') return; // vídeo avança no onended
+    timer = setInterval(() => {
+      elapsed++;
+      const pct = Math.round((elapsed / s.duration) * 100);
+      document.getElementById('progress-fill').style.width = pct + '%';
+      if (elapsed >= s.duration) nextSlide();
+    }, 1000);
+  }
+
+  function resetProgress() {
+    document.getElementById('progress-fill').style.width = '0%';
+  }
+
+  function nextSlide() {
+    clearInterval(timer); timer = null;
+    current = (current + 1) % slides.length;
+    renderSlide();
+    startTimer();
+  }
+
+  // ── RELÓGIO ─────────────────────────────────────────────
+  function updateClock() {
+    const n = new Date();
+    const h = n.getHours().toString().padStart(2, '0');
+    const m = n.getMinutes().toString().padStart(2, '0');
+    document.getElementById('clock').textContent = h + ':' + m;
+  }
+
+  // ── INIT ────────────────────────────────────────────────
+  fetchPlaylist();
+  setInterval(fetchPlaylist, POLL_INTERVAL);
+  heartbeat();
+  setInterval(heartbeat, HB_INTERVAL);
+  updateClock();
+  setInterval(updateClock, 10000);
+
+  // Reload automático à meia-noite pra limpar memória
+  setInterval(() => {
+    const n = new Date();
+    if (n.getHours() === 0 && n.getMinutes() === 0) location.reload();
+  }, 60000);
+</script>
+<script>
+(function () {
+  'use strict';
+
+  var SCREEN_ID = location.pathname.split('/').pop();
+  var API = '/api/player/' + encodeURIComponent(SCREEN_ID);
+  var HEARTBEAT = '/api/heartbeat';
+  var POLL_INTERVAL = 30000;
+  var HB_INTERVAL = 20000;
+  var slides = [];
+  var current = 0;
+  var elapsed = 0;
+  var timer = null;
+  var retryTimer = null;
+  var started = false;
+  var offline = false;
+  var cacheKey = 'corptv_slides_' + SCREEN_ID;
+  var cacheRecord = { saved_at: 0, slides: [] };
+
+  try {
+    var parsedCache = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+    // O formato antigo era apenas um array e podia ressuscitar conteúdo
+    // expirado. Ele é deliberadamente descartado na primeira atualização.
+    if (parsedCache && parsedCache.saved_at && parsedCache.slides instanceof Array) {
+      cacheRecord = parsedCache;
+    }
+  } catch (e) {
+    cacheRecord = { saved_at: 0, slides: [] };
+  }
+
+  function showStatus(message) {
+    var status = document.getElementById('conn-status');
+    status.innerHTML = message;
+    status.style.display = 'block';
+  }
+
+  function hideStatus() {
+    if (offline) return;
+    document.getElementById('conn-status').style.display = 'none';
+  }
+
+  function playlistKey(list) {
+    var comparable = [];
+    var i;
+    for (i = 0; i < list.length; i++) {
+      comparable.push({
+        id: list[i].id,
+        type: list[i].type,
+        title: list[i].title,
+        body: list[i].body,
+        duration: list[i].duration,
+        bg: list[i].bg,
+        url: list[i].url
+      });
+    }
+    return JSON.stringify(comparable);
+  }
+
+  function saveCache(list) {
+    cacheRecord = { saved_at: Date.now(), slides: list };
+    try { localStorage.setItem(cacheKey, JSON.stringify(cacheRecord)); } catch (e) {}
+  }
+
+  function validCachedSlides() {
+    var valid = [];
+    var now = Date.now();
+    var i;
+    for (i = 0; i < cacheRecord.slides.length; i++) {
+      var slide = cacheRecord.slides[i];
+      if (slide.cache_for_ms === null || slide.cache_for_ms === undefined ||
+          cacheRecord.saved_at + slide.cache_for_ms > now) {
+        valid.push(slide);
+      }
+    }
+    return valid;
+  }
+
+  function applyPlaylist(nextSlides) {
+    var oldKey = playlistKey(slides);
+    var nextKey = playlistKey(nextSlides);
+    var currentId = slides.length && slides[current] ? slides[current].id : null;
+    var nextCurrent = 0;
+    var i;
+
+    slides = nextSlides;
+    if (started && oldKey === nextKey) return;
+
+    clearInterval(timer);
+    timer = null;
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    if (currentId) {
+      for (i = 0; i < slides.length; i++) {
+        if (slides[i].id === currentId) {
+          nextCurrent = i;
+          break;
+        }
+      }
+    }
+    current = nextCurrent;
+    started = true;
+    renderSlide();
+    startTimer();
+  }
+
+  function fetchPlaylist() {
+    var xhr = new XMLHttpRequest();
+    var handled = false;
+    function fail() {
+      if (handled) return;
+      handled = true;
+      useOfflinePlaylist();
+    }
+    xhr.open('GET', API, true);
+    xhr.timeout = 15000;
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          var nextSlides = data.slides || [];
+          handled = true;
+          offline = false;
+          saveCache(nextSlides);
+          applyPlaylist(nextSlides);
+          hideStatus();
+        } catch (e) {
+          fail();
+        }
+      } else {
+        fail();
+      }
+    };
+    xhr.onerror = fail;
+    xhr.ontimeout = fail;
+    try { xhr.send(null); } catch (e) { fail(); }
+  }
+
+  function useOfflinePlaylist() {
+    var cached = validCachedSlides();
+    offline = true;
+    showStatus(cached.length
+      ? 'Sem conexão — usando a lista salva'
+      : 'Sem conexão — a programação salva expirou');
+    applyPlaylist(cached);
+  }
+
+  function heartbeat() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', HEARTBEAT, true);
+    xhr.timeout = 10000;
+    xhr.setRequestHeader('Content-Type', 'application/json');
+    try { xhr.send(JSON.stringify({ screen_id: SCREEN_ID })); } catch (e) {}
+  }
+
+  function clearMedia() {
+    var layer = document.getElementById('media-layer');
+    while (layer.firstChild) layer.removeChild(layer.firstChild);
+    return layer;
+  }
+
+  function renderSlide() {
+    if (retryTimer) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+
+    if (!slides.length) {
+      document.getElementById('empty').style.display = 'flex';
+      document.getElementById('content').style.display = 'none';
+      document.getElementById('overlay').style.display = 'none';
+      document.getElementById('dots').innerHTML = '';
+      resetProgress();
+      clearMedia();
+      return;
+    }
+
+    if (current >= slides.length) current = 0;
+    document.getElementById('empty').style.display = 'none';
+    document.getElementById('content').style.display = 'flex';
+
+    var slide = slides[current];
+    var screen = document.getElementById('screen');
+    var layer = clearMedia();
+    var overlay = document.getElementById('overlay');
+    var currentAtRender = current;
+
+    screen.style.background = slide.bg || '#111';
+    screen.className = '';
+    screen.offsetWidth;
+    screen.className = 'fade-in';
+
+    if (slide.url && slide.type === 'img') {
+      var image = document.createElement('img');
+      image.src = slide.url;
+      image.alt = slide.title || '';
+      layer.appendChild(image);
+      overlay.style.display = 'block';
+    } else if (slide.url && slide.type === 'vid') {
+      var video = document.createElement('video');
+      video.id = 'tv-video';
+      video.src = slide.url;
+      video.autoplay = true;
+      video.muted = true;
+      video.volume = 0;
+      video.preload = 'auto';
+      video.setAttribute('muted', 'muted');
+      video.setAttribute('playsinline', 'playsinline');
+      video.setAttribute('webkit-playsinline', 'webkit-playsinline');
+      video.onended = nextSlide;
+      video.onplaying = hideStatus;
+      video.onerror = function () {
+        if (retryTimer || current !== currentAtRender) return;
+        showStatus('Falha ao abrir o video - nova tentativa em 15 segundos');
+        retryTimer = setTimeout(function () {
+          retryTimer = null;
+          if (current === currentAtRender) {
+            renderSlide();
+            startTimer();
+          }
+        }, 15000);
+      };
+      layer.appendChild(video);
+      overlay.style.display = 'block';
+      try { video.load(); video.play(); } catch (e) {}
+    } else {
+      overlay.style.display = 'none';
+    }
+
+    document.getElementById('slide-title').innerText = slide.title || '';
+    document.getElementById('slide-body').innerText = slide.body || '';
+    document.getElementById('content').style.opacity = (slide.title || slide.body) ? '1' : '0';
+    renderDots();
+    resetProgress();
+  }
+
+  function renderDots() {
+    var html = '';
+    var i;
+    for (i = 0; i < slides.length; i++) {
+      html += '<div class="dot' + (i === current ? ' active' : '') + '"></div>';
+    }
+    document.getElementById('dots').innerHTML = html;
+  }
+
+  function startTimer() {
+    clearInterval(timer);
+    timer = null;
+    elapsed = 0;
+    if (!slides.length) return;
+    var slide = slides[current];
+    if (slide.type === 'vid') return;
+    var duration = parseInt(slide.duration, 10) || 8;
+    timer = setInterval(function () {
+      elapsed += 1;
+      document.getElementById('progress-fill').style.width = Math.round((elapsed / duration) * 100) + '%';
+      if (elapsed >= duration) nextSlide();
+    }, 1000);
+  }
+
+  function resetProgress() {
+    document.getElementById('progress-fill').style.width = '0%';
+  }
+
+  function nextSlide() {
+    clearInterval(timer);
+    timer = null;
+    if (!slides.length) return;
+    current = (current + 1) % slides.length;
+    renderSlide();
+    startTimer();
+  }
+
+  function pad2(value) {
+    return value < 10 ? '0' + value : String(value);
+  }
+
+  function updateClock() {
+    var now = new Date();
+    document.getElementById('clock').innerHTML = pad2(now.getHours()) + ':' + pad2(now.getMinutes());
+  }
+
+  fetchPlaylist();
+  setInterval(fetchPlaylist, POLL_INTERVAL);
+  heartbeat();
+  setInterval(heartbeat, HB_INTERVAL);
+  updateClock();
+  setInterval(updateClock, 10000);
+  setInterval(function () {
+    var now = new Date();
+    if (now.getHours() === 0 && now.getMinutes() === 0) location.reload();
+  }, 60000);
+}());
+</script>
+</body>
+</html>
