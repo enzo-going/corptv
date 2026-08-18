@@ -80,6 +80,20 @@ test('API valida relações, entradas e impede cache de programação', async ()
   assert.match(player.headers.get('cache-control'), /no-store/);
 });
 
+test('API rejeita corpos JSON ausentes sem responder erro interno', async () => {
+  const group = await json('/api/groups', { method: 'POST' });
+  assert.equal(group.response.status, 400);
+  assert.match(group.body.error, /obrigatório/i);
+
+  const heartbeat = await json('/api/heartbeat', { method: 'POST' });
+  assert.equal(heartbeat.response.status, 400);
+  assert.match(heartbeat.body.error, /obrigatória/i);
+
+  const playlist = await json('/api/groups/inexistente/slides', { method: 'POST' });
+  assert.equal(playlist.response.status, 404);
+  assert.match(playlist.body.error, /grupo não encontrado/i);
+});
+
 test('upload falso é rejeitado e removido', async () => {
   const form = new FormData();
   addPanelFields(form, 'Arquivo falso');
