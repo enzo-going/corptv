@@ -279,7 +279,7 @@ app.get('/api/groups/:id/slides', async (req, res) => {
 });
 
 app.post('/api/groups/:id/slides', async (req, res) => {
-  const { slide_id } = req.body;
+  const { slide_id } = req.body || {};
   const [group, slide] = await Promise.all([
     db.groups.findOne({ id: req.params.id }),
     db.slides.findOne({ id: slide_id })
@@ -354,7 +354,7 @@ const OFFLINE_MS = 60000;
 const lastBeat = new Map();
 
 app.post('/api/heartbeat', async (req, res) => {
-  const { screen_id } = req.body;
+  const { screen_id } = req.body || {};
   if (!screen_id || typeof screen_id !== 'string') {
     return res.status(400).json({ error: 'Tela obrigatória' });
   }

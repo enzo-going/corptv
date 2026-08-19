@@ -26,7 +26,7 @@ function toIso(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
-function scheduleFromBody(body) {
+function scheduleFromBody(body = {}) {
   return {
     starts_at: toIso(body.starts_at),
     expires_at: toIso(body.expires_at),
