@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
   normalizeDuration,
+  normalizeVideoText,
   validateGroupInput,
   validateScreenInput,
   validateSlideInput
@@ -33,4 +34,18 @@ test('um slide exige título ou arquivo e respeita os limites', () => {
   assert.match(validateSlideInput({ type: 'txt', duration: '8', bg: '#111111' }).error, /título ou arquivo/i);
   assert.match(validateSlideInput({ title: 'x'.repeat(121), type: 'txt', duration: '8', bg: '#111111' }).error, /120/);
   assert.equal(validateSlideInput({ title: '', type: 'img', duration: '8', bg: '#111111' }, { hasFile: true, fileType: 'img' }).value.type, 'img');
+});
+
+test('valida os três modos de texto sobre vídeo', () => {
+  assert.deepEqual(normalizeVideoText({ video_text_mode: 'none' }, 'vid').value, {
+    video_text_mode: 'none', video_text_seconds: 0
+  });
+  assert.deepEqual(normalizeVideoText({ video_text_mode: 'fixed' }, 'vid').value, {
+    video_text_mode: 'fixed', video_text_seconds: 0
+  });
+  assert.deepEqual(normalizeVideoText({ video_text_mode: 'timed', video_text_seconds: '7' }, 'vid').value, {
+    video_text_mode: 'timed', video_text_seconds: 7
+  });
+  assert.match(normalizeVideoText({ video_text_mode: 'timed', video_text_seconds: '0' }, 'vid').error, /1 e 300/);
+  assert.match(normalizeVideoText({ video_text_mode: 'piscar' }, 'vid').error, /inválido/i);
 });

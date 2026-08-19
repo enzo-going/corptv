@@ -74,6 +74,7 @@
   .stat-label{font-size:11px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
   .url-box{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;font-family:'DM Mono',monospace}
   .url-box span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent2)}
+  .url-box .url-value{flex:1;min-width:0;border:0;outline:0;padding:0;background:transparent;color:var(--accent2);font:inherit;text-overflow:ellipsis}
   .slug-box{display:flex;align-items:center;gap:6px;background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:6px 12px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent);margin-top:6px}
   .dropzone{border:1.5px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s}
   .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:rgba(108,99,255,.05)}
@@ -163,9 +164,22 @@
               <option value="vid">Vídeo</option>
             </select>
           </div>
-          <div><label>Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300"></div>
+          <div id="sl-duration-wrap"><label>Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300"></div>
           <div class="form-full"><label>Título</label><input type="text" id="sl-title" placeholder="Ex: Bom dia, equipe!"></div>
           <div class="form-full" id="sl-body-wrap"><label>Texto</label><input type="text" id="sl-body" placeholder="Ex: Reunião às 14h"></div>
+          <div class="form-full" id="sl-video-text-wrap" style="display:none">
+            <div class="form-grid" style="margin-bottom:0">
+              <div><label>Texto sobre o vídeo</label>
+                <select id="sl-video-text-mode" onchange="videoTextModeChange('sl')">
+                  <option value="fixed">Fixo durante todo o vídeo</option>
+                  <option value="timed">Temporário com fade</option>
+                  <option value="none">Não exibir texto</option>
+                </select>
+              </div>
+              <div id="sl-video-text-seconds-wrap" style="display:none"><label>Tempo visível antes do fade (segundos)</label><input type="number" id="sl-video-text-seconds" value="5" min="1" max="300"></div>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">O título acima identifica o conteúdo na biblioteca e, quando habilitado, aparece no centro do vídeo.</div>
+          </div>
           <div class="form-full" id="sl-file-wrap" style="display:none">
             <label>Arquivo</label>
             <label class="dropzone" id="sl-dropzone" ondragover="doDragOver(event)" ondragleave="doDragLeave()" ondrop="doDrop(event)">
@@ -254,12 +268,34 @@
     </div>
   </div>
 </div>
+<div class="modal-back" id="video-text-modal">
+  <div class="modal" style="max-width:520px">
+    <div class="card-title" style="margin-bottom:2px">Texto sobre o vídeo</div>
+    <div class="card-sub" id="video-text-name" style="margin-bottom:16px"></div>
+    <div class="form-grid">
+      <div class="form-full"><label>Como o texto deve aparecer</label>
+        <select id="video-text-mode" onchange="videoTextModeChange('edit')">
+          <option value="fixed">Fixo durante todo o vídeo</option>
+          <option value="timed">Temporário com fade</option>
+          <option value="none">Não exibir texto</option>
+        </select>
+      </div>
+      <div class="form-full" id="video-text-seconds-wrap" style="display:none"><label>Tempo visível antes do fade (segundos)</label><input type="number" id="video-text-seconds" value="5" min="1" max="300"></div>
+    </div>
+    <div id="video-text-hint" class="sched-hint" style="margin-bottom:18px"></div>
+    <div class="flex-gap" style="justify-content:flex-end">
+      <button class="btn btn-ghost" onclick="closeVideoText()">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveVideoText()">Salvar</button>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script>
 const BASE='';
 let slides=[],groups=[],screens=[];
 let pendingFile=null;
+let videoTextEditId=null;
 const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade80',msg:'#6c63ff',aviso:'#f87171'};
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
@@ -314,8 +350,23 @@ function slTypeChange(){
   const t=document.getElementById('sl-type').value;
   document.getElementById('sl-file-wrap').style.display=t!=='txt'?'block':'none';
   document.getElementById('sl-body-wrap').style.display=t==='txt'?'block':'none';
+  document.getElementById('sl-duration-wrap').style.display=t==='vid'?'none':'block';
+  document.getElementById('sl-video-text-wrap').style.display=t==='vid'?'block':'none';
   document.getElementById('sl-dur').value=t==='vid'?'0':'8';
+  videoTextModeChange('sl');
   if(t==='txt') cancelFile();
+}
+
+function videoTextModeChange(scope){
+  const editing=scope==='edit';
+  const mode=document.getElementById(editing?'video-text-mode':'sl-video-text-mode').value;
+  document.getElementById(editing?'video-text-seconds-wrap':'sl-video-text-seconds-wrap').style.display=mode==='timed'?'block':'none';
+  if(editing){
+    const hint=document.getElementById('video-text-hint');
+    if(mode==='none')hint.textContent='O nome continua na biblioteca, mas nenhum texto será mostrado sobre o vídeo.';
+    else if(mode==='fixed')hint.textContent='O título ficará visível no centro durante todo o vídeo.';
+    else hint.textContent='O título aparece no início e desaparece suavemente após o tempo escolhido.';
+  }
 }
 
 function cancelFile(){
@@ -358,6 +409,8 @@ async function addSlide(){
   try{
     const fd=new FormData();
     fd.append('title',title);fd.append('body',body);fd.append('type',type);fd.append('duration',dur);fd.append('bg',bg);
+    fd.append('video_text_mode',type==='vid'?document.getElementById('sl-video-text-mode').value:'none');
+    fd.append('video_text_seconds',type==='vid'?document.getElementById('sl-video-text-seconds').value:'0');
     fd.append('starts_at',document.getElementById('nsl-starts').value||'');
     fd.append('expires_at',document.getElementById('nsl-expires').value||'');
     fd.append('days',getDays('nsl-days'));
@@ -369,6 +422,9 @@ async function addSlide(){
     if(data.error){toast('Erro: '+data.error);return;}
     document.getElementById('sl-title').value='';
     document.getElementById('sl-body').value='';
+    document.getElementById('sl-video-text-mode').value='fixed';
+    document.getElementById('sl-video-text-seconds').value='5';
+    videoTextModeChange('sl');
     resetScheduleForm();
     cancelFile();
     await load();toast('Slide adicionado!');
@@ -391,7 +447,8 @@ function renderSlides(){
       ? '<span class="state state-on">● No ar</span>'
       : `<span class="state state-off">● Oculto — ${esc(st.detail||'fora da programação')}</span>`;
     const regra=isScheduled(s)?`<span class="sched-badge">⏱ ${esc(scheduleLabel(s))}</span>`:'';
-    const meta=[s.body||'',s.duration+'s'].filter(Boolean).map(esc).join(' · ');
+    const typeMeta=s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem':'texto';
+    const meta=[s.body||'',typeMeta,s.type!=='vid'&&s.duration?s.duration+'s':''].filter(Boolean).map(esc).join(' · ');
     return `<div class="item${st.active?'':' item-off'}">
       <div class="item-thumb">${thumb}</div>
       <div class="item-info">
@@ -399,11 +456,39 @@ function renderSlides(){
         <div class="item-meta">${estado}${meta?' · '+meta:''}</div>
       </div>
       <div class="item-actions">
+        ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="openSched('${s.id}')">Agendar</button>
         <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')">✕</button>
       </div>
     </div>`;
   }).join('');
+}
+function videoTextModeOf(s){return s.video_text_mode||'fixed'}
+function videoTextLabel(s){
+  const mode=videoTextModeOf(s);
+  if(mode==='none')return 'sem texto';
+  if(mode==='timed')return 'texto por '+(parseInt(s.video_text_seconds,10)||5)+'s + fade';
+  return 'texto fixo';
+}
+function openVideoText(id){
+  const s=slides.find(x=>x.id===id);
+  if(!s||s.type!=='vid')return;
+  videoTextEditId=id;
+  document.getElementById('video-text-name').textContent=s.title||'Vídeo';
+  document.getElementById('video-text-mode').value=videoTextModeOf(s);
+  document.getElementById('video-text-seconds').value=parseInt(s.video_text_seconds,10)||5;
+  videoTextModeChange('edit');
+  document.getElementById('video-text-modal').classList.add('show');
+}
+function closeVideoText(){document.getElementById('video-text-modal').classList.remove('show');videoTextEditId=null}
+async function saveVideoText(){
+  if(!videoTextEditId)return;
+  const mode=document.getElementById('video-text-mode').value;
+  const seconds=parseInt(document.getElementById('video-text-seconds').value,10);
+  if(mode==='timed'&&(!seconds||seconds<1||seconds>300)){toast('Informe um tempo entre 1 e 300 segundos');return;}
+  const r=await api('PUT','/api/slides/'+videoTextEditId,{video_text_mode:mode,video_text_seconds:mode==='timed'?seconds:0});
+  if(r&&r.error){toast(r.error);return;}
+  closeVideoText();await load();toast('Texto do vídeo atualizado');
 }
 async function delSlide(id){if(!confirm('Remover este slide e sua mídia?'))return;await api('DELETE','/api/slides/'+id);await load();toast('Slide removido')}
 
@@ -629,15 +714,38 @@ async function renderScreens(){
       <div class="sep" style="margin:12px 0"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
       <div class="url-box">
-        <span>${esc(playerUrl)}</span>
-        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}')">Copiar</button>
+        <input class="url-value" value="${esc(playerUrl)}" readonly aria-label="URL do player">
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}',this)">Copiar</button>
         <a href="${playerUrl}" target="_blank" class="btn btn-ghost btn-sm">Abrir</a>
       </div>
     </div>`;
   }).join('');
 }
 async function delScreen(id){if(!confirm('Remover esta tela?'))return;await api('DELETE','/api/screens/'+id);await load();toast('Tela removida')}
-function copyUrl(url){navigator.clipboard.writeText(url);toast('URL copiada!')}
+function legacyCopy(url,trigger){
+  const previous=document.activeElement;
+  const visible=trigger&&trigger.parentElement?trigger.parentElement.querySelector('.url-value'):null;
+  const area=visible||document.createElement('textarea');
+  if(!visible){area.value=url;area.setAttribute('readonly','');area.setAttribute('aria-hidden','true');area.style.position='fixed';area.style.top='0';area.style.left='0';area.style.width='1px';area.style.height='1px';area.style.padding='0';area.style.border='0';area.style.opacity='.01';document.body.appendChild(area);}
+  area.focus({preventScroll:true});area.select();area.setSelectionRange(0,area.value.length);
+  let eventHandled=false;
+  const onCopy=e=>{if(e.clipboardData){e.clipboardData.setData('text/plain',url);e.preventDefault();eventHandled=true;}};
+  document.addEventListener('copy',onCopy,{once:true});
+  let copied=false;
+  try{copied=document.execCommand('copy');}
+  finally{setTimeout(()=>{document.removeEventListener('copy',onCopy);if(!visible){area.remove();if(previous&&previous.focus)previous.focus({preventScroll:true});}},100);}
+  if(!copied&&!eventHandled)throw new Error('copy indisponível');
+}
+async function copyUrl(url,trigger){
+  try{
+    if(window.isSecureContext&&navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(url);
+    else legacyCopy(url,trigger);
+    toast(window.isSecureContext?'URL copiada!':'URL selecionada e cópia solicitada — Ctrl+C se necessário');
+  }catch(e){
+    try{legacyCopy(url,trigger);toast('URL selecionada — pressione Ctrl+C para copiar');}
+    catch(f){toast('Não foi possível copiar — selecione a URL manualmente');}
+  }
+}
 
 // DASHBOARD
 async function renderDash(){
@@ -657,8 +765,8 @@ async function renderDash(){
       </div>
       <div class="card-sub mt8">${esc(g?g.name:'Sem grupo')}</div>
       <div class="url-box mt8" style="font-size:11px">
-        <span>${esc(origin+'/player/'+s.id)}</span>
-        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}')">Copiar</button>
+        <input class="url-value" value="${esc(origin+'/player/'+s.id)}" readonly aria-label="URL do player">
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}',this)">Copiar</button>
       </div>
     </div>`;
   }).join('')+'</div>';
@@ -692,6 +800,7 @@ async function renderProgramacao(){
 fillDays('nsl-days');
 fillDays('ed-days');
 document.getElementById('sched-modal').addEventListener('click',e=>{if(e.target.id==='sched-modal')closeSched();});
+document.getElementById('video-text-modal').addEventListener('click',e=>{if(e.target.id==='video-text-modal')closeVideoText();});
 // A frase do modal acompanha o que o usuário digita, em tempo real
 ['ed-starts','ed-expires','ed-tstart','ed-tend'].forEach(id=>{
   document.getElementById(id).addEventListener('input',updateSchedHint);
@@ -699,6 +808,7 @@ document.getElementById('sched-modal').addEventListener('click',e=>{if(e.target.
 document.getElementById('ed-days').addEventListener('change',updateSchedHint);
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&document.getElementById('sched-modal').classList.contains('show'))closeSched();
+  if(e.key==='Escape'&&document.getElementById('video-text-modal').classList.contains('show'))closeVideoText();
 });
 load();
 setInterval(load,30000);

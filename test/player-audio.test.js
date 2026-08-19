@@ -15,3 +15,15 @@ test('o player tenta reproduzir videos com som e orienta quando o navegador bloq
   assert.match(activeScript, /Som bloqueado pelo navegador/);
   assert.doesNotMatch(activeScript, /video\.volume = 0/);
 });
+
+test('o player suporta texto oculto, fixo ou temporário com fade', () => {
+  const html = fs.readFileSync(path.join(__dirname, '../public/player/index.html'), 'utf8');
+  const activeScript = html.slice(html.lastIndexOf('<script>'), html.lastIndexOf('</script>'));
+
+  assert.match(html, /#overlay\.video-text-fade, #content\.video-text-fade/);
+  assert.match(activeScript, /slide\.video_text_mode \|\| 'fixed'/);
+  assert.match(activeScript, /textMode !== 'none'/);
+  assert.match(activeScript, /visibleSeconds \* 1000/);
+  assert.match(activeScript, /classList\.add\('video-text-fade'\)/);
+  assert.match(activeScript, /video_text_seconds: list\[i\]\.video_text_seconds/);
+});

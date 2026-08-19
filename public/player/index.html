@@ -33,6 +33,7 @@
     position: absolute; top: 0; right: 0; bottom: 0; left: 0;
     background: linear-gradient(to top, rgba(0,0,0,.7) 0%, transparent 50%, rgba(0,0,0,.2) 100%);
     pointer-events: none;
+    transition: opacity 1.2s ease;
   }
 
   /* CONTEÚDO TEXTUAL */
@@ -43,7 +44,9 @@
     padding: 80px;
     text-align: center;
     z-index: 2;
+    transition: opacity 1.2s ease;
   }
+  #overlay.video-text-fade, #content.video-text-fade { opacity: 0 !important; }
   #slide-title {
     font-size: 48px;
     font-size: clamp(32px, 5vw, 72px);
@@ -352,6 +355,7 @@
   var elapsed = 0;
   var timer = null;
   var retryTimer = null;
+  var videoTextTimer = null;
   var started = false;
   var offline = false;
   var audioBlocked = false;
@@ -465,7 +469,9 @@
         body: list[i].body,
         duration: list[i].duration,
         bg: list[i].bg,
-        url: list[i].url
+        url: list[i].url,
+        video_text_mode: list[i].video_text_mode,
+        video_text_seconds: list[i].video_text_seconds
       });
     }
     return JSON.stringify(comparable);
@@ -582,6 +588,15 @@
       clearTimeout(retryTimer);
       retryTimer = null;
     }
+    if (videoTextTimer) {
+      clearTimeout(videoTextTimer);
+      videoTextTimer = null;
+    }
+
+    var content = document.getElementById('content');
+    var overlay = document.getElementById('overlay');
+    content.classList.remove('video-text-fade');
+    overlay.classList.remove('video-text-fade');
 
     if (!slides.length) {
       document.getElementById('empty').style.display = 'flex';
@@ -600,7 +615,6 @@
     var slide = slides[current];
     var screen = document.getElementById('screen');
     var layer = clearMedia();
-    var overlay = document.getElementById('overlay');
     var currentAtRender = current;
 
     audioBlocked = false;
@@ -649,7 +663,21 @@
 
     document.getElementById('slide-title').innerText = slide.title || '';
     document.getElementById('slide-body').innerText = slide.body || '';
-    document.getElementById('content').style.opacity = (slide.title || slide.body) ? '1' : '0';
+    var hasText = Boolean(slide.title || slide.body);
+    var textMode = slide.type === 'vid' ? (slide.video_text_mode || 'fixed') : 'fixed';
+    var showText = hasText && textMode !== 'none';
+    content.style.opacity = showText ? '1' : '0';
+    if (slide.type === 'vid') overlay.style.display = showText ? 'block' : 'none';
+    if (slide.type === 'vid' && textMode === 'timed' && showText) {
+      var visibleSeconds = parseInt(slide.video_text_seconds, 10);
+      if (!visibleSeconds || visibleSeconds < 1) visibleSeconds = 5;
+      videoTextTimer = setTimeout(function () {
+        if (current !== currentAtRender) return;
+        content.classList.add('video-text-fade');
+        overlay.classList.add('video-text-fade');
+        videoTextTimer = null;
+      }, visibleSeconds * 1000);
+    }
     renderDots();
     resetProgress();
   }

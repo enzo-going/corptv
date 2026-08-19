@@ -17,6 +17,7 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 ## Destaques
 
 - Texto, imagens JPG/PNG/WEBP e vídeos MP4
+- Vídeos em loop com áudio e título oculto, fixo ou temporário com fade
 - Playlists independentes por grupo de telas
 - URL legível e permanente para cada dispositivo
 - Agendamento por início, expiração, dias da semana e faixa de horário
@@ -110,7 +111,7 @@ npm test
 npm audit --omit=dev
 ```
 
-A suíte automatizada cobre API, vínculos entre entidades, uploads falsos, limpeza de mídias, limites de campos, datas, expiração, horários inválidos, duplicação de dias, madrugada e validade do cache offline. O workflow de CI executa a suíte em Node.js 22 e 24.
+A suíte automatizada cobre API, vínculos entre entidades, uploads falsos, limpeza de mídias, limites de campos, texto sobre vídeos, áudio, cópia de URLs em HTTP, datas, expiração, horários inválidos, duplicação de dias, madrugada e validade do cache offline. O workflow de CI executa a suíte em Node.js 22 e 24.
 
 ## Estrutura
 

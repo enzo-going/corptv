@@ -104,3 +104,60 @@ test('exclusão de slide também remove sua mídia', async () => {
   assert.equal(removed.response.status, 200);
   assert.equal(fs.existsSync(mediaPath), false);
 });
+
+test('modo do texto do vídeo é salvo, atualizado e entregue ao player', async () => {
+  const group = await json('/api/groups', {
+    method: 'POST', body: { name: 'Vídeo com texto', color: '#F59E0B' }
+  });
+  assert.equal(group.response.status, 200);
+
+  const screen = await json('/api/screens', {
+    method: 'POST', body: { name: 'TV vídeo com texto', group_id: group.body.id }
+  });
+  assert.equal(screen.response.status, 200);
+
+  const mp4 = Buffer.from([
+    0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70,
+    0x69, 0x73, 0x6f, 0x6d, 0x00, 0x00, 0x00, 0x00
+  ]);
+  const form = new FormData();
+  addPanelFields(form, 'Bom dia, equipe!');
+  form.set('type', 'vid');
+  form.set('duration', '0');
+  form.set('video_text_mode', 'timed');
+  form.set('video_text_seconds', '4');
+  form.set('file', new Blob([mp4], { type: 'video/mp4' }), 'abertura.mp4');
+
+  const createdResponse = await fetch(baseUrl + '/api/slides', { method: 'POST', body: form });
+  assert.equal(createdResponse.status, 200);
+  const slide = await createdResponse.json();
+  assert.equal(slide.video_text_mode, 'timed');
+  assert.equal(slide.video_text_seconds, 4);
+
+  const linked = await json('/api/groups/' + group.body.id + '/slides', {
+    method: 'POST', body: { slide_id: slide.id }
+  });
+  assert.equal(linked.response.status, 200);
+
+  const playerResponse = await fetch(baseUrl + '/api/player/' + screen.body.id);
+  assert.equal(playerResponse.status, 200);
+  const player = await playerResponse.json();
+  assert.equal(player.slides[0].video_text_mode, 'timed');
+  assert.equal(player.slides[0].video_text_seconds, 4);
+
+  const updated = await json('/api/slides/' + slide.id, {
+    method: 'PUT', body: { video_text_mode: 'none', video_text_seconds: 0 }
+  });
+  assert.equal(updated.response.status, 200);
+
+  const slidesResponse = await fetch(baseUrl + '/api/slides');
+  const slides = await slidesResponse.json();
+  const saved = slides.find(item => item.id === slide.id);
+  assert.equal(saved.video_text_mode, 'none');
+  assert.equal(saved.video_text_seconds, 0);
+
+  const invalid = await json('/api/slides/' + slide.id, {
+    method: 'PUT', body: { video_text_mode: 'timed', video_text_seconds: 0 }
+  });
+  assert.equal(invalid.response.status, 400);
+});
