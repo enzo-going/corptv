@@ -59,7 +59,7 @@ function normalizeVideoText(body, type, options) {
   return { value: { video_text_mode: rawMode, video_text_seconds: seconds } };
 }
 
-function validateSlideInput(body, options) {
+function validateSlideInput(body = {}, options) {
   const settings = options || {};
   const partial = settings.partial === true;
   const hasFile = settings.hasFile === true;
@@ -109,7 +109,7 @@ function validateSlideInput(body, options) {
   return { value };
 }
 
-function validateGroupInput(body) {
+function validateGroupInput(body = {}) {
   const name = normalizeText(body.name, 'Nome', 80, true);
   if (name.error) return name;
   const color = normalizeColor(body.color, '#378ADD');
@@ -117,7 +117,7 @@ function validateGroupInput(body) {
   return { value: { name: name.value, color: color.value } };
 }
 
-function validateScreenInput(body) {
+function validateScreenInput(body = {}) {
   const name = normalizeText(body.name, 'Nome', 80, true);
   if (name.error) return name;
   const groupId = normalizeText(body.group_id, 'Grupo', 80, true);
