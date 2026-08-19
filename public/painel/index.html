@@ -127,10 +127,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Visão geral
       </button>
       <button class="nav-item" onclick="goTo('slides',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 12h10M7 8h10M7 16h6"/></svg>Slides
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2"/><path d="M7 12h10M7 8h10M7 16h6"/></svg>Conteúdo
       </button>
       <button class="nav-item" onclick="goTo('grupos',this)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><path d="M21 21v-2a4 4 0 0 0-3-3.85"/></svg>Grupos
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-6 9 6v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>Ambientes
       </button>
       <button class="nav-item" onclick="goTo('telas',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Telas
@@ -143,8 +143,8 @@
     <div class="page active" id="page-dash">
       <div class="page-header"><div><div class="page-title">Visão geral</div><div class="page-sub">Status do sistema em tempo real</div></div></div>
       <div class="stats-row">
-        <div class="stat"><div class="stat-val" id="st-slides">—</div><div class="stat-label">Slides</div></div>
-        <div class="stat"><div class="stat-val" id="st-grupos">—</div><div class="stat-label">Grupos</div></div>
+        <div class="stat"><div class="stat-val" id="st-slides">—</div><div class="stat-label">Conteúdos</div></div>
+        <div class="stat"><div class="stat-val" id="st-grupos">—</div><div class="stat-label">Ambientes</div></div>
         <div class="stat"><div class="stat-val" id="st-telas">—</div><div class="stat-label">Telas</div></div>
       </div>
       <div id="dash-screens"></div>
@@ -153,9 +153,9 @@
 
     <!-- SLIDES -->
     <div class="page" id="page-slides">
-      <div class="page-header"><div><div class="page-title">Slides</div><div class="page-sub">Biblioteca de conteúdo</div></div></div>
+      <div class="page-header"><div><div class="page-title">Conteúdo</div><div class="page-sub">Biblioteca — vídeos, imagens e textos disponíveis</div></div></div>
       <div class="card">
-        <div class="card-title" style="margin-bottom:14px">Novo slide</div>
+        <div class="card-title" style="margin-bottom:14px">Novo conteúdo</div>
         <div class="form-grid">
           <div><label>Tipo</label>
             <select id="sl-type" onchange="slTypeChange()">
@@ -199,32 +199,24 @@
               <option value="#111111">Preto</option>
             </select>
           </div>
-          <details class="sched">
-            <summary>⏱ Agendamento (opcional) — prazo, dias e horários</summary>
-            <div class="form-grid" style="margin-top:12px">
-              <div><label>Exibir a partir de</label><input type="datetime-local" id="nsl-starts"></div>
-              <div><label>Expira em</label><input type="datetime-local" id="nsl-expires"></div>
-              <div class="form-full"><label>Dias da semana</label><div id="nsl-days" class="days-row"></div></div>
-              <div><label>Horário — início</label><input type="time" id="nsl-tstart"></div>
-              <div><label>Horário — fim</label><input type="time" id="nsl-tend"></div>
-            </div>
-            <div style="font-size:11px;color:var(--muted);margin-top:6px">Deixe em branco para exibir sempre. Sem dias marcados = todos os dias. Se o horário virar a noite, marque o dia em que ele começa.</div>
-          </details>
         </div>
-        <button class="btn btn-primary" onclick="addSlide()">Adicionar slide</button>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+          Aqui é só a biblioteca. Para definir <b style="color:var(--text)">onde</b> e <b style="color:var(--text)">quando</b> um conteúdo aparece, use a aba <b style="color:var(--text)">Ambientes</b>.
+        </div>
+        <button class="btn btn-primary" onclick="addSlide()">Adicionar à biblioteca</button>
       </div>
       <div id="slide-list" class="item-list"></div>
     </div>
 
-    <!-- GRUPOS -->
+    <!-- AMBIENTES -->
     <div class="page" id="page-grupos">
-      <div class="page-header"><div><div class="page-title">Grupos</div><div class="page-sub">Configure playlists por grupo de telas</div></div></div>
+      <div class="page-header"><div><div class="page-title">Ambientes</div><div class="page-sub">O que toca em cada lugar, e quando</div></div></div>
       <div class="card">
         <div class="form-grid">
-          <div><label>Nome do grupo</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
+          <div><label>Nome do ambiente</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
           <div><label>Cor</label><input type="color" id="gr-color" value="#6c63ff"></div>
         </div>
-        <button class="btn btn-primary" onclick="addGroup()">Criar grupo</button>
+        <button class="btn btn-primary" onclick="addGroup()">Criar ambiente</button>
       </div>
       <div id="group-list"></div>
     </div>
@@ -235,7 +227,7 @@
       <div class="card">
         <div class="form-grid">
           <div><label>Nome da tela</label><input type="text" id="sc-name" placeholder="Ex: Recepção Principal" oninput="previewSlug(this.value)"></div>
-          <div><label>Grupo</label><select id="sc-group"></select></div>
+          <div><label>Ambiente onde ela fica</label><select id="sc-group"></select></div>
         </div>
         <div id="slug-preview" style="display:none" class="slug-box">
           <span style="color:var(--muted)">URL:</span>
@@ -250,20 +242,22 @@
 
 <div class="modal-back" id="sched-modal">
   <div class="modal">
-    <div class="card-title" style="margin-bottom:2px">Agendar slide</div>
+    <div class="card-title" style="margin-bottom:2px">Quando este conteúdo aparece</div>
     <div class="card-sub" id="ed-slide-name" style="margin-bottom:16px"></div>
     <div class="form-grid">
-      <div><label>Exibir a partir de</label><input type="datetime-local" id="ed-starts"></div>
-      <div><label>Expira em</label><input type="datetime-local" id="ed-expires"></div>
+      <div class="form-full" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Período (dias corridos)</div>
+      <div><label>Começa em</label><input type="date" id="ed-starts"></div>
+      <div><label>Termina em</label><input type="date" id="ed-expires"></div>
+      <div class="form-full" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:6px">Dentro do período, repete assim</div>
       <div class="form-full"><label>Dias da semana</label><div id="ed-days" class="days-row"></div></div>
-      <div><label>Horário — início</label><input type="time" id="ed-tstart"></div>
-      <div><label>Horário — fim</label><input type="time" id="ed-tend"></div>
+      <div><label>Das</label><input type="time" id="ed-tstart"></div>
+      <div><label>Até</label><input type="time" id="ed-tend"></div>
     </div>
     <div id="ed-hint" class="sched-hint"></div>
-    <div style="font-size:11px;color:var(--muted);margin:8px 0 18px">Deixe em branco para exibir sempre. Sem dias marcados = todos os dias. Se o horário virar a noite, marque o dia em que ele começa.</div>
+    <div style="font-size:11px;color:var(--muted);margin:8px 0 18px">Tudo em branco = aparece sempre. Sem dias marcados = todos os dias. Sem horário = o dia inteiro.</div>
     <div class="flex-gap" style="justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeSched()">Cancelar</button>
-      <button class="btn btn-danger" onclick="clearSched()">Limpar agendamento</button>
+      <button class="btn btn-danger" onclick="clearSched()">Deixar sempre no ar</button>
       <button class="btn btn-primary" onclick="saveSched()">Salvar</button>
     </div>
   </div>
@@ -299,9 +293,6 @@ let videoTextEditId=null;
 const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade80',msg:'#6c63ff',aviso:'#f87171'};
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
-function esc(value){return String(value??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]))}
-function safeColor(value,fallback='#333333'){return /^#[0-9a-f]{6}$/i.test(value||'')?value:fallback}
-function safeMediaUrl(value){return /^\/uploads\/[0-9a-f-]+\.(?:jpe?g|png|webp|mp4)$/i.test(value||'')?value:''}
 function goTo(p,btn){
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
@@ -411,11 +402,6 @@ async function addSlide(){
     fd.append('title',title);fd.append('body',body);fd.append('type',type);fd.append('duration',dur);fd.append('bg',bg);
     fd.append('video_text_mode',type==='vid'?document.getElementById('sl-video-text-mode').value:'none');
     fd.append('video_text_seconds',type==='vid'?document.getElementById('sl-video-text-seconds').value:'0');
-    fd.append('starts_at',document.getElementById('nsl-starts').value||'');
-    fd.append('expires_at',document.getElementById('nsl-expires').value||'');
-    fd.append('days',getDays('nsl-days'));
-    fd.append('time_start',document.getElementById('nsl-tstart').value||'');
-    fd.append('time_end',document.getElementById('nsl-tend').value||'');
     if(pendingFile)fd.append('file',pendingFile);
     const r=await fetch('/api/slides',{method:'POST',body:fd});
     const data=await r.json();
@@ -425,40 +411,35 @@ async function addSlide(){
     document.getElementById('sl-video-text-mode').value='fixed';
     document.getElementById('sl-video-text-seconds').value='5';
     videoTextModeChange('sl');
-    resetScheduleForm();
     cancelFile();
-    await load();toast('Slide adicionado!');
+    await load();
+    toast('Adicionado à biblioteca. Agora coloque em um ambiente.');
   }catch(e){
     toast('Erro ao enviar. Verifique o servidor.');
   }finally{
     btn.disabled=false;
-    btn.textContent='Adicionar slide';
+    btn.textContent='Adicionar à biblioteca';
   }
 }
 function renderSlides(){
   const el=document.getElementById('slide-list');
-  if(!slides.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum slide ainda.</div>';return;}
+  if(!slides.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum conteúdo ainda.</div>';return;}
   el.innerHTML=slides.map(s=>{
-    const media=safeMediaUrl(s.url);
-    const thumb=media?(s.type==='vid'?`<video src="${esc(media)}" style="width:100%;height:100%;object-fit:cover"></video>`:`<img src="${esc(media)}" alt="" style="width:100%;height:100%;object-fit:cover">`):
-      `<div style="background:${safeColor(s.bg,'#111111')};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:10px;color:rgba(255,255,255,.4)">${esc(s.type)}</div>`;
-    const st=s.status||{active:true};
-    const estado=st.active
-      ? '<span class="state state-on">● No ar</span>'
-      : `<span class="state state-off">● Oculto — ${esc(st.detail||'fora da programação')}</span>`;
-    const regra=isScheduled(s)?`<span class="sched-badge">⏱ ${esc(scheduleLabel(s))}</span>`:'';
-    const typeMeta=s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem':'texto';
-    const meta=[s.body||'',typeMeta,s.type!=='vid'&&s.duration?s.duration+'s':''].filter(Boolean).map(esc).join(' · ');
-    return `<div class="item${st.active?'':' item-off'}">
-      <div class="item-thumb">${thumb}</div>
+    const meta=[s.body||'', s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem':'texto', s.type!=='vid'&&s.duration?s.duration+'s':'']
+      .filter(Boolean).join(' · ');
+    const uso=s.em_uso
+      ? `<span class="state state-on">● em ${s.em_uso} ambiente${s.em_uso>1?'s':''}</span>`
+      : '<span class="state state-off">● não está em nenhum ambiente</span>';
+    return `<div class="item${s.em_uso?'':' item-off'}">
+      <div class="item-thumb">${thumbDe(s)}</div>
       <div class="item-info">
-        <div class="item-name">${esc(s.title||'Sem título')}${regra}</div>
-        <div class="item-meta">${estado}${meta?' · '+meta:''}</div>
+        <div class="item-name">${nomeDe(s)}</div>
+        <div class="item-meta">${uso} · ${meta}</div>
       </div>
       <div class="item-actions">
         ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:''}
-        <button class="btn btn-ghost btn-sm" onclick="openSched('${s.id}')">Agendar</button>
-        <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')">✕</button>
+        <button class="btn btn-ghost btn-sm" onclick="renameSlide('${s.id}')">Renomear</button>
+        <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')" title="Remover da biblioteca">✕</button>
       </div>
     </div>`;
   }).join('');
@@ -474,7 +455,7 @@ function openVideoText(id){
   const s=slides.find(x=>x.id===id);
   if(!s||s.type!=='vid')return;
   videoTextEditId=id;
-  document.getElementById('video-text-name').textContent=s.title||'Vídeo';
+  document.getElementById('video-text-name').textContent=nomeDe(s);
   document.getElementById('video-text-mode').value=videoTextModeOf(s);
   document.getElementById('video-text-seconds').value=parseInt(s.video_text_seconds,10)||5;
   videoTextModeChange('edit');
@@ -490,7 +471,45 @@ async function saveVideoText(){
   if(r&&r.error){toast(r.error);return;}
   closeVideoText();await load();toast('Texto do vídeo atualizado');
 }
-async function delSlide(id){if(!confirm('Remover este slide e sua mídia?'))return;await api('DELETE','/api/slides/'+id);await load();toast('Slide removido')}
+// Conteudo enviado antes do titulo automatico fica como "(sem titulo)". Isso
+// permite dar nome sem reenviar o arquivo.
+async function renameSlide(id){
+  const s=slides.find(x=>x.id===id);
+  if(!s)return;
+  const atual=(s.title&&s.title.trim())?s.title:'';
+  const novo=prompt('Nome deste conteúdo:',atual);
+  if(novo===null)return;
+  const limpo=novo.trim();
+  if(limpo===atual)return;
+  if(!limpo){toast('O nome não pode ficar vazio');return;}
+  const r=await api('PUT','/api/slides/'+id,{title:limpo});
+  if(r&&r.error){toast(r.error);return;}
+  await load();toast('Renomeado');
+}
+// Nome legivel: sem titulo, dois videos apareciam ambos como "vid"
+function nomeDe(s){
+  if(s.title&&s.title.trim())return s.title;
+  if(s.url){
+    const arq=(s.url.split('/').pop()||'').replace(/\.[^.]+$/,'');
+    if(arq)return arq.length>28?arq.slice(0,28)+'…':arq;
+  }
+  return s.type==='vid'?'Vídeo':s.type==='img'?'Imagem':'Sem título';
+}
+function thumbDe(s){
+  if(s.url&&s.type==='vid')return `<video src="${s.url}#t=1" style="width:100%;height:100%;object-fit:cover" preload="metadata" muted></video>`;
+  if(s.url)return `<img src="${s.url}" style="width:100%;height:100%;object-fit:cover">`;
+  return `<div style="background:${s.bg||'#111'};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.5)">TXT</div>`;
+}
+async function delSlide(id){
+  const s=slides.find(x=>x.id===id);
+  const aviso=s&&s.em_uso
+    ? '"'+nomeDe(s)+'" está em '+s.em_uso+' ambiente(s). Remover da biblioteca tira de todos. Continuar?'
+    : 'Remover "'+nomeDe(s)+'" da biblioteca? Esta ação também exclui o arquivo enviado.';
+  if(!confirm(aviso))return;
+  const r=await api('DELETE','/api/slides/'+id);
+  if(r.error){toast(r.error);return;}
+  await load();toast('Removido da biblioteca');
+}
 
 // ── AGENDAMENTO (prazo / dias / horario por slide) ──────────
 const WEEKDAYS=[{v:1,l:'Seg'},{v:2,l:'Ter'},{v:3,l:'Qua'},{v:4,l:'Qui'},{v:5,l:'Sex'},{v:6,l:'Sáb'},{v:0,l:'Dom'}];
@@ -506,18 +525,26 @@ function setDays(containerId,days){
   const set=new Set((days||[]).map(String));
   document.querySelectorAll('#'+containerId+' input').forEach(c=>{c.checked=set.has(c.value);});
 }
-function toLocalInput(iso){
+// Só a data: a hora do dia é definida pelos campos "Das/Até", não aqui.
+// Era isso que aparecia duplicado.
+function toDateInput(iso){
   if(!iso)return '';
   const d=new Date(iso);
   if(isNaN(d.getTime()))return '';
   const p=n=>String(n).padStart(2,'0');
-  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T'+p(d.getHours())+':'+p(d.getMinutes());
+  return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());
 }
-function fmtDate(iso){
-  const d=new Date(iso);
-  if(isNaN(d.getTime()))return '';
+// Aceita ISO completo (vem do servidor) e 'AAAA-MM-DD' (vem do input de data).
+// Sem o tratamento do segundo caso, new Date('2026-07-31') seria meia-noite UTC
+// e a tela mostraria 30/07 — um dia a menos.
+function fmtDate(valor){
+  if(!valor)return '';
   const p=n=>String(n).padStart(2,'0');
-  return p(d.getDate())+'/'+p(d.getMonth()+1)+' '+p(d.getHours())+':'+p(d.getMinutes());
+  const soData=/^(\d{4})-(\d{2})-(\d{2})$/.exec(String(valor));
+  if(soData)return soData[3]+'/'+soData[2];
+  const d=new Date(valor);
+  if(isNaN(d.getTime()))return '';
+  return p(d.getDate())+'/'+p(d.getMonth()+1);
 }
 function daysLabel(days){
   const order=[1,2,3,4,5,6,0];
@@ -529,33 +556,33 @@ function isScheduled(s){
 }
 function scheduleLabel(s){
   const parts=[];
-  if(s.starts_at)parts.push('de '+fmtDate(s.starts_at));
-  if(s.expires_at)parts.push('até '+fmtDate(s.expires_at));
+  if(s.starts_at&&s.expires_at)parts.push(fmtDate(s.starts_at)+' a '+fmtDate(s.expires_at));
+  else if(s.starts_at)parts.push('a partir de '+fmtDate(s.starts_at));
+  else if(s.expires_at)parts.push('até '+fmtDate(s.expires_at));
   if(s.days&&s.days.length)parts.push(daysLabel(s.days));
   if(s.time_start&&s.time_end)parts.push(s.time_start+'–'+s.time_end);
   return parts.join(' · ');
 }
-function resetScheduleForm(){
-  document.getElementById('nsl-starts').value='';
-  document.getElementById('nsl-expires').value='';
-  document.getElementById('nsl-tstart').value='';
-  document.getElementById('nsl-tend').value='';
-  setDays('nsl-days',[]);
-}
-function openSched(id){
-  const s=slides.find(x=>x.id===id);
-  if(!s)return;
-  schedEditId=id;
-  document.getElementById('ed-slide-name').textContent=s.title||(s.type==='vid'?'Vídeo':s.type==='img'?'Imagem':'Slide sem título');
-  document.getElementById('ed-starts').value=toLocalInput(s.starts_at);
-  document.getElementById('ed-expires').value=toLocalInput(s.expires_at);
-  document.getElementById('ed-tstart').value=s.time_start||'';
-  document.getElementById('ed-tend').value=s.time_end||'';
-  setDays('ed-days',s.days||[]);
+
+// O agendamento pertence ao par (ambiente, conteudo): o mesmo video pode ter
+// prazos diferentes em cada lugar.
+let schedGrupo=null;
+function openSched(groupId,slideId){
+  const item=(playlistCache[groupId]||[]).find(x=>x.id===slideId);
+  if(!item)return;
+  const g=groups.find(x=>x.id===groupId);
+  schedGrupo=groupId;schedEditId=slideId;
+  document.getElementById('ed-slide-name').innerHTML=
+    '<b style="color:var(--text)">'+nomeDe(item)+'</b> no ambiente <b style="color:var(--text)">'+(g?g.name:'—')+'</b>';
+  document.getElementById('ed-starts').value=toDateInput(item.starts_at);
+  document.getElementById('ed-expires').value=toDateInput(item.expires_at);
+  document.getElementById('ed-tstart').value=item.time_start||'';
+  document.getElementById('ed-tend').value=item.time_end||'';
+  setDays('ed-days',item.days||[]);
   document.getElementById('sched-modal').classList.add('show');
   updateSchedHint();
 }
-function closeSched(){document.getElementById('sched-modal').classList.remove('show');schedEditId=null;}
+function closeSched(){document.getElementById('sched-modal').classList.remove('show');schedEditId=null;schedGrupo=null;}
 
 // Lê o formulário do modal
 function schedForm(){
@@ -571,14 +598,13 @@ function schedForm(){
 // Mesmas regras do servidor (validarAgendamento). Aqui servem só para avisar
 // antes de salvar; quem decide de verdade continua sendo o servidor.
 function schedProblema(b){
-  if(b.starts_at&&b.expires_at){
-    const i=new Date(b.starts_at),f=new Date(b.expires_at);
-    if(f<i)return 'A expiração é anterior ao início — o slide nunca apareceria.';
-    if(f.getTime()===i.getTime())return 'Início e expiração iguais — o slide nunca apareceria.';
+  // Datas sem hora: "de 14/08 até 14/08" é válido e significa "só nesse dia".
+  if(b.starts_at&&b.expires_at&&b.expires_at<b.starts_at){
+    return 'A data final é anterior à inicial — nunca apareceria.';
   }
-  if(b.time_start&&!b.time_end)return 'Falta o horário de fim.';
-  if(b.time_end&&!b.time_start)return 'Falta o horário de início.';
-  if(b.time_start&&b.time_end&&b.time_start===b.time_end)return 'Horário de início e fim iguais — o slide nunca apareceria.';
+  if(b.time_start&&!b.time_end)return 'Falta o horário final ("Até").';
+  if(b.time_end&&!b.time_start)return 'Falta o horário inicial ("Das").';
+  if(b.time_start&&b.time_end&&b.time_start===b.time_end)return 'Os dois horários são iguais — nunca apareceria.';
   return null;
 }
 
@@ -598,7 +624,7 @@ function updateSchedHint(){
   if(btn)btn.disabled=false;
   if(!b.starts_at&&!b.expires_at&&!b.days&&!b.time_start){
     el.className='sched-hint';
-    el.innerHTML='Sem agendamento: <b>toca sempre</b>, em toda passagem da playlist.';
+    el.innerHTML='Sem agendamento: fica <b>sempre no ar</b> neste ambiente.';
     return;
   }
   const partes=[];
@@ -606,26 +632,32 @@ function updateSchedHint(){
   if(b.time_start&&b.time_end){
     partes.push('das <b>'+b.time_start+'</b> às <b>'+b.time_end+'</b>'+
       (b.time_end<b.time_start?' (vira a noite)':''));
-  }else partes.push('o dia todo');
-  if(b.starts_at)partes.push('a partir de <b>'+fmtDate(b.starts_at)+'</b>');
-  if(b.expires_at)partes.push('até <b>'+fmtDate(b.expires_at)+'</b>');
-  const frase='Vai tocar '+partes.join(', ')+'.';
-  const jaPassou=b.expires_at&&new Date(b.expires_at)<new Date();
-  el.className='sched-hint'+(jaPassou?' warn':'');
-  el.innerHTML=frase+(jaPassou?'<br>⚠ Essa data já passou: o slide <b>sai da tela assim que salvar</b>.':'');
+  }else partes.push('o dia inteiro');
+  if(b.starts_at&&b.expires_at)partes.push('de <b>'+fmtDate(b.starts_at)+'</b> até <b>'+fmtDate(b.expires_at)+'</b>');
+  else if(b.starts_at)partes.push('a partir de <b>'+fmtDate(b.starts_at)+'</b>');
+  else if(b.expires_at)partes.push('até <b>'+fmtDate(b.expires_at)+'</b>');
+
+  const frase='Neste ambiente, aparece '+partes.join(', ')+'.';
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const jaPassou=b.expires_at&&new Date(b.expires_at+'T23:59:59')<new Date();
+  const aindaNao=b.starts_at&&new Date(b.starts_at+'T00:00:00')>new Date();
+  el.className='sched-hint'+((jaPassou||aindaNao)?' warn':'');
+  el.innerHTML=frase
+    +(jaPassou?'<br>⚠ Esse prazo já passou: <b>sai da tela assim que salvar</b>.':'')
+    +(aindaNao?'<br>⏳ Ainda não começou: <b>só aparece a partir dessa data</b>.':'');
 }
 
 async function saveSched(){
-  if(!schedEditId)return;
+  if(!schedEditId||!schedGrupo)return;
   const body=schedForm();
   const problema=schedProblema(body);
   if(problema){toast(problema);return;}
-  const r=await api('PUT','/api/slides/'+schedEditId,body);
+  const r=await api('PUT','/api/groups/'+schedGrupo+'/slides/'+schedEditId,body);
   if(r&&r.error){toast(r.error);return;}
   closeSched();await load();
   toast(r&&r.status&&r.status.active===false
-    ? 'Salvo — o slide está oculto: '+(r.status.detail||'fora da programação')
-    : 'Agendamento salvo — slide no ar');
+    ? 'Salvo — está oculto: '+(r.status.detail||'fora da programação')
+    : 'Salvo — está no ar agora');
 }
 function clearSched(){
   document.getElementById('ed-starts').value='';
@@ -636,47 +668,93 @@ function clearSched(){
   saveSched();
 }
 
-// GRUPOS
+// AMBIENTES — é aqui que se define o que toca em cada lugar, e quando
+let playlistCache={};
+
 async function addGroup(){
   const name=document.getElementById('gr-name').value.trim();
-  if(!name){toast('Digite o nome do grupo');return;}
-  const result=await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
-  if(result.error){toast(result.error);return;}
+  if(!name){toast('Digite o nome do ambiente');return;}
+  await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
   document.getElementById('gr-name').value='';
-  await load();toast('Grupo criado!');
+  await load();toast('Ambiente criado');
 }
-async function toggleSlide(gid,sid){
-  const pl=await api('GET','/api/groups/'+gid+'/slides');
-  if(pl.find(s=>s.id===sid))await api('DELETE','/api/groups/'+gid+'/slides/'+sid);
-  else await api('POST','/api/groups/'+gid+'/slides',{slide_id:sid});
-  await renderGroups();
+async function addToGroup(gid,select){
+  const sid=select.value;
+  if(!sid)return;
+  const r=await api('POST','/api/groups/'+gid+'/slides',{slide_id:sid});
+  if(r&&r.error){toast(r.error);return;}
+  await load();toast('Adicionado — clique em Agendar para definir quando aparece');
 }
+async function removeFromGroup(gid,sid){
+  await api('DELETE','/api/groups/'+gid+'/slides/'+sid);
+  await load();toast('Removido do ambiente');
+}
+
 async function renderGroups(){
   const el=document.getElementById('group-list');
-  if(!groups.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum grupo ainda.</div>';return;}
+  if(!groups.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum ambiente ainda.</div>';return;}
   const pls=await Promise.all(groups.map(g=>api('GET','/api/groups/'+g.id+'/slides')));
+  playlistCache={};
+  groups.forEach((g,i)=>{playlistCache[g.id]=pls[i];});
+
   el.innerHTML=groups.map((g,i)=>{
     const pl=pls[i];
-    const pills=slides.map(s=>`<span class="pill ${pl.find(p=>p.id===s.id)?'on':''}" onclick="toggleSlide('${g.id}','${s.id}')"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${esc(s.title||s.type)}</span>`).join('');
-    const plPills=pl.map(s=>`<span class="pill on"><span class="pill-dot" style="background:${ACCENT[s.type]||'#888'}"></span>${esc(s.title||'Sem título')} <span style="opacity:.5">${esc(s.duration)}s</span></span>`).join('');
-    return `<div class="card">
-      <div class="card-row" style="margin-bottom:14px">
-        <div class="flex-gap"><span class="cdot" style="background:${safeColor(g.color)}"></span><span class="card-title">${esc(g.name)}</span></div>
+    const telas=screens.filter(s=>s.group_id===g.id);
+    const noAr=pl.filter(x=>x.status&&x.status.active).length;
+
+    const itens=pl.length?pl.map(item=>{
+      const st=item.status||{active:true};
+      const estado=st.active
+        ? '<span class="state state-on">● No ar</span>'
+        : `<span class="state state-off">● Oculto — ${st.detail||'fora da programação'}</span>`;
+      const regra=item.agendado
+        ? `<span class="sched-badge">⏱ ${scheduleLabel(item)}</span>`
+        : '<span class="sched-badge" style="background:rgba(255,255,255,.06);color:var(--muted)">sempre</span>';
+      return `<div class="item${st.active?'':' item-off'}">
+        <div class="item-thumb">${thumbDe(item)}</div>
+        <div class="item-info">
+          <div class="item-name">${nomeDe(item)}${regra}</div>
+          <div class="item-meta">${estado}</div>
+        </div>
+        <div class="item-actions">
+          <button class="btn btn-ghost btn-sm" onclick="openSched('${g.id}','${item.id}')">Agendar</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="removeFromGroup('${g.id}','${item.id}')" title="Tirar deste ambiente">✕</button>
+        </div>
+      </div>`;
+    }).join(''):'<div style="font-size:12px;color:var(--muted);padding:14px 2px">Nenhum conteúdo aqui ainda.</div>';
+
+    const disponiveis=slides.filter(s=>!pl.find(p=>p.id===s.id));
+    const seletor=disponiveis.length
+      ? `<select onchange="addToGroup('${g.id}',this)" style="max-width:340px">
+           <option value="">+ Adicionar conteúdo…</option>
+           ${disponiveis.map(s=>`<option value="${s.id}">${nomeDe(s)}</option>`).join('')}
+         </select>`
+      : `<span style="font-size:12px;color:var(--muted)">${slides.length?'Todo o conteúdo já está aqui.':'Cadastre conteúdo primeiro na aba Conteúdo.'}</span>`;
+
+    const alerta=(telas.length&&!noAr)
+      ? `<div class="sched-hint bad" style="margin:0 0 12px">⚠ Este ambiente tem ${telas.length} tela(s) e <b>nada no ar agora</b> — elas estão em branco.</div>`
+      : '';
+
+    return `<div class="card" style="border-left:3px solid ${g.color||'#333'}">
+      <div class="card-row" style="margin-bottom:4px">
+        <div class="flex-gap"><span class="cdot" style="background:${g.color}"></span><span class="card-title">${g.name}</span></div>
         <button class="btn btn-danger btn-sm" onclick="delGroup('${g.id}')">Remover</button>
       </div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Clique para adicionar à playlist:</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">${pills||'<span style="font-size:12px;color:var(--muted)">Crie slides primeiro</span>'}</div>
-      <div class="sep"></div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">Playlist atual (${pl.length} slide${pl.length!==1?'s':''}):</div>
-      <div class="pill-area">${plPills||'<span style="font-size:12px;color:var(--muted)">Nenhum slide selecionado</span>'}</div>
+      <div class="card-sub" style="margin-bottom:14px">
+        ${telas.length?telas.map(t=>t.name).join(', '):'nenhuma tela neste ambiente'} · ${noAr} de ${pl.length} no ar
+      </div>
+      ${alerta}
+      <div class="item-list">${itens}</div>
+      <div style="margin-top:12px">${seletor}</div>
     </div>`;
   }).join('');
 }
 async function delGroup(id){
-  if(!confirm('Remover este grupo?'))return;
+  const g=groups.find(x=>x.id===id);
+  if(!confirm('Remover o ambiente "'+(g?g.name:'selecionado')+'"?'))return;
   const r=await api('DELETE','/api/groups/'+id);
   if(r.error){toast(r.error);return;}
-  await load();toast('Grupo removido');
+  await load();toast('Ambiente removido');
 }
 
 // TELAS
@@ -684,8 +762,7 @@ async function addScreen(){
   const name=document.getElementById('sc-name').value.trim();
   const group_id=document.getElementById('sc-group').value;
   if(!name||!group_id){toast('Nome e grupo são obrigatórios');return;}
-  const result=await api('POST','/api/screens',{name,group_id});
-  if(result.error){toast(result.error);return;}
+  await api('POST','/api/screens',{name,group_id});
   document.getElementById('sc-name').value='';
   document.getElementById('slug-preview').style.display='none';
   await load();toast('Tela adicionada!');
@@ -693,7 +770,7 @@ async function addScreen(){
 async function renderScreens(){
   const el=document.getElementById('screen-list');
   const sel=document.getElementById('sc-group');
-  sel.innerHTML=groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
+  sel.innerHTML=groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
   if(!screens.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhuma tela cadastrada.</div>';return;}
   const origin=publicOrigin();
   el.innerHTML=screens.map(s=>{
@@ -704,7 +781,7 @@ async function renderScreens(){
       <div class="card-row">
         <div class="flex-gap">
           <span class="online-dot ${online?'on':'off'}"></span>
-          <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(g?g.name:'Sem grupo')}</div></div>
+          <div><div class="card-title">${s.name}</div><div class="card-sub">${g?g.name:'Sem grupo'}</div></div>
         </div>
         <div class="flex-gap">
           <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
@@ -714,36 +791,46 @@ async function renderScreens(){
       <div class="sep" style="margin:12px 0"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
       <div class="url-box">
-        <input class="url-value" value="${esc(playerUrl)}" readonly aria-label="URL do player">
+        <input class="url-value" value="${playerUrl}" readonly aria-label="URL do player">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}',this)">Copiar</button>
         <a href="${playerUrl}" target="_blank" class="btn btn-ghost btn-sm">Abrir</a>
       </div>
     </div>`;
   }).join('');
 }
-async function delScreen(id){if(!confirm('Remover esta tela?'))return;await api('DELETE','/api/screens/'+id);await load();toast('Tela removida')}
+async function delScreen(id){
+  const s=screens.find(x=>x.id===id);
+  if(!confirm('Remover a tela "'+(s?s.name:'selecionada')+'"? O endereço do player deixará de funcionar.'))return;
+  const r=await api('DELETE','/api/screens/'+id);
+  if(r.error){toast(r.error);return;}
+  await load();toast('Tela removida');
+}
 function legacyCopy(url,trigger){
   const previous=document.activeElement;
-  const visible=trigger&&trigger.parentElement?trigger.parentElement.querySelector('.url-value'):null;
-  const area=visible||document.createElement('textarea');
-  if(!visible){area.value=url;area.setAttribute('readonly','');area.setAttribute('aria-hidden','true');area.style.position='fixed';area.style.top='0';area.style.left='0';area.style.width='1px';area.style.height='1px';area.style.padding='0';area.style.border='0';area.style.opacity='.01';document.body.appendChild(area);}
+  const area=document.createElement('textarea');
+  area.value=url;area.setAttribute('readonly','');area.setAttribute('aria-hidden','true');
+  area.style.position='fixed';area.style.top='0';area.style.left='0';area.style.width='1px';area.style.height='1px';area.style.padding='0';area.style.border='0';area.style.opacity='.01';
+  document.body.appendChild(area);
   area.focus({preventScroll:true});area.select();area.setSelectionRange(0,area.value.length);
-  let eventHandled=false;
-  const onCopy=e=>{if(e.clipboardData){e.clipboardData.setData('text/plain',url);e.preventDefault();eventHandled=true;}};
-  document.addEventListener('copy',onCopy,{once:true});
   let copied=false;
   try{copied=document.execCommand('copy');}
-  finally{setTimeout(()=>{document.removeEventListener('copy',onCopy);if(!visible){area.remove();if(previous&&previous.focus)previous.focus({preventScroll:true});}},100);}
-  if(!copied&&!eventHandled)throw new Error('copy indisponível');
+  finally{area.remove();if(previous&&previous.focus)previous.focus({preventScroll:true});}
+  if(!copied)throw new Error('copy indisponível');
+}
+function selectUrlForManualCopy(url,trigger){
+  const visible=trigger&&trigger.parentElement?trigger.parentElement.querySelector('.url-value'):null;
+  if(!visible)throw new Error('campo da URL indisponível');
+  visible.focus({preventScroll:true});visible.select();visible.setSelectionRange(0,visible.value.length);
 }
 async function copyUrl(url,trigger){
   try{
     if(window.isSecureContext&&navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(url);
-    else legacyCopy(url,trigger);
-    toast(window.isSecureContext?'URL copiada!':'URL selecionada e cópia solicitada — Ctrl+C se necessário');
+    else{legacyCopy(url,trigger);selectUrlForManualCopy(url,trigger);}
+    toast('URL copiada!');
   }catch(e){
-    try{legacyCopy(url,trigger);toast('URL selecionada — pressione Ctrl+C para copiar');}
-    catch(f){toast('Não foi possível copiar — selecione a URL manualmente');}
+    try{legacyCopy(url,trigger);selectUrlForManualCopy(url,trigger);toast('URL copiada!');}
+    catch(f){try{selectUrlForManualCopy(url,trigger);toast('Cópia bloqueada pelo navegador — pressione Ctrl+C');}
+    catch(g){toast('Não foi possível copiar — selecione a URL manualmente');}}
   }
 }
 
@@ -758,14 +845,14 @@ async function renderDash(){
   el.innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+screens.map(s=>{
     const g=groups.find(g=>g.id===s.group_id);
     const online=s.last_seen&&(Date.now()-new Date(s.last_seen).getTime())<60000;
-    return `<div class="card" style="border-left:3px solid ${safeColor(g?.color)}">
+    return `<div class="card" style="border-left:3px solid ${g?.color||'#333'}">
       <div class="card-row">
-        <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${esc(s.name)}</span></div>
+        <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${s.name}</span></div>
         <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
       </div>
-      <div class="card-sub mt8">${esc(g?g.name:'Sem grupo')}</div>
+      <div class="card-sub mt8">${g?g.name:'Sem grupo'}</div>
       <div class="url-box mt8" style="font-size:11px">
-        <input class="url-value" value="${esc(origin+'/player/'+s.id)}" readonly aria-label="URL do player">
+        <input class="url-value" value="${origin}/player/${s.id}" readonly aria-label="URL do player">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}',this)">Copiar</button>
       </div>
     </div>`;
@@ -783,21 +870,20 @@ async function renderProgramacao(){
   el.innerHTML='<div class="page-title" style="font-size:15px;margin:24px 0 10px">Programação agora</div>'+
     prog.map(t=>{
       const noAr=t.no_ar.length
-            ? t.no_ar.map(i=>`<div class="prog-line"><span class="tag tag-on">programado</span><span>${esc(i.title)}</span></div>`).join('')
-            : '<div class="prog-line" style="color:var(--danger)"><span class="tag tag-off">vazio</span><span>Nenhum conteúdo programado para esta tela</span></div>';
+        ? t.no_ar.map(i=>`<div class="prog-line"><span class="tag tag-on">no ar</span><span>${i.title}</span></div>`).join('')
+        : '<div class="prog-line" style="color:var(--danger)"><span class="tag tag-off">vazio</span><span>Nenhum conteúdo tocando nesta tela</span></div>';
       const ocultos=t.ocultos.map(i=>
-        `<div class="prog-line"><span class="tag tag-off">oculto</span><span>${esc(i.title)} — ${esc(i.status.detail||'fora da programação')}</span></div>`).join('');
+        `<div class="prog-line"><span class="tag tag-off">oculto</span><span>${i.title} — ${i.status.detail||'fora da programação'}</span></div>`).join('');
       return `<div class="prog-screen">
         <div class="card-row">
-          <div class="flex-gap"><span class="online-dot ${t.online?'on':'off'}"></span><span class="card-title">${esc(t.screen_name)}</span></div>
-          <span class="card-sub">${esc(t.group_name)}</span>
+          <div class="flex-gap"><span class="online-dot ${t.online?'on':'off'}"></span><span class="card-title">${t.screen_name}</span></div>
+          <span class="card-sub">${t.group_name}</span>
         </div>
         ${noAr}${ocultos}
       </div>`;
     }).join('');
 }
 
-fillDays('nsl-days');
 fillDays('ed-days');
 document.getElementById('sched-modal').addEventListener('click',e=>{if(e.target.id==='sched-modal')closeSched();});
 document.getElementById('video-text-modal').addEventListener('click',e=>{if(e.target.id==='video-text-modal')closeVideoText();});

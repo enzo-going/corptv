@@ -97,11 +97,18 @@ async function seed() {
   console.log('   Player de exemplo: http://localhost:3000/player/recepcao-principal');
 }
 
-db.ready = process.env.CORPTV_DISABLE_SEED === '1'
-  ? Promise.resolve()
-  : seed().catch(error => {
-      console.error(error);
-      throw error;
-    });
+// Aguarda explicitamente a carga dos quatro bancos antes de liberar a API.
+// CORPTV_DISABLE_SEED=1 evita criar os dados de exemplo durante os testes.
+db.ready = (async () => {
+  await Promise.all(
+    stores.map(name => db[name].load())
+  );
+  if (process.env.CORPTV_DISABLE_SEED !== '1') await seed();
+  return db;
+})();
+
+db.ready.catch(error => {
+  console.error('[db] falha ao inicializar:', error && error.message);
+});
 
 module.exports = db;

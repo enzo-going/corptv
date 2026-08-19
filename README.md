@@ -18,13 +18,13 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 
 - Texto, imagens JPG/PNG/WEBP e vídeos MP4
 - Vídeos em loop com áudio e título oculto, fixo ou temporário com fade
-- Playlists independentes por grupo de telas
+- Playlists e agendamentos independentes por ambiente
 - URL legível e permanente para cada dispositivo
 - Agendamento por início, expiração, dias da semana e faixa de horário
 - Janelas que atravessam a meia-noite com semântica previsível
 - Atualização automática, heartbeat e visão consolidada da programação
 - Cache offline que respeita o prazo de cada conteúdo
-- HTTP Range e cache imutável para servir vídeos com eficiência
+- HTTP Range, cache imutável e limite de banda por conexão para servir vídeos com eficiência
 - Validação de campos, MIME e assinatura real dos uploads
 - Remoção automática da mídia quando um slide é excluído
 - Watchdog com confirmação de falha antes de reiniciar o serviço
@@ -82,6 +82,7 @@ As variáveis abaixo são opcionais. O arquivo `.env.example` serve como referê
 | `CORPTV_DATA_DIR` | `./data` | Bancos NeDB persistentes |
 | `CORPTV_UPLOADS_DIR` | `./public/uploads` | Imagens e vídeos |
 | `CORPTV_LOG_DIR` | `./logs` | Log de acesso às mídias |
+| `CORPTV_LIMITE_MBPS` | `4.5` | Limite de entrega de mídia por conexão; `0` desativa |
 
 ## Fluxo de operação
 
@@ -93,7 +94,9 @@ As variáveis abaixo são opcionais. O arquivo `.env.example` serve como referê
 
 ## Agendamento
 
-Todos os campos são opcionais; sem regra, o slide toca sempre.
+Todos os campos são opcionais; sem regra, o conteúdo toca sempre. A agenda
+pertence ao vínculo conteúdo–ambiente, então o mesmo vídeo pode ter horários
+diferentes em locais distintos.
 
 | Campo | Comportamento |
 |---|---|
@@ -130,6 +133,7 @@ corptv/
 │   └── validation.js
 ├── test/
 ├── data/                    # execução; ignorado pelo Git
+├── iniciar.bat              # iniciador Windows sem loop
 └── package.json
 ```
 
@@ -141,7 +145,7 @@ O projeto não possui autenticação integrada. Use em uma rede confiável ou ad
 
 ## Operação no Windows
 
-A pasta [`ops`](ops/) inclui o iniciador resiliente, watchdog, backup e registro das tarefas agendadas. O backup para o serviço por poucos segundos para copiar os bancos de forma consistente; as mídias imutáveis usam hardlinks NTFS, evitando duplicar gigabytes a cada dia. Consulte [ops/README.md](ops/README.md) para instalação e restauração.
+A pasta [`ops`](ops/) inclui watchdog, backup e registro das tarefas agendadas. O `iniciar.bat` abre uma única instância; o watchdog é o único responsável pelo reinício automático, evitando processos órfãos. O backup para o serviço por poucos segundos para copiar os bancos de forma consistente; as mídias imutáveis usam hardlinks NTFS, evitando duplicar gigabytes a cada dia. Consulte [ops/README.md](ops/README.md) para instalação e restauração.
 
 ## Licença
 
