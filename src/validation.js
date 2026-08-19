@@ -1,6 +1,7 @@
 'use strict';
 
 const SLIDE_TYPES = new Set(['txt', 'img', 'vid']);
+const VIDEO_TEXT_MODES = new Set(['none', 'fixed', 'timed']);
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 function normalizeText(value, field, maxLength, required) {
@@ -30,6 +31,32 @@ function normalizeDuration(value, type) {
     return { error: 'A duração deve estar entre 3 e 300 segundos.' };
   }
   return { value: duration };
+}
+
+function normalizeVideoText(body, type, options) {
+  const settings = options || {};
+  const current = settings.current || {};
+  if (type !== 'vid') return { value: { video_text_mode: 'none', video_text_seconds: 0 } };
+
+  const rawMode = body.video_text_mode === undefined
+    ? (current.video_text_mode || 'fixed')
+    : body.video_text_mode;
+  if (typeof rawMode !== 'string' || !VIDEO_TEXT_MODES.has(rawMode)) {
+    return { error: 'Modo do texto do vídeo inválido.' };
+  }
+
+  if (rawMode !== 'timed') {
+    return { value: { video_text_mode: rawMode, video_text_seconds: 0 } };
+  }
+
+  const rawSeconds = body.video_text_seconds === undefined
+    ? (current.video_text_seconds || 5)
+    : body.video_text_seconds;
+  const seconds = Number.parseInt(rawSeconds, 10);
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 300) {
+    return { error: 'O texto temporário deve ficar entre 1 e 300 segundos.' };
+  }
+  return { value: { video_text_mode: rawMode, video_text_seconds: seconds } };
 }
 
 function validateSlideInput(body = {}, options) {
@@ -68,6 +95,14 @@ function validateSlideInput(body = {}, options) {
     value.bg = color.value;
   }
 
+  const shouldNormalizeVideoText = !partial || fileType ||
+    body.video_text_mode !== undefined || body.video_text_seconds !== undefined;
+  if (shouldNormalizeVideoText) {
+    const videoText = normalizeVideoText(body, type, { current: settings.current });
+    if (videoText.error) return videoText;
+    Object.assign(value, videoText.value);
+  }
+
   if (!partial && !value.title && !hasFile) {
     return { error: 'Título ou arquivo obrigatório.' };
   }
@@ -94,6 +129,7 @@ module.exports = {
   normalizeColor,
   normalizeDuration,
   normalizeText,
+  normalizeVideoText,
   validateGroupInput,
   validateScreenInput,
   validateSlideInput
