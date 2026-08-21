@@ -10,6 +10,17 @@ const MIME_BY_EXTENSION = new Map([
   ['.webp', new Set(['image/webp'])],
   ['.mp4', new Set(['video/mp4'])]
 ]);
+const UPLOAD_FILE_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:jpe?g|png|webp|mp4)$/i;
+
+function resolveUploadPath(filePath, uploadsDir) {
+  if (typeof filePath !== 'string' || typeof uploadsDir !== 'string') return null;
+  const root = path.resolve(uploadsDir);
+  const candidate = path.resolve(filePath);
+  const relative = path.relative(root, candidate);
+  if (!relative || path.isAbsolute(relative) || relative.startsWith('..' + path.sep) || relative.includes(path.sep)) return null;
+  if (!candidate.startsWith(root + path.sep) || !UPLOAD_FILE_PATTERN.test(relative)) return null;
+  return candidate;
+}
 
 function acceptsUpload(file) {
   const extension = path.extname(file.originalname || '').toLowerCase();
@@ -25,8 +36,10 @@ function mediaTypeFromSignature(bytes) {
   return null;
 }
 
-async function inspectStoredUpload(filePath, file) {
-  const handle = await fs.promises.open(filePath, 'r');
+async function inspectStoredUpload(filePath, file, uploadsDir) {
+  const safePath = resolveUploadPath(filePath, uploadsDir);
+  if (!safePath) return { ok: false, error: 'O caminho do upload é inválido.' };
+  const handle = await fs.promises.open(safePath, 'r');
   try {
     const buffer = Buffer.alloc(16);
     const result = await handle.read(buffer, 0, buffer.length, 0);
@@ -42,15 +55,17 @@ async function inspectStoredUpload(filePath, file) {
 }
 
 function uploadedPathFromUrl(url, uploadsDir) {
-  if (typeof url !== 'string' || !/^\/uploads\/[0-9a-f-]+\.(?:jpe?g|png|webp|mp4)$/i.test(url)) return null;
-  const candidate = path.join(uploadsDir, path.basename(url));
-  return path.dirname(candidate) === path.resolve(uploadsDir) ? candidate : null;
+  if (typeof url !== 'string' || !url.startsWith('/uploads/')) return null;
+  const fileName = url.slice('/uploads/'.length);
+  if (!UPLOAD_FILE_PATTERN.test(fileName)) return null;
+  return resolveUploadPath(path.join(uploadsDir, fileName), uploadsDir);
 }
 
-async function removeFile(filePath) {
-  if (!filePath) return false;
+async function removeFile(filePath, uploadsDir) {
+  const safePath = resolveUploadPath(filePath, uploadsDir);
+  if (!safePath) return false;
   try {
-    await fs.promises.unlink(filePath);
+    await fs.promises.unlink(safePath);
     return true;
   } catch (error) {
     if (error.code === 'ENOENT') return false;
