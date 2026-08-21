@@ -10,6 +10,9 @@ const db = {
   slides:  Datastore.create({ filename: path.join(dbPath, 'slides.db'),  autoload: true }),
   gslides: Datastore.create({ filename: path.join(dbPath, 'gslides.db'), autoload: true }),
   screens: Datastore.create({ filename: path.join(dbPath, 'screens.db'), autoload: true }),
+  users: Datastore.create({ filename: path.join(dbPath, 'users.db'), autoload: true }),
+  sessions: Datastore.create({ filename: path.join(dbPath, 'sessions.db'), autoload: true }),
+  audit: Datastore.create({ filename: path.join(dbPath, 'audit.db'), autoload: true }),
 };
 
 // O NeDB grava em log append-only: cada update anexa uma linha nova em vez de
@@ -19,7 +22,7 @@ const db = {
 // o servico fica lento e pesado com o tempo. Compacta a cada 30 min, reescrevendo
 // so o estado atual. Os dados sao preservados: muda apenas o formato em disco.
 const COMPACTION_MS = 30 * 60 * 1000;
-const stores = ['groups', 'slides', 'gslides', 'screens'];
+const stores = ['groups', 'slides', 'gslides', 'screens', 'users', 'sessions', 'audit'];
 stores.forEach(name => {
   const store = db[name];
   if (process.env.CORPTV_DISABLE_MAINTENANCE !== '1' && store && typeof store.setAutocompactionInterval === 'function') {
@@ -103,6 +106,11 @@ db.ready = (async () => {
   await Promise.all(
     stores.map(name => db[name].load())
   );
+  await Promise.all([
+    db.users.ensureIndex({ fieldName: 'username', unique: true }),
+    db.sessions.ensureIndex({ fieldName: 'token_hash', unique: true }),
+    db.audit.ensureIndex({ fieldName: 'seq', unique: true })
+  ]);
   if (process.env.CORPTV_DISABLE_SEED !== '1') await seed();
   return db;
 })();

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>CorporTV — Acesso</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root{--bg:#0d0d0f;--card:#18181c;--field:#101012;--border:#2d2d34;--text:#f4f4f5;--muted:#9292a3;--accent:#6c63ff;--accent2:#4ade80;--danger:#f87171}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -20%,#242141 0,transparent 40%),var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:grid;place-items:center;padding:24px}
+    .wrap{width:min(440px,100%)}.brand{display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:26px;font-size:22px;font-weight:600}.brand svg{color:#ddd}.brand span{display:block;color:var(--muted);font:10px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:1.8px;margin-top:2px}
+    .card{background:rgba(24,24,28,.96);border:1px solid var(--border);border-radius:16px;padding:30px;box-shadow:0 24px 80px rgba(0,0,0,.35)}h1{font-size:22px;margin:0 0 7px}p{font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 24px}label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:15px 0 7px}input{width:100%;background:var(--field);border:1px solid var(--border);border-radius:9px;color:var(--text);font:14px 'DM Sans',sans-serif;padding:11px 12px;outline:0}input:focus{border-color:var(--accent)}button{width:100%;border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:600;padding:12px;margin-top:22px;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.error{display:none;color:var(--danger);background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:14px}.error.show{display:block}.local{display:none;color:#fbbf24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:12px;font-size:12px;line-height:1.5}.hint{font-size:11px;color:var(--muted);margin-top:7px}.setup-only,.remote-only{display:none}body.setup .setup-only{display:block}body.setup.remote .remote-only{display:block}body.setup .login-only{display:none}.secure-note{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:11px;line-height:1.45;margin-top:18px}.secure-note svg{flex:none;color:var(--accent2)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      <div>CorporTV<span>Painel de gestão</span></div>
+    </div>
+    <section class="card">
+      <div id="remote-setup" class="local">A configuração inicial só pode ser concluída por um endereço autorizado da rede interna.</div>
+      <form id="form">
+        <h1 class="login-only">Entrar no painel</h1>
+        <p class="login-only">Use a conta fornecida pelo setor de TI.</p>
+        <h1 class="setup-only">Configuração inicial</h1>
+        <p class="setup-only">Crie a primeira conta do setor de TI. Ela terá controle administrativo completo.</p>
+        <div class="remote-only"><label for="setup-code">Código de ativação</label><input id="setup-code" name="setup_code" maxlength="20" autocomplete="one-time-code" autocapitalize="characters"><div class="hint">Código único fornecido pelo setor de implantação.</div></div>
+        <div class="setup-only"><label for="name">Nome completo</label><input id="name" name="name" maxlength="80" autocomplete="name"></div>
+        <label for="username">Usuário</label><input id="username" name="username" minlength="3" maxlength="40" autocomplete="username" autocapitalize="none" required autofocus>
+        <label for="password">Senha</label><input id="password" name="password" type="password" minlength="12" maxlength="128" autocomplete="current-password" required>
+        <div class="setup-only hint">Use pelo menos 12 caracteres. Frases longas são bem-vindas.</div>
+        <div class="setup-only"><label for="confirm">Confirmar senha</label><input id="confirm" name="confirm" type="password" minlength="12" maxlength="128" autocomplete="new-password"></div>
+        <div id="error" class="error" role="alert"></div>
+        <button id="submit" type="submit"><span class="login-only">Entrar</span><span class="setup-only">Criar administrador</span></button>
+        <div class="secure-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span>A sessão fica protegida em cookie inacessível ao JavaScript e expira automaticamente.</span></div>
+      </form>
+    </section>
+  </div>
+  <script>
+    const setup=location.pathname==='/setup';
+    if(setup)document.body.classList.add('setup');
+    const params=new URLSearchParams(location.search);
+    if(params.get('setup')==='required'){
+      document.getElementById('remote-setup').style.display='block';
+      document.getElementById('form').style.display='none';
+    }
+    if(setup){
+      document.getElementById('name').required=true;
+      document.getElementById('confirm').required=true;
+      document.getElementById('password').autocomplete='new-password';
+      const button=document.getElementById('submit');
+      button.disabled=true;
+      fetch('/api/setup/status',{cache:'no-store'})
+        .then(response=>response.json().then(data=>({response,data})))
+        .then(({response,data})=>{
+          if(!response.ok||!data.allowed)throw new Error('A configuração inicial não está disponível neste endereço.');
+          if(!data.needs_setup){location.href='/painel';return;}
+          if(data.activation_required){
+            document.body.classList.add('remote');
+            document.getElementById('setup-code').required=true;
+          }
+          button.disabled=false;
+        })
+        .catch(err=>{
+          const error=document.getElementById('error');
+          error.textContent=err.message;
+          error.classList.add('show');
+        });
+    }
+    document.getElementById('form').addEventListener('submit',async event=>{
+      event.preventDefault();
+      const error=document.getElementById('error');
+      const button=document.getElementById('submit');
+      error.classList.remove('show');
+      const body={username:event.target.username.value,password:event.target.password.value};
+      if(setup){
+        body.name=event.target.name.value;
+        body.setup_code=event.target.setup_code.value;
+        if(body.password!==event.target.confirm.value){error.textContent='As senhas não coincidem.';error.classList.add('show');return;}
+      }
+      button.disabled=true;
+      try{
+        const response=await fetch(setup?'/api/setup':'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.error||'Não foi possível entrar.');
+        const next=params.get('next');
+        location.href=next&&next.startsWith('/')&&!next.startsWith('//')?next:'/painel';
+      }catch(err){error.textContent=err.message;error.classList.add('show');button.disabled=false;}
+    });
+  </script>
+</body>
+</html>

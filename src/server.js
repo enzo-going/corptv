@@ -5,6 +5,8 @@ const { Transform } = require('stream');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const db = require('./db');
+const { createAudit } = require('./audit');
+const { createAuth } = require('./auth');
 const { validateGroupInput, validateScreenInput } = require('./validation');
 const {
   acceptsUpload,
@@ -14,6 +16,7 @@ const {
 } = require('./uploads');
 
 const app = express();
+if (process.env.CORPTV_TRUST_PROXY === '1') app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 const STARTED_AT = Date.now();
 // Os caminhos configuráveis permitem testar a aplicação contra uma cópia
@@ -48,11 +51,14 @@ function log(level, msg, extra) {
 app.disable('x-powered-by');
 app.use(express.json({ limit: '100kb' }));
 app.use((req, res, next) => {
+  req.requestId = uuidv4();
   res.set({
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'SAMEORIGIN',
     'Referrer-Policy': 'no-referrer',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()'
+    'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    'X-Request-Id': req.requestId,
+    'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
   });
   next();
 });
@@ -63,6 +69,16 @@ app.use('/api', (req, res, next) => {
 });
 fs.mkdirSync(uploadsDir, { recursive: true });
 fs.mkdirSync(logDir, { recursive: true });
+
+// Autenticacao protege apenas o painel e a API de gestao. Player, heartbeat,
+// midias e health continuam publicos para as TV boxes funcionarem sem conta.
+const audit = createAudit(db);
+const auth = createAuth({
+  app, db, audit, log,
+  setupCodeFile: path.join(logDir, 'corptv-setup-code.txt')
+});
+app.use('/api', auth.requireManagementApi);
+app.use('/api', auth.auditManagementMutation);
 
 // Registra somente transferencias de midia. O log ajuda a investigar uma TV
 // sem registrar o corpo dos arquivos nem aumentar perceptivelmente o trafego.
@@ -199,8 +215,6 @@ app.get('/uploads/:arquivo', (req, res, next) => {
     else leitura.pipe(res);
   });
 });
-app.use(express.static(path.join(__dirname, '../public')));
-
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadsDir),
   filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname).toLowerCase())
@@ -729,7 +743,10 @@ app.get('/health', async (req, res) => {
 
 // ── HTML ──────────────────────────────────────────────────
 app.get('/player/:slug', (req, res) => res.sendFile(path.join(__dirname, '../public/player/index.html')));
-app.get('/painel', (req, res) => res.sendFile(path.join(__dirname, '../public/painel/index.html')));
+app.use('/painel', auth.requirePanelPage);
+app.get(['/painel', '/painel/', '/painel/index.html'], (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/painel/index.html'));
+});
 app.get('/', (req, res) => res.redirect('/painel'));
 
 // ── ERRO ──────────────────────────────────────────────────

@@ -38,7 +38,7 @@
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
   .form-full{grid-column:span 2}
   label{display:block;font-size:11px;color:var(--muted);margin-bottom:4px;letter-spacing:.5px;text-transform:uppercase}
-  input[type=text],input[type=number],input[type=datetime-local],input[type=time],select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s}
+  input[type=text],input[type=password],input[type=number],input[type=date],input[type=datetime-local],input[type=time],select,textarea{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:inherit;font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s}
   input[type=datetime-local]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-calendar-picker-indicator{filter:invert(.7)}
   input:focus,select:focus,textarea:focus{border-color:var(--accent)}
   select option{background:var(--bg3)}
@@ -113,6 +113,13 @@
   .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:500;padding:20px}
   .modal-back.show{display:flex}
   .modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius-lg);padding:24px;width:min(560px,92vw);max-height:90vh;overflow:auto}
+  [hidden]{display:none!important}
+  body.readonly .editor-only{display:none!important}
+  .account{border-top:1px solid var(--border);padding:12px}.account-user{padding:0 10px 10px;min-width:0}.account-name{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.account-role{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-top:2px}
+  .security-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}.security-stat{background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px}.security-stat b{display:block;font-size:18px}.security-stat span{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .user-row{display:grid;grid-template-columns:minmax(150px,1fr) 130px 95px auto;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:7px}.user-off{opacity:.6}.user-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}.role-select{padding:6px 8px}
+  .audit-tools{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr auto;gap:8px;align-items:end}.audit-list{margin-top:12px;overflow:auto;border:1px solid var(--border);border-radius:10px}.audit-table{width:100%;border-collapse:collapse;min-width:820px;font-size:11px}.audit-table th{text-align:left;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px;background:var(--bg3);position:sticky;top:0}.audit-table th,.audit-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}.audit-table tr:last-child td{border-bottom:0}.audit-action{font-family:'DM Mono',monospace;color:var(--text)}.outcome-success{color:var(--accent2)}.outcome-failure,.outcome-denied{color:var(--danger)}.integrity{font-size:11px;display:flex;align-items:center;gap:6px}.integrity.ok{color:var(--accent2)}.integrity.bad{color:var(--danger)}
+  @media(max-width:760px){.sidebar{width:190px}.page{padding:22px 18px}.user-row{grid-template-columns:1fr}.user-actions{justify-content:flex-start}.audit-tools{grid-template-columns:1fr 1fr}.security-grid{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -135,7 +142,18 @@
       <button class="nav-item" onclick="goTo('telas',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Telas
       </button>
+      <button class="nav-item" data-admin-only hidden onclick="goTo('users',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>Usuários
+      </button>
+      <button class="nav-item" data-admin-only hidden onclick="goTo('audit',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>Auditoria
+      </button>
     </nav>
+    <div class="account">
+      <div class="account-user"><div id="account-name" class="account-name">—</div><div id="account-role" class="account-role">—</div></div>
+      <button class="nav-item" onclick="goTo('profile',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.88l.06.06a2 2 0 01-2.83 2.83l-.06-.06A1.7 1.7 0 0015 19.4a1.7 1.7 0 00-1 .6 1.7 1.7 0 00-.4 1.1V21a2 2 0 01-4 0v-.09A1.7 1.7 0 008.6 19.4a1.7 1.7 0 00-1.88.34l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.7 1.7 0 004.6 15a1.7 1.7 0 00-.6-1 1.7 1.7 0 00-1.1-.4H3a2 2 0 010-4h.09A1.7 1.7 0 004.6 8.6a1.7 1.7 0 00-.34-1.88l-.06-.06a2 2 0 012.83-2.83l.06.06A1.7 1.7 0 009 4.6a1.7 1.7 0 001-.6 1.7 1.7 0 00.4-1.1V3a2 2 0 014 0v.09A1.7 1.7 0 0015.4 4.6a1.7 1.7 0 001.88-.34l.06-.06a2 2 0 012.83 2.83l-.06.06A1.7 1.7 0 0019.4 9c.14.37.36.7.65.97.29.26.66.41 1.05.43H21a2 2 0 010 4h-.09a1.7 1.7 0 00-1.51.6z"/></svg>Minha conta</button>
+      <button class="nav-item" onclick="logout()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>Sair</button>
+    </div>
   </aside>
 
   <main class="main">
@@ -154,7 +172,7 @@
     <!-- SLIDES -->
     <div class="page" id="page-slides">
       <div class="page-header"><div><div class="page-title">Conteúdo</div><div class="page-sub">Biblioteca — vídeos, imagens e textos disponíveis</div></div></div>
-      <div class="card">
+      <div class="card editor-only">
         <div class="card-title" style="margin-bottom:14px">Novo conteúdo</div>
         <div class="form-grid">
           <div><label>Tipo</label>
@@ -211,7 +229,7 @@
     <!-- AMBIENTES -->
     <div class="page" id="page-grupos">
       <div class="page-header"><div><div class="page-title">Ambientes</div><div class="page-sub">O que toca em cada lugar, e quando</div></div></div>
-      <div class="card">
+      <div class="card editor-only">
         <div class="form-grid">
           <div><label>Nome do ambiente</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
           <div><label>Cor</label><input type="color" id="gr-color" value="#6c63ff"></div>
@@ -224,7 +242,7 @@
     <!-- TELAS -->
     <div class="page" id="page-telas">
       <div class="page-header"><div><div class="page-title">Telas</div><div class="page-sub">Smart TVs e dispositivos cadastrados</div></div></div>
-      <div class="card">
+      <div class="card editor-only">
         <div class="form-grid">
           <div><label>Nome da tela</label><input type="text" id="sc-name" placeholder="Ex: Recepção Principal" oninput="previewSlug(this.value)"></div>
           <div><label>Ambiente onde ela fica</label><select id="sc-group"></select></div>
@@ -236,6 +254,40 @@
         <button class="btn btn-primary" style="margin-top:12px" onclick="addScreen()">Adicionar tela</button>
       </div>
       <div id="screen-list"></div>
+    </div>
+
+    <!-- MINHA CONTA -->
+    <div class="page" id="page-profile">
+      <div class="page-header"><div><div class="page-title">Minha conta</div><div class="page-sub">Sessão e credenciais de acesso</div></div></div>
+      <div class="card"><div class="card-title" id="profile-name">—</div><div class="card-sub" id="profile-meta">—</div></div>
+      <div class="card">
+        <div class="card-title">Alterar minha senha</div><div class="card-sub" style="margin-bottom:14px">Ao salvar, as outras sessões desta conta serão encerradas.</div>
+        <div class="form-grid"><div><label>Senha atual</label><input type="password" id="pw-current" autocomplete="current-password"></div><div><label>Nova senha</label><input type="password" id="pw-new" minlength="12" maxlength="128" autocomplete="new-password"></div></div>
+        <button class="btn btn-primary" onclick="changeOwnPassword()">Alterar senha</button>
+      </div>
+    </div>
+
+    <!-- USUÁRIOS -->
+    <div class="page" id="page-users">
+      <div class="page-header"><div><div class="page-title">Usuários</div><div class="page-sub">Acessos dos colaboradores e do setor de TI</div></div></div>
+      <div class="security-grid"><div class="security-stat"><b id="user-total">—</b><span>Contas</span></div><div class="security-stat"><b id="user-active">—</b><span>Ativas</span></div><div class="security-stat"><b id="user-sessions">—</b><span>Sessões abertas</span></div></div>
+      <div class="card">
+        <div class="card-title" style="margin-bottom:14px">Nova conta</div>
+        <div class="form-grid"><div><label>Nome completo</label><input type="text" id="us-name" maxlength="80"></div><div><label>Usuário</label><input type="text" id="us-username" maxlength="40" autocapitalize="none"></div><div><label>Perfil</label><select id="us-role"><option value="viewer">Somente leitura</option><option value="editor">Colaborador editor</option><option value="admin">TI administrador</option></select></div><div><label>Senha inicial</label><input type="password" id="us-password" minlength="12" maxlength="128" autocomplete="new-password"></div></div>
+        <button class="btn btn-primary" onclick="addUser()">Criar conta</button>
+      </div>
+      <div id="user-list"></div>
+    </div>
+
+    <!-- AUDITORIA -->
+    <div class="page" id="page-audit">
+      <div class="page-header"><div><div class="page-title">Auditoria</div><div class="page-sub">Histórico de acessos, alterações e tentativas negadas</div></div><div id="audit-integrity" class="integrity"></div></div>
+      <div class="card">
+        <div class="audit-tools"><div><label>Ação ou evento</label><input type="text" id="au-action" placeholder="Ex: login, content, user"></div><div><label>Usuário</label><input type="text" id="au-actor"></div><div><label>Resultado</label><select id="au-outcome"><option value="">Todos</option><option value="success">Sucesso</option><option value="failure">Falha</option><option value="denied">Negado</option></select></div><div><label>Desde</label><input type="date" id="au-from"></div><button class="btn btn-primary" onclick="loadAudit(true)">Filtrar</button></div>
+        <div class="flex-gap" style="justify-content:space-between;margin-top:12px"><span class="card-sub" id="audit-count">—</span><button class="btn btn-ghost btn-sm" onclick="exportAudit()">Exportar CSV</button></div>
+        <div id="audit-list" class="audit-list"></div>
+        <div class="flex-gap" style="justify-content:flex-end;margin-top:12px"><button id="audit-prev" class="btn btn-ghost btn-sm" onclick="auditPage(-1)">Anterior</button><button id="audit-next" class="btn btn-ghost btn-sm" onclick="auditPage(1)">Próxima</button></div>
+      </div>
     </div>
   </main>
 </div>
@@ -290,22 +342,50 @@ const BASE='';
 let slides=[],groups=[],screens=[];
 let pendingFile=null;
 let videoTextEditId=null;
+let currentUser=null,permissions=null,csrfToken='';
+let auditOffset=0;
+const AUDIT_LIMIT=50;
 const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade80',msg:'#6c63ff',aviso:'#f87171'};
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+function esc(value){return String(value===undefined||value===null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
 function goTo(p,btn){
+  if((p==='users'||p==='audit')&&(!permissions||!permissions.users)){toast('Acesso restrito ao setor de TI');return;}
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   btn.classList.add('active');
   if(p==='dash')renderDash();
+  if(p==='users')loadUsers();
+  if(p==='audit')loadAudit(true);
 }
 async function api(method,url,body,isForm=false){
   const opts={method,headers:{}};
+  if(!['GET','HEAD','OPTIONS'].includes(method)&&csrfToken)opts.headers['X-CSRF-Token']=csrfToken;
   if(body&&!isForm){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
   else if(isForm){opts.body=body;}
-  const r=await fetch(BASE+url,opts);return r.json();
+  const r=await fetch(BASE+url,opts);
+  if(r.status===401){location.href='/login?next=%2Fpainel';throw new Error('Sessão encerrada');}
+  const data=await r.json();
+  if(r.status===403)toast(data.error||'Acesso negado');
+  return data;
 }
+async function bootstrap(){
+  try{
+    const auth=await api('GET','/api/auth/me');
+    currentUser=auth.user;permissions=auth.permissions;csrfToken=auth.csrf_token;
+    document.body.classList.toggle('readonly',!permissions.edit);
+    document.querySelectorAll('[data-admin-only]').forEach(el=>el.hidden=!permissions.users);
+    document.getElementById('account-name').textContent=currentUser.name;
+    document.getElementById('account-role').textContent=roleLabel(currentUser.role);
+    document.getElementById('profile-name').textContent=currentUser.name;
+    document.getElementById('profile-meta').textContent='@'+currentUser.username+' · '+roleLabel(currentUser.role);
+    await load();
+    setInterval(load,30000);
+  }catch(error){if(!location.pathname.startsWith('/login'))toast('Não foi possível iniciar o painel');}
+}
+function roleLabel(role){return role==='admin'?'TI administrador':role==='editor'?'Colaborador editor':'Somente leitura'}
+async function logout(){const result=await api('POST','/api/auth/logout',{});if(!result.error)location.href='/login'}
 // O painel recarrega sozinho a cada 30s. Se o servidor estiver reiniciando
 // (deploy, queda), avisa em vez de estourar erro no console e mantém a tela
 // com os últimos dados; a próxima passagem se recupera sozinha.
@@ -403,8 +483,7 @@ async function addSlide(){
     fd.append('video_text_mode',type==='vid'?document.getElementById('sl-video-text-mode').value:'none');
     fd.append('video_text_seconds',type==='vid'?document.getElementById('sl-video-text-seconds').value:'0');
     if(pendingFile)fd.append('file',pendingFile);
-    const r=await fetch('/api/slides',{method:'POST',body:fd});
-    const data=await r.json();
+    const data=await api('POST','/api/slides',fd,true);
     if(data.error){toast('Erro: '+data.error);return;}
     document.getElementById('sl-title').value='';
     document.getElementById('sl-body').value='';
@@ -433,10 +512,10 @@ function renderSlides(){
     return `<div class="item${s.em_uso?'':' item-off'}">
       <div class="item-thumb">${thumbDe(s)}</div>
       <div class="item-info">
-        <div class="item-name">${nomeDe(s)}</div>
-        <div class="item-meta">${uso} · ${meta}</div>
+        <div class="item-name">${esc(nomeDe(s))}</div>
+        <div class="item-meta">${uso} · ${esc(meta)}</div>
       </div>
-      <div class="item-actions">
+      <div class="item-actions editor-only">
         ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="renameSlide('${s.id}')">Renomear</button>
         <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')" title="Remover da biblioteca">✕</button>
@@ -496,9 +575,9 @@ function nomeDe(s){
   return s.type==='vid'?'Vídeo':s.type==='img'?'Imagem':'Sem título';
 }
 function thumbDe(s){
-  if(s.url&&s.type==='vid')return `<video src="${s.url}#t=1" style="width:100%;height:100%;object-fit:cover" preload="metadata" muted></video>`;
-  if(s.url)return `<img src="${s.url}" style="width:100%;height:100%;object-fit:cover">`;
-  return `<div style="background:${s.bg||'#111'};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.5)">TXT</div>`;
+  if(s.url&&s.type==='vid')return `<video src="${esc(s.url)}#t=1" style="width:100%;height:100%;object-fit:cover" preload="metadata" muted></video>`;
+  if(s.url)return `<img src="${esc(s.url)}" style="width:100%;height:100%;object-fit:cover">`;
+  return `<div style="background:${esc(s.bg||'#111')};width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:9px;color:rgba(255,255,255,.5)">TXT</div>`;
 }
 async function delSlide(id){
   const s=slides.find(x=>x.id===id);
@@ -573,7 +652,7 @@ function openSched(groupId,slideId){
   const g=groups.find(x=>x.id===groupId);
   schedGrupo=groupId;schedEditId=slideId;
   document.getElementById('ed-slide-name').innerHTML=
-    '<b style="color:var(--text)">'+nomeDe(item)+'</b> no ambiente <b style="color:var(--text)">'+(g?g.name:'—')+'</b>';
+    '<b style="color:var(--text)">'+esc(nomeDe(item))+'</b> no ambiente <b style="color:var(--text)">'+esc(g?g.name:'—')+'</b>';
   document.getElementById('ed-starts').value=toDateInput(item.starts_at);
   document.getElementById('ed-expires').value=toDateInput(item.expires_at);
   document.getElementById('ed-tstart').value=item.time_start||'';
@@ -706,17 +785,17 @@ async function renderGroups(){
       const st=item.status||{active:true};
       const estado=st.active
         ? '<span class="state state-on">● No ar</span>'
-        : `<span class="state state-off">● Oculto — ${st.detail||'fora da programação'}</span>`;
+        : `<span class="state state-off">● Oculto — ${esc(st.detail||'fora da programação')}</span>`;
       const regra=item.agendado
-        ? `<span class="sched-badge">⏱ ${scheduleLabel(item)}</span>`
+        ? `<span class="sched-badge">⏱ ${esc(scheduleLabel(item))}</span>`
         : '<span class="sched-badge" style="background:rgba(255,255,255,.06);color:var(--muted)">sempre</span>';
       return `<div class="item${st.active?'':' item-off'}">
         <div class="item-thumb">${thumbDe(item)}</div>
         <div class="item-info">
-          <div class="item-name">${nomeDe(item)}${regra}</div>
+          <div class="item-name">${esc(nomeDe(item))}${regra}</div>
           <div class="item-meta">${estado}</div>
         </div>
-        <div class="item-actions">
+        <div class="item-actions editor-only">
           <button class="btn btn-ghost btn-sm" onclick="openSched('${g.id}','${item.id}')">Agendar</button>
           <button class="btn btn-danger btn-sm btn-icon" onclick="removeFromGroup('${g.id}','${item.id}')" title="Tirar deste ambiente">✕</button>
         </div>
@@ -725,9 +804,9 @@ async function renderGroups(){
 
     const disponiveis=slides.filter(s=>!pl.find(p=>p.id===s.id));
     const seletor=disponiveis.length
-      ? `<select onchange="addToGroup('${g.id}',this)" style="max-width:340px">
+      ? `<select class="editor-only" onchange="addToGroup('${g.id}',this)" style="max-width:340px">
            <option value="">+ Adicionar conteúdo…</option>
-           ${disponiveis.map(s=>`<option value="${s.id}">${nomeDe(s)}</option>`).join('')}
+           ${disponiveis.map(s=>`<option value="${s.id}">${esc(nomeDe(s))}</option>`).join('')}
          </select>`
       : `<span style="font-size:12px;color:var(--muted)">${slides.length?'Todo o conteúdo já está aqui.':'Cadastre conteúdo primeiro na aba Conteúdo.'}</span>`;
 
@@ -737,11 +816,11 @@ async function renderGroups(){
 
     return `<div class="card" style="border-left:3px solid ${g.color||'#333'}">
       <div class="card-row" style="margin-bottom:4px">
-        <div class="flex-gap"><span class="cdot" style="background:${g.color}"></span><span class="card-title">${g.name}</span></div>
-        <button class="btn btn-danger btn-sm" onclick="delGroup('${g.id}')">Remover</button>
+        <div class="flex-gap"><span class="cdot" style="background:${esc(g.color)}"></span><span class="card-title">${esc(g.name)}</span></div>
+        <button class="btn btn-danger btn-sm editor-only" onclick="delGroup('${g.id}')">Remover</button>
       </div>
       <div class="card-sub" style="margin-bottom:14px">
-        ${telas.length?telas.map(t=>t.name).join(', '):'nenhuma tela neste ambiente'} · ${noAr} de ${pl.length} no ar
+        ${telas.length?telas.map(t=>esc(t.name)).join(', '):'nenhuma tela neste ambiente'} · ${noAr} de ${pl.length} no ar
       </div>
       ${alerta}
       <div class="item-list">${itens}</div>
@@ -770,7 +849,7 @@ async function addScreen(){
 async function renderScreens(){
   const el=document.getElementById('screen-list');
   const sel=document.getElementById('sc-group');
-  sel.innerHTML=groups.map(g=>`<option value="${g.id}">${g.name}</option>`).join('');
+  sel.innerHTML=groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
   if(!screens.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhuma tela cadastrada.</div>';return;}
   const origin=publicOrigin();
   el.innerHTML=screens.map(s=>{
@@ -781,19 +860,19 @@ async function renderScreens(){
       <div class="card-row">
         <div class="flex-gap">
           <span class="online-dot ${online?'on':'off'}"></span>
-          <div><div class="card-title">${s.name}</div><div class="card-sub">${g?g.name:'Sem grupo'}</div></div>
+           <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(g?g.name:'Sem grupo')}</div></div>
         </div>
         <div class="flex-gap">
           <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
-          <button class="btn btn-danger btn-sm btn-icon" onclick="delScreen('${s.id}')">✕</button>
+           <button class="btn btn-danger btn-sm btn-icon editor-only" onclick="delScreen('${s.id}')">✕</button>
         </div>
       </div>
       <div class="sep" style="margin:12px 0"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
       <div class="url-box">
-        <input class="url-value" value="${playerUrl}" readonly aria-label="URL do player">
+        <input class="url-value" value="${esc(playerUrl)}" readonly aria-label="URL do player">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}',this)">Copiar</button>
-        <a href="${playerUrl}" target="_blank" class="btn btn-ghost btn-sm">Abrir</a>
+        <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Abrir</a>
       </div>
     </div>`;
   }).join('');
@@ -834,6 +913,82 @@ async function copyUrl(url,trigger){
   }
 }
 
+// CONTAS E AUDITORIA
+async function changeOwnPassword(){
+  const current=document.getElementById('pw-current').value;
+  const next=document.getElementById('pw-new').value;
+  if(!current||next.length<12){toast('Informe a senha atual e uma nova senha com pelo menos 12 caracteres');return;}
+  const result=await api('POST','/api/auth/change-password',{current_password:current,new_password:next});
+  if(result.error){toast(result.error);return;}
+  csrfToken=result.csrf_token;
+  document.getElementById('pw-current').value='';document.getElementById('pw-new').value='';
+  toast('Senha alterada e outras sessões encerradas');
+}
+async function addUser(){
+  const body={name:document.getElementById('us-name').value.trim(),username:document.getElementById('us-username').value.trim(),role:document.getElementById('us-role').value,password:document.getElementById('us-password').value};
+  if(!body.name||!body.username||body.password.length<12){toast('Preencha nome, usuário e senha com pelo menos 12 caracteres');return;}
+  const result=await api('POST','/api/users',body);
+  if(result.error){toast(result.error);return;}
+  ['us-name','us-username','us-password'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('us-role').value='viewer';
+  await loadUsers();toast('Conta criada');
+}
+async function loadUsers(){
+  const users=await api('GET','/api/users');
+  if(!Array.isArray(users))return;
+  document.getElementById('user-total').textContent=users.length;
+  document.getElementById('user-active').textContent=users.filter(user=>user.active).length;
+  document.getElementById('user-sessions').textContent=users.reduce((sum,user)=>sum+(user.active_sessions||0),0);
+  const list=document.getElementById('user-list');
+  list.innerHTML=users.map(user=>`<div class="user-row${user.active?'':' user-off'}">
+    <div><div class="card-title">${esc(user.name)} ${user.id===currentUser.id?'<span class="badge badge-online">você</span>':''}</div><div class="card-sub">@${esc(user.username)} · último login: ${esc(formatDateTime(user.last_login_at))}</div></div>
+    <select class="role-select" onchange="updateUser('${user.id}',{role:this.value})" ${user.id===currentUser.id?'disabled':''}><option value="viewer" ${user.role==='viewer'?'selected':''}>Somente leitura</option><option value="editor" ${user.role==='editor'?'selected':''}>Editor</option><option value="admin" ${user.role==='admin'?'selected':''}>TI admin</option></select>
+    <span class="badge ${user.active_sessions?'badge-online':'badge-offline'}">${user.active_sessions||0} sessão(ões)</span>
+    <div class="user-actions">${user.id===currentUser.id?'<span class="card-sub">Gerencie a senha em Minha conta</span>':`<button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${user.id}','${esc(user.username)}')">Redefinir senha</button><button class="btn btn-ghost btn-sm" onclick="revokeUserSessions('${user.id}')" ${user.active_sessions?'':'disabled'}>Encerrar sessões</button><button class="btn ${user.active?'btn-danger':'btn-ghost'} btn-sm" onclick="updateUser('${user.id}',{active:${!user.active}})">${user.active?'Desativar':'Reativar'}</button>`}</div>
+  </div>`).join('');
+}
+async function updateUser(id,changes){
+  const result=await api('PUT','/api/users/'+id,changes);
+  if(result.error){toast(result.error);await loadUsers();return;}
+  await loadUsers();toast('Conta atualizada');
+}
+async function resetUserPassword(id,username){
+  const password=prompt('Nova senha para @'+username+' (mínimo de 12 caracteres):');
+  if(password===null)return;
+  if(password.length<12){toast('A senha precisa ter pelo menos 12 caracteres');return;}
+  if(!confirm('Redefinir a senha e encerrar todas as sessões desta conta?'))return;
+  const result=await api('POST','/api/users/'+id+'/reset-password',{password});
+  if(result.error){toast(result.error);return;}
+  await loadUsers();toast('Senha redefinida e sessões encerradas');
+}
+async function revokeUserSessions(id){
+  if(!confirm('Encerrar todas as sessões desta conta?'))return;
+  const result=await api('DELETE','/api/users/'+id+'/sessions');
+  if(result.error){toast(result.error);return;}
+  await loadUsers();toast('Sessões encerradas');
+}
+function formatDateTime(value){return value?new Date(value).toLocaleString('pt-BR'):'nunca'}
+function auditParams(){
+  const params=new URLSearchParams({limit:String(AUDIT_LIMIT),offset:String(auditOffset)});
+  const values={action:document.getElementById('au-action').value.trim(),actor:document.getElementById('au-actor').value.trim(),outcome:document.getElementById('au-outcome').value,from:document.getElementById('au-from').value};
+  Object.entries(values).forEach(([key,value])=>{if(value)params.set(key,value)});
+  return params;
+}
+async function loadAudit(reset){
+  if(reset)auditOffset=0;
+  const data=await api('GET','/api/audit?'+auditParams());
+  if(!data||!Array.isArray(data.items))return;
+  document.getElementById('audit-count').textContent=`${data.total} registro(s) · exibindo ${data.items.length}`;
+  const integrity=document.getElementById('audit-integrity');
+  integrity.className='integrity '+(data.integrity&&data.integrity.ok?'ok':'bad');
+  integrity.textContent=data.integrity&&data.integrity.ok?'● Integridade verificada':'⚠ Falha de integridade';
+  document.getElementById('audit-prev').disabled=auditOffset===0;
+  document.getElementById('audit-next').disabled=auditOffset+AUDIT_LIMIT>=data.total;
+  document.getElementById('audit-list').innerHTML=data.items.length?`<table class="audit-table"><thead><tr><th>Data</th><th>Usuário</th><th>Ação</th><th>Objeto</th><th>Resultado</th><th>Origem</th><th>Detalhes</th></tr></thead><tbody>${data.items.map(item=>`<tr><td>${esc(formatDateTime(item.ts))}<div class="card-sub">#${item.seq}</div></td><td>${esc(item.actor?item.actor.username:'sistema')}<div class="card-sub">${esc(item.actor?roleLabel(item.actor.role):'')}</div></td><td class="audit-action">${esc(item.action)}</td><td>${esc(item.entity_type)}<div class="card-sub">${esc(item.entity_id||'')}</div></td><td class="outcome-${esc(item.outcome)}">${esc(item.outcome)}</td><td>${esc(item.ip||'—')}</td><td>${esc(JSON.stringify(item.details||{}))}</td></tr>`).join('')}</tbody></table>`:'<div style="padding:24px;text-align:center;color:var(--muted)">Nenhum registro encontrado.</div>';
+}
+function auditPage(direction){auditOffset=Math.max(0,auditOffset+direction*AUDIT_LIMIT);loadAudit(false)}
+function exportAudit(){const params=auditParams();params.delete('limit');params.delete('offset');location.href='/api/audit/export.csv?'+params}
+
 // DASHBOARD
 async function renderDash(){
   document.getElementById('st-slides').textContent=slides.length;
@@ -847,12 +1002,12 @@ async function renderDash(){
     const online=s.last_seen&&(Date.now()-new Date(s.last_seen).getTime())<60000;
     return `<div class="card" style="border-left:3px solid ${g?.color||'#333'}">
       <div class="card-row">
-        <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${s.name}</span></div>
+        <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${esc(s.name)}</span></div>
         <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
       </div>
-      <div class="card-sub mt8">${g?g.name:'Sem grupo'}</div>
+      <div class="card-sub mt8">${esc(g?g.name:'Sem grupo')}</div>
       <div class="url-box mt8" style="font-size:11px">
-        <input class="url-value" value="${origin}/player/${s.id}" readonly aria-label="URL do player">
+        <input class="url-value" value="${esc(origin+'/player/'+s.id)}" readonly aria-label="URL do player">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}',this)">Copiar</button>
       </div>
     </div>`;
@@ -870,14 +1025,14 @@ async function renderProgramacao(){
   el.innerHTML='<div class="page-title" style="font-size:15px;margin:24px 0 10px">Programação agora</div>'+
     prog.map(t=>{
       const noAr=t.no_ar.length
-        ? t.no_ar.map(i=>`<div class="prog-line"><span class="tag tag-on">no ar</span><span>${i.title}</span></div>`).join('')
+        ? t.no_ar.map(i=>`<div class="prog-line"><span class="tag tag-on">no ar</span><span>${esc(i.title)}</span></div>`).join('')
         : '<div class="prog-line" style="color:var(--danger)"><span class="tag tag-off">vazio</span><span>Nenhum conteúdo tocando nesta tela</span></div>';
       const ocultos=t.ocultos.map(i=>
-        `<div class="prog-line"><span class="tag tag-off">oculto</span><span>${i.title} — ${i.status.detail||'fora da programação'}</span></div>`).join('');
+        `<div class="prog-line"><span class="tag tag-off">oculto</span><span>${esc(i.title)} — ${esc(i.status.detail||'fora da programação')}</span></div>`).join('');
       return `<div class="prog-screen">
         <div class="card-row">
-          <div class="flex-gap"><span class="online-dot ${t.online?'on':'off'}"></span><span class="card-title">${t.screen_name}</span></div>
-          <span class="card-sub">${t.group_name}</span>
+          <div class="flex-gap"><span class="online-dot ${t.online?'on':'off'}"></span><span class="card-title">${esc(t.screen_name)}</span></div>
+          <span class="card-sub">${esc(t.group_name)}</span>
         </div>
         ${noAr}${ocultos}
       </div>`;
@@ -896,8 +1051,7 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&document.getElementById('sched-modal').classList.contains('show'))closeSched();
   if(e.key==='Escape'&&document.getElementById('video-text-modal').classList.contains('show'))closeVideoText();
 });
-load();
-setInterval(load,30000);
+bootstrap();
 </script>
 </body>
 </html>
