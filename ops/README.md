@@ -2,12 +2,16 @@
 
 Estes scripts complementam o serviço em instalações Windows locais:
 
-- `start-corptv.cmd`: inicia o Node em loop e gira o log principal quando ele passa de 10 MB;
+- `../iniciar.bat` (e o equivalente `start-corptv.cmd`): inicia uma única instância do Node, sem loop;
 - `watchdog.ps1`: confirma duas falhas de saúde consecutivas antes de reiniciar o processo;
 - `backup.ps1`: cria um snapshot diário consistente, com o serviço brevemente parado;
 - `register-tasks.ps1`: registra o watchdog e o backup e torna a tarefa principal tolerante a energia/UPS.
 
 O backup guarda os bancos por cópia e as mídias por hardlinks NTFS. Isso protege uma mídia excluída sem duplicar imediatamente vários gigabytes. São mantidos sete snapshots em `C:\corptv\backups\data`.
+
+O iniciador não deve conter um loop de reinício. O watchdog já é o responsável
+pelo 24/7; dois mecanismos concorrentes impedem que `schtasks /End` finalize a
+tarefa de forma limpa e podem deixar o serviço indisponível.
 
 Para instalar as tarefas em um PowerShell elevado:
 

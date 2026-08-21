@@ -10,8 +10,9 @@ const panel = fs.readFileSync(path.join(__dirname, '../public/painel/index.html'
 test('o botão Copiar possui fallback para painel HTTP', () => {
   assert.match(panel, /window\.isSecureContext&&navigator\.clipboard/);
   assert.match(panel, /document\.execCommand\('copy'\)/);
+  assert.match(panel, /document\.createElement\('textarea'\)/);
   assert.match(panel, /class="url-value"/);
-  assert.match(panel, /pressione Ctrl\+C/);
+  assert.match(panel, /Cópia bloqueada pelo navegador — pressione Ctrl\+C/);
   assert.match(panel, /Não foi possível copiar/);
 });
 

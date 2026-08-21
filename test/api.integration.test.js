@@ -91,7 +91,27 @@ test('API rejeita corpos JSON ausentes sem responder erro interno', async () => 
 
   const playlist = await json('/api/groups/inexistente/slides', { method: 'POST' });
   assert.equal(playlist.response.status, 404);
-  assert.match(playlist.body.error, /grupo não encontrado/i);
+  assert.match(playlist.body.error, /ambiente não encontrado/i);
+
+  const unknownHeartbeat = await json('/api/heartbeat', {
+    method: 'POST', body: { screen_id: 'inexistente' }
+  });
+  assert.equal(unknownHeartbeat.response.status, 404);
+
+  const unknownGroup = await json('/api/groups/inexistente', {
+    method: 'PUT', body: { name: 'Não existe', color: '#123456' }
+  });
+  assert.equal(unknownGroup.response.status, 404);
+
+  const unknownScreen = await json('/api/screens/inexistente', {
+    method: 'DELETE', body: {}
+  });
+  assert.equal(unknownScreen.response.status, 404);
+
+  const headers = await fetch(baseUrl + '/api/groups');
+  assert.equal(headers.headers.get('x-powered-by'), null);
+  assert.equal(headers.headers.get('x-content-type-options'), 'nosniff');
+  assert.match(headers.headers.get('cache-control'), /no-store/);
 });
 
 test('upload falso é rejeitado e removido', async () => {
