@@ -13,21 +13,24 @@ define uma rotina curta para repetir a auditoria sem depender da interface web.
 | Secret scanning | Ativo; zero alertas abertos |
 | Push protection | Ativa |
 | Reporte privado de vulnerabilidades | Ativo |
-| Ruleset da branch padrão | Ativo; impede exclusão e force push |
+| Ruleset da branch padrão | Ativo; exige PR, cinco checks, exclusão e force push bloqueados |
+| Actions | Permissão padrão somente leitura; SHA pinning obrigatório |
+| Padrões de segredo não-provedor | Desativados; lacuna registrada para habilitação pelo plano/UI |
 | CI | Node.js 22, Node.js 24 e scripts operacionais no Windows |
 
 O ruleset exige que alterações cheguem por pull request e impede exclusão ou
-force push na branch padrão. Ele ainda não exige aprovação nem checks de status
-antes de cada merge. Como o repositório possui um único mantenedor, a exigência
-de revisão obrigatória deve ser avaliada junto com um caminho de recuperação
-para não bloquear correções urgentes.
+force push na branch padrão. Antes de cada merge, os checks `Node.js 22`,
+`Node.js 24`, `Windows operations scripts`, `CodeQL (JavaScript)` e
+`Dependency review` precisam passar. Não há aprovação obrigatória: como o
+repositório possui um único mantenedor, essa decisão evita bloquear correções
+urgentes e deve ser revista se a equipe crescer.
 
 ## Rotina mensal e antes de releases
 
 1. Confirme que a autenticação do GitHub CLI pertence à conta esperada.
 2. Consulte alertas abertos de CodeQL, Dependabot e secret scanning.
 3. Revise execuções com falha ou canceladas na `main`.
-4. Confira alterações recentes nos workflows e no ruleset da branch padrão.
+4. Confira permissões de Actions, SHA pinning e alterações recentes no ruleset.
 5. Execute `npm ci`, `npm test` e `npm audit --omit=dev` a partir de um checkout limpo.
 6. Registre no pull request a data, os resultados e qualquer exceção aceita.
 
@@ -40,6 +43,7 @@ gh api "repos/enzo-going/corptv/dependabot/alerts?state=open&per_page=100"
 gh api "repos/enzo-going/corptv/secret-scanning/alerts?state=open&per_page=100"
 gh run list --repo enzo-going/corptv --branch main --limit 20
 gh api repos/enzo-going/corptv/rulesets
+gh api repos/enzo-going/corptv/actions/permissions
 gh api repos/enzo-going/corptv/private-vulnerability-reporting
 ```
 
