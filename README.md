@@ -147,6 +147,12 @@ npm test
 npm audit --omit=dev
 ```
 
+## Segurança
+
+Relate vulnerabilidades pelo canal privado descrito em [`SECURITY.md`](SECURITY.md).
+A rotina e a linha de base dos controles do repositório estão em
+[`docs/github-security-audit.md`](docs/github-security-audit.md).
+
 A suíte automatizada cobre autenticação, CSRF, perfis, revogação de sessão,
 auditoria, API, vínculos entre entidades, uploads falsos, limpeza de mídias,
 limites de campos, texto sobre vídeos, áudio, cópia de URLs em HTTP, datas,
