@@ -92,6 +92,8 @@ As variáveis abaixo são opcionais. O arquivo `.env.example` serve como referê
 | `CORPTV_UPLOADS_DIR` | `./public/uploads` | Imagens e vídeos |
 | `CORPTV_LOG_DIR` | `./logs` | Log de acesso às mídias |
 | `CORPTV_LIMITE_MBPS` | `4.5` | Limite de entrega de mídia por conexão; `0` desativa |
+| `CORPTV_MEDIA_REQUESTS_PER_MINUTE` | `600` | Limite por IP para arquivos de mídia |
+| `CORPTV_PAGE_REQUESTS_PER_MINUTE` | `120` | Limite por IP para páginas do player e painel |
 | `CORPTV_SESSION_HOURS` | `8` | Duração máxima de uma sessão do painel |
 | `CORPTV_SESSION_IDLE_MINUTES` | `60` | Expiração após inatividade |
 | `CORPTV_TRUST_PROXY` | `0` | Use `1` somente atrás de um proxy reverso confiável que encerra HTTPS |

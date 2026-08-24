@@ -4,6 +4,7 @@ const fs = require('fs');
 const { Transform } = require('stream');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
+const { rateLimit } = require('express-rate-limit');
 const db = require('./db');
 const { createAudit } = require('./audit');
 const { createAuth } = require('./auth');
@@ -24,6 +25,24 @@ const STARTED_AT = Date.now();
 const uploadsDir = path.resolve(process.env.CORPTV_UPLOADS_DIR || path.join(__dirname, '../public/uploads'));
 const logDir = path.resolve(process.env.CORPTV_LOG_DIR || path.join(__dirname, '../logs'));
 const accessLog = path.join(logDir, 'corptv-media-access.log');
+
+function positiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const mediaRequestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: positiveInteger(Number(process.env.CORPTV_MEDIA_REQUESTS_PER_MINUTE), 600),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false
+});
+const pageRequestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: positiveInteger(Number(process.env.CORPTV_PAGE_REQUESTS_PER_MINUTE), 120),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false
+});
 
 // Log com carimbo de tempo no stdout. O gerenciador do processo pode redirecionar
 // a saída; o log de mídia fica no diretório configurado por CORPTV_LOG_DIR.
@@ -152,7 +171,7 @@ function limitador(bytesPorSegundo) {
   });
 }
 
-app.get('/uploads/:arquivo', (req, res, next) => {
+app.get('/uploads/:arquivo', mediaRequestLimiter, (req, res, next) => {
   // Impede sair da pasta de uploads (path traversal) com nome manipulado.
   const nome = path.basename(req.params.arquivo);
   const caminho = path.join(uploadsDir, nome);
@@ -257,7 +276,7 @@ function handleUpload(req, res, next) {
         }
         return res.status(500).json({ error: 'Erro no upload: ' + err.message });
       };
-      return Promise.resolve(req.file && removeFile(req.file.path)).catch(error => {
+      return Promise.resolve(req.file && removeFile(req.file.path, uploadsDir)).catch(error => {
         log('ERRO', 'não foi possível limpar upload rejeitado', { msg: error.message });
       }).finally(respond);
     }
@@ -462,12 +481,12 @@ function textoDoVideo(body, type, current) {
 app.post('/api/slides', handleUpload, async (req, res) => {
   const fields = req.body || {};
   const { title, body, type, duration, bg } = fields;
-  const cleanupUpload = () => req.file && removeFile(req.file.path);
+  const cleanupUpload = () => req.file && removeFile(req.file.path, uploadsDir);
   let uploadedType = null;
   if (req.file) {
     let inspection;
     try {
-      inspection = await inspectStoredUpload(req.file.path, req.file);
+      inspection = await inspectStoredUpload(req.file.path, req.file, uploadsDir);
     } catch (error) {
       await cleanupUpload();
       throw error;
@@ -532,7 +551,7 @@ app.delete('/api/slides/:id', async (req, res) => {
   const mediaPath = uploadedPathFromUrl(slide.url, uploadsDir);
   if (mediaPath) {
     try {
-      await removeFile(mediaPath);
+      await removeFile(mediaPath, uploadsDir);
     } catch (error) {
       log('ERRO', 'não foi possível remover mídia órfã', { slide: slide.id, msg: error.message });
     }
@@ -742,12 +761,15 @@ app.get('/health', async (req, res) => {
 });
 
 // ── HTML ──────────────────────────────────────────────────
-app.get('/player/:slug', (req, res) => res.sendFile(path.join(__dirname, '../public/player/index.html')));
-app.use('/painel', auth.requirePanelPage);
+app.get('/player/:slug', pageRequestLimiter, (req, res) => res.sendFile(path.join(__dirname, '../public/player/index.html')));
+app.use('/painel', pageRequestLimiter, (req, res, next) => {
+  Promise.resolve(auth.requirePanelPage(req, res, next)).catch(next);
+});
 app.get(['/painel', '/painel/', '/painel/index.html'], (req, res) => {
   res.sendFile(path.join(__dirname, '../public/painel/index.html'));
 });
 app.get('/', (req, res) => res.redirect('/painel'));
+app.use(express.static(path.join(__dirname, '../public')));
 
 // ── ERRO ──────────────────────────────────────────────────
 // Ultimo middleware: registra o erro completo no log e devolve mensagem

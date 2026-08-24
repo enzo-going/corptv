@@ -12,6 +12,8 @@ process.env.CORPTV_UPLOADS_DIR = path.join(sandbox, 'uploads');
 process.env.CORPTV_LOG_DIR = path.join(sandbox, 'logs');
 process.env.CORPTV_DISABLE_SEED = '1';
 process.env.CORPTV_DISABLE_MAINTENANCE = '1';
+process.env.CORPTV_MEDIA_REQUESTS_PER_MINUTE = '2';
+process.env.CORPTV_PAGE_REQUESTS_PER_MINUTE = '2';
 
 const db = require('../src/db');
 const { app } = require('../src/server');
@@ -70,6 +72,31 @@ test.after(async () => {
   await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   db.stopMaintenance();
   fs.rmSync(sandbox, { recursive: true, force: true });
+});
+
+test('limita leituras de mídia e páginas por endereço', async () => {
+  const fileName = '123e4567-e89b-12d3-a456-426614174000.png';
+  const filePath = path.join(sandbox, 'uploads', fileName);
+  fs.writeFileSync(filePath, Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a]));
+
+  try {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const media = await fetch(baseUrl + '/uploads/' + fileName);
+      assert.equal(media.status, 200);
+      await media.arrayBuffer();
+      const panel = await fetch(baseUrl + '/painel');
+      assert.equal(panel.status, 200);
+      await panel.arrayBuffer();
+    }
+
+    const blockedMedia = await fetch(baseUrl + '/uploads/' + fileName);
+    const blockedPanel = await fetch(baseUrl + '/painel');
+    assert.equal(blockedMedia.status, 429);
+    assert.equal(blockedPanel.status, 429);
+    assert.ok(blockedMedia.headers.get('ratelimit'));
+  } finally {
+    fs.rmSync(filePath, { force: true });
+  }
 });
 
 test('API valida relações, entradas e impede cache de programação', async () => {
