@@ -10,4 +10,4 @@ REM "Em execucao" e recusava subir outra instancia. O servico ficava fora do ar
 REM sem ninguem conseguir reinicia-lo remotamente. Nao reintroduzir o loop.
 cd /d C:\corptv
 set PORT=3000
-"C:\Program Files\nodejs\node.exe" src\server.js >> "C:\ProgramData\CodexInstallLogs\corptv.log" 2>&1
+"C:\Program Files\nodejs\node.exe" src\server.js >> "C:\ProgramData\CorporTVLogs\corptv.log" 2>&1
