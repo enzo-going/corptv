@@ -16,9 +16,11 @@ define uma rotina curta para repetir a auditoria sem depender da interface web.
 | Ruleset da branch padrão | Ativo; impede exclusão e force push |
 | CI | Node.js 22, Node.js 24 e scripts operacionais no Windows |
 
-O ruleset ainda não exige aprovação nem checks de status antes de cada merge.
-Como o repositório possui um único mantenedor, essa alteração deve ser avaliada
-junto com um caminho de recuperação para não bloquear correções urgentes.
+O ruleset exige que alterações cheguem por pull request e impede exclusão ou
+force push na branch padrão. Ele ainda não exige aprovação nem checks de status
+antes de cada merge. Como o repositório possui um único mantenedor, a exigência
+de revisão obrigatória deve ser avaliada junto com um caminho de recuperação
+para não bloquear correções urgentes.
 
 ## Rotina mensal e antes de releases
 
