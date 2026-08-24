@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { v4: uuidv4 } = require('uuid');
+const { rateLimit } = require('express-rate-limit');
 const {
   hashPassword,
   isLoopback,
@@ -24,6 +25,21 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 const LOGIN_PAIR_LIMIT = 5;
 const LOGIN_IP_LIMIT = 12;
 const failedLogins = new Map();
+
+function positiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+// Além do bloqueio progressivo de credenciais inválidas, limita o volume total
+// das rotas que consultam sessões, usuários e auditoria. Isso também restringe
+// tentativas com credenciais válidas e requisições caras feitas em rajada.
+const authRequestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: positiveInteger(process.env.CORPTV_AUTH_REQUESTS_PER_MINUTE, 120),
+  standardHeaders: 'draft-8',
+  legacyHeaders: false
+});
 
 function positiveNumber(value, fallback) {
   const parsed = Number(value);
@@ -313,14 +329,14 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     next();
   }
 
-  app.get('/api/setup/status', async (req, res) => {
+  app.get('/api/setup/status', authRequestLimiter, async (req, res) => {
     const local = isLoopback(req);
     const allowed = isPrivateNetwork(req);
     res.set('Cache-Control', 'no-store');
     res.json({ needs_setup: await userCount() === 0, local, allowed, activation_required: allowed && !local });
   });
 
-  app.post('/api/setup', async (req, res) => {
+  app.post('/api/setup', authRequestLimiter, async (req, res) => {
     await db.ready;
     if (!isPrivateNetwork(req)) return res.status(403).json({ error: 'A configuração inicial só é permitida pela rede interna.' });
     if (!sameOrigin(req)) return res.status(403).json({ error: 'Origem inválida.' });
@@ -368,7 +384,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     }
   });
 
-  app.post('/api/auth/login', async (req, res) => {
+  app.post('/api/auth/login', authRequestLimiter, async (req, res) => {
     await db.ready;
     if (!sameOrigin(req)) return res.status(403).json({ error: 'Origem inválida.' });
     const username = normalizeUsername(req.body && req.body.username);
@@ -402,18 +418,18 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     res.json({ user: publicUser(user), csrf_token: session.csrf_token, permissions: permissionsFor(user.role) });
   });
 
-  app.get('/api/auth/me', requireSession, (req, res) => {
+  app.get('/api/auth/me', authRequestLimiter, requireSession, (req, res) => {
     res.json({ user: publicUser(req.user), csrf_token: req.session.csrf_token, permissions: permissionsFor(req.user.role) });
   });
 
-  app.post('/api/auth/logout', requireSession, requireCsrf, async (req, res) => {
+  app.post('/api/auth/logout', authRequestLimiter, requireSession, requireCsrf, async (req, res) => {
     await db.sessions.remove({ id: req.session.id }, {});
     await audit.fromRequest(req, { action: 'logout', entity_type: 'authentication', entity_id: req.user.id });
     res.set('Set-Cookie', clearCookieHeader(isSecureRequest(req)));
     res.json({ ok: true });
   });
 
-  app.post('/api/auth/change-password', requireSession, requireCsrf, async (req, res) => {
+  app.post('/api/auth/change-password', authRequestLimiter, requireSession, requireCsrf, async (req, res) => {
     const current = String((req.body && req.body.current_password) || '');
     const password = validatePassword(req.body && req.body.new_password, req.user.username);
     if (password.error) return res.status(400).json({ error: password.error });
@@ -431,7 +447,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     res.json({ ok: true, csrf_token: session.csrf_token });
   });
 
-  app.get('/api/users', requireRole('admin'), async (req, res) => {
+  app.get('/api/users', authRequestLimiter, requireRole('admin'), async (req, res) => {
     const [users, sessions] = await Promise.all([
       db.users.find({}).sort({ name: 1 }),
       db.sessions.find({ expires_at: { $gt: new Date().toISOString() } })
@@ -441,7 +457,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     res.json(users.map(user => ({ ...publicUser(user), active_sessions: counts.get(user.id) || 0 })));
   });
 
-  app.post('/api/users', requireRole('admin'), requireCsrf, async (req, res) => {
+  app.post('/api/users', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {
     const username = validateUsername(req.body && req.body.username);
     const name = cleanName(req.body && req.body.name);
     const role = String((req.body && req.body.role) || 'viewer');
@@ -463,7 +479,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     res.status(201).json(publicUser(user));
   });
 
-  app.put('/api/users/:id', requireRole('admin'), requireCsrf, async (req, res) => {
+  app.put('/api/users/:id', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {
     const target = await db.users.findOne({ id: req.params.id });
     if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
     const name = req.body && req.body.name !== undefined ? cleanName(req.body.name) : { value: target.name };
@@ -488,7 +504,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     res.json({ ...publicUser({ ...target, name: name.value, role, active, updated_at: updatedAt }) });
   });
 
-  app.post('/api/users/:id/reset-password', requireRole('admin'), requireCsrf, async (req, res) => {
+  app.post('/api/users/:id/reset-password', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {
     const target = await db.users.findOne({ id: req.params.id });
     if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
     if (target.id === req.user.id) return res.status(400).json({ error: 'Altere sua própria senha pela página Minha conta.' });
@@ -506,7 +522,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     res.json({ ok: true });
   });
 
-  app.delete('/api/users/:id/sessions', requireRole('admin'), requireCsrf, async (req, res) => {
+  app.delete('/api/users/:id/sessions', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {
     const target = await db.users.findOne({ id: req.params.id });
     if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
     if (target.id === req.user.id) return res.status(400).json({ error: 'Use Sair para encerrar a própria sessão.' });
@@ -531,7 +547,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     return query;
   }
 
-  app.get('/api/audit', requireRole('admin'), async (req, res) => {
+  app.get('/api/audit', authRequestLimiter, requireRole('admin'), async (req, res) => {
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit, 10) || 50));
     const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
     let query;
@@ -545,7 +561,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     audit.fromRequest(req, { action: 'audit.read', entity_type: 'audit', details: { total, offset, limit } }).catch(() => {});
   });
 
-  app.get('/api/audit/export.csv', requireRole('admin'), async (req, res) => {
+  app.get('/api/audit/export.csv', authRequestLimiter, requireRole('admin'), async (req, res) => {
     let query;
     try { query = auditQuery(req); } catch (_) { return res.status(400).json({ error: 'Filtro de data inválido.' }); }
     const items = await db.audit.find(query).sort({ seq: -1 });
@@ -564,14 +580,14 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     res.send('\uFEFF' + header.map(csvCell).join(',') + '\n' + rows.join('\n'));
   });
 
-  app.get('/login', async (req, res) => {
+  app.get('/login', authRequestLimiter, async (req, res) => {
     if (await userCount() === 0 && isPrivateNetwork(req)) return res.redirect('/setup');
     if (await resolveSession(req)) return res.redirect('/painel');
     res.set('Cache-Control', 'no-store');
     res.sendFile(loginFile);
   });
 
-  app.get('/setup', async (req, res) => {
+  app.get('/setup', authRequestLimiter, async (req, res) => {
     if (await userCount() !== 0) return res.redirect('/painel');
     if (!isPrivateNetwork(req)) return res.redirect('/login?setup=required');
     res.set('Cache-Control', 'no-store');

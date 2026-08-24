@@ -207,3 +207,13 @@ test('a verificação de integridade detecta alteração posterior em um evento'
   assert.equal(result.data.integrity.ok, false);
   assert.equal(result.data.integrity.broken_at, 1);
 });
+
+test('rotas sensíveis limitam rajadas por endereço', async () => {
+  let limited = null;
+  for (let attempt = 0; attempt < 130 && !limited; attempt += 1) {
+    const result = await send('/login', { redirect: 'manual' });
+    if (result.response.status === 429) limited = result.response;
+  }
+  assert.ok(limited, 'o limite compartilhado deveria bloquear a rajada');
+  assert.match(limited.headers.get('retry-after') || '', /^\d+$/);
+});

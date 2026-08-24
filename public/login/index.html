@@ -86,8 +86,7 @@
         const response=await fetch(setup?'/api/setup':'/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         const data=await response.json();
         if(!response.ok)throw new Error(data.error||'Não foi possível entrar.');
-        const next=params.get('next');
-        location.href=next&&next.startsWith('/')&&!next.startsWith('//')?next:'/painel';
+        location.href='/painel';
       }catch(err){error.textContent=err.message;error.classList.add('show');button.disabled=false;}
     });
   </script>

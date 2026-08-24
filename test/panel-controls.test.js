@@ -42,3 +42,8 @@ test('a configuração inicial remota pede o código de ativação descartável'
   assert.match(login, /activation_required/);
   assert.match(login, /body\.setup\.remote \.remote-only/);
 });
+
+test('o login não redireciona para um destino fornecido pela URL', () => {
+  assert.doesNotMatch(login, /params\.get\(['"]next['"]\)/);
+  assert.match(login, /location\.href=['"]\/painel['"]/);
+});
