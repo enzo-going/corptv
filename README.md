@@ -18,6 +18,9 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 
 - Texto, imagens JPG/PNG/WEBP e vídeos MP4
 - Vídeos em loop com áudio e título oculto, fixo ou temporário com fade
+- Contas individuais com perfis de TI administrador, editor e somente leitura
+- Sessões protegidas, limitação de tentativas e defesa CSRF
+- Auditoria pesquisável de logins e alterações, com exportação CSV e verificação de integridade
 - Playlists e agendamentos independentes por ambiente
 - URL legível e permanente para cada dispositivo
 - Agendamento por início, expiração, dias da semana e faixa de horário
@@ -59,6 +62,12 @@ npm ci
 npm start
 ```
 
+No primeiro início, abra `http://IP_DO_SERVIDOR:3000/setup` pela rede interna e
+crie a conta inicial do setor de TI. Informe o código único gravado em
+`CORPTV_LOG_DIR/corptv-setup-code.txt`; o arquivo e a rota de cadastro são
+desativados automaticamente assim que o primeiro administrador é criado. No
+navegador do próprio servidor (`localhost`), o código não é solicitado.
+
 Abra:
 
 - Painel: `http://IP_DO_SERVIDOR:3000/painel`
@@ -85,6 +94,28 @@ As variáveis abaixo são opcionais. O arquivo `.env.example` serve como referê
 | `CORPTV_LIMITE_MBPS` | `4.5` | Limite de entrega de mídia por conexão; `0` desativa |
 | `CORPTV_MEDIA_REQUESTS_PER_MINUTE` | `600` | Limite por IP para arquivos de mídia |
 | `CORPTV_PAGE_REQUESTS_PER_MINUTE` | `120` | Limite por IP para páginas do player e painel |
+| `CORPTV_AUTH_REQUESTS_PER_MINUTE` | `120` | Limite por IP para autenticação, usuários e auditoria |
+| `CORPTV_SESSION_HOURS` | `8` | Duração máxima de uma sessão do painel |
+| `CORPTV_SESSION_IDLE_MINUTES` | `60` | Expiração após inatividade |
+| `CORPTV_TRUST_PROXY` | `0` | Use `1` somente atrás de um proxy reverso confiável que encerra HTTPS |
+
+## Usuários e auditoria
+
+O player das TVs, o heartbeat e a rota de saúde continuam públicos na rede
+local para que as TV Boxes não precisem guardar credenciais. O painel e todas
+as APIs de gestão exigem uma conta.
+
+| Perfil | Acesso |
+|---|---|
+| TI administrador | Conteúdo, ambientes, telas, usuários, sessões e auditoria |
+| Colaborador editor | Visualização e alterações operacionais |
+| Somente leitura | Visão geral e consultas, sem qualquer alteração |
+
+Administradores podem criar e desativar contas, redefinir senhas e encerrar
+sessões. Contas não são excluídas, preservando a autoria histórica. A auditoria
+registra sucessos, falhas e acessos negados sem guardar senhas, cookies ou
+tokens. Cada registro referencia criptograficamente o anterior; o painel avisa
+se a cadeia não conferir.
 
 ## Fluxo de operação
 
@@ -116,7 +147,11 @@ npm test
 npm audit --omit=dev
 ```
 
-A suíte automatizada cobre API, vínculos entre entidades, uploads falsos, limpeza de mídias, limites de campos, texto sobre vídeos, áudio, cópia de URLs em HTTP, datas, expiração, horários inválidos, duplicação de dias, madrugada e validade do cache offline. O workflow de CI executa a suíte em Node.js 22 e 24.
+A suíte automatizada cobre autenticação, CSRF, perfis, revogação de sessão,
+auditoria, API, vínculos entre entidades, uploads falsos, limpeza de mídias,
+limites de campos, texto sobre vídeos, áudio, cópia de URLs em HTTP, datas,
+expiração, horários inválidos, duplicação de dias, madrugada e validade do cache
+offline. O workflow de CI executa a suíte em Node.js 22 e 24.
 
 ## Estrutura
 
@@ -129,6 +164,9 @@ corptv/
 │   └── uploads/             # execução; ignorado pelo Git
 ├── src/
 │   ├── db.js
+│   ├── auth.js
+│   ├── audit.js
+│   ├── security.js
 │   ├── scheduling.js
 │   ├── server.js
 │   ├── uploads.js
@@ -141,9 +179,18 @@ corptv/
 
 ## Segurança e dados
 
-Banco, uploads, logs e arquivos de ambiente não entram no repositório. O upload exige uma combinação permitida de extensão e MIME e também confere a assinatura binária do arquivo.
+Banco, uploads, logs e arquivos de ambiente não entram no repositório. Senhas
+são derivadas com `scrypt`; tokens de sessão só são persistidos como SHA-256 e
+o cookie é `HttpOnly` e `SameSite=Strict`. O upload exige uma combinação
+permitida de extensão e MIME e também confere a assinatura binária do arquivo.
 
-O projeto não possui autenticação integrada. Use em uma rede confiável ou adicione um proxy autenticado com HTTPS antes de expor o painel e as rotas administrativas à internet. Consulte [SECURITY.md](SECURITY.md) para reportar vulnerabilidades.
+Na instalação padrão em HTTP, o cookie não pode usar o atributo `Secure`.
+Mantenha o serviço em uma rede interna controlada. Antes de atravessar redes não
+confiáveis ou ser exposto à internet, coloque toda a aplicação atrás de HTTPS e
+um proxy reverso. Nesse cenário, defina `CORPTV_TRUST_PROXY=1` para o Express
+reconhecer HTTPS e marcar o cookie como `Secure`; não habilite a opção quando o
+cliente puder acessar diretamente o servidor. Consulte [SECURITY.md](SECURITY.md) para reportar
+vulnerabilidades.
 
 ## Operação no Windows
 

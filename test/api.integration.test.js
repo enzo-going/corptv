@@ -20,6 +20,8 @@ const { app } = require('../src/server');
 
 let server;
 let baseUrl;
+let authCookie = '';
+let csrfToken = '';
 
 function addPanelFields(form, title) {
   form.set('title', title);
@@ -34,8 +36,15 @@ function addPanelFields(form, title) {
   form.set('time_end', '');
 }
 
+async function request(pathname, options = {}) {
+  const headers = { ...(options.headers || {}) };
+  if (authCookie) headers.cookie = authCookie;
+  if (csrfToken && !['GET', 'HEAD', 'OPTIONS'].includes(options.method || 'GET')) headers['x-csrf-token'] = csrfToken;
+  return fetch(baseUrl + pathname, { ...options, headers });
+}
+
 async function json(pathname, options) {
-  const response = await fetch(baseUrl + pathname, {
+  const response = await request(pathname, {
     ...options,
     headers: { 'content-type': 'application/json', ...(options && options.headers) },
     body: options && options.body ? JSON.stringify(options.body) : undefined
@@ -49,6 +58,14 @@ test.before(async () => {
   server = app.listen(0, '127.0.0.1');
   await new Promise(resolve => server.once('listening', resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const setup = await fetch(baseUrl + '/api/setup', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ name: 'Administrador dos testes', username: 'test-admin', password: 'Senha segura de testes 2026!' })
+  });
+  assert.equal(setup.status, 201);
+  authCookie = setup.headers.get('set-cookie').split(';')[0];
+  csrfToken = (await setup.json()).csrf_token;
 });
 
 test.after(async () => {
@@ -102,7 +119,7 @@ test('API valida relações, entradas e impede cache de programação', async ()
   });
   assert.equal(screen.response.status, 200);
 
-  const player = await fetch(baseUrl + '/api/player/' + screen.body.id);
+  const player = await request('/api/player/' + screen.body.id);
   assert.equal(player.status, 200);
   assert.match(player.headers.get('cache-control'), /no-store/);
 });
@@ -135,7 +152,7 @@ test('API rejeita corpos JSON ausentes sem responder erro interno', async () => 
   });
   assert.equal(unknownScreen.response.status, 404);
 
-  const headers = await fetch(baseUrl + '/api/groups');
+  const headers = await request('/api/groups');
   assert.equal(headers.headers.get('x-powered-by'), null);
   assert.equal(headers.headers.get('x-content-type-options'), 'nosniff');
   assert.match(headers.headers.get('cache-control'), /no-store/);
@@ -145,7 +162,7 @@ test('upload falso é rejeitado e removido', async () => {
   const form = new FormData();
   addPanelFields(form, 'Arquivo falso');
   form.set('file', new Blob(['<script>alert(1)</script>'], { type: 'image/png' }), 'falso.png');
-  const response = await fetch(baseUrl + '/api/slides', { method: 'POST', body: form });
+  const response = await request('/api/slides', { method: 'POST', body: form });
   assert.equal(response.status, 415);
   assert.deepEqual(fs.readdirSync(process.env.CORPTV_UPLOADS_DIR), []);
 });
@@ -155,7 +172,7 @@ test('exclusão de slide também remove sua mídia', async () => {
   const form = new FormData();
   addPanelFields(form, 'Aviso');
   form.set('file', new Blob([png], { type: 'image/png' }), 'aviso.png');
-  const created = await fetch(baseUrl + '/api/slides', { method: 'POST', body: form });
+  const created = await request('/api/slides', { method: 'POST', body: form });
   assert.equal(created.status, 200);
   const slide = await created.json();
   const mediaPath = path.join(process.env.CORPTV_UPLOADS_DIR, path.basename(slide.url));
@@ -189,7 +206,7 @@ test('modo do texto do vídeo é salvo, atualizado e entregue ao player', async 
   form.set('video_text_seconds', '4');
   form.set('file', new Blob([mp4], { type: 'video/mp4' }), 'abertura.mp4');
 
-  const createdResponse = await fetch(baseUrl + '/api/slides', { method: 'POST', body: form });
+  const createdResponse = await request('/api/slides', { method: 'POST', body: form });
   assert.equal(createdResponse.status, 200);
   const slide = await createdResponse.json();
   assert.equal(slide.video_text_mode, 'timed');
@@ -200,7 +217,7 @@ test('modo do texto do vídeo é salvo, atualizado e entregue ao player', async 
   });
   assert.equal(linked.response.status, 200);
 
-  const playerResponse = await fetch(baseUrl + '/api/player/' + screen.body.id);
+  const playerResponse = await request('/api/player/' + screen.body.id);
   assert.equal(playerResponse.status, 200);
   const player = await playerResponse.json();
   assert.equal(player.slides[0].video_text_mode, 'timed');
@@ -211,7 +228,7 @@ test('modo do texto do vídeo é salvo, atualizado e entregue ao player', async 
   });
   assert.equal(updated.response.status, 200);
 
-  const slidesResponse = await fetch(baseUrl + '/api/slides');
+  const slidesResponse = await request('/api/slides');
   const slides = await slidesResponse.json();
   const saved = slides.find(item => item.id === slide.id);
   assert.equal(saved.video_text_mode, 'none');
