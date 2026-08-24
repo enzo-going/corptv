@@ -71,7 +71,7 @@ try {
     $manifest | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $partial 'manifest.json') -Encoding UTF8
     Move-Item -LiteralPath $partial -Destination $snapshot -ErrorAction Stop
 
-    $programDataLogs = 'C:\ProgramData\CodexInstallLogs'
+    $programDataLogs = 'C:\ProgramData\CorporTVLogs'
     Rotate-CorporTVLog -Path (Join-Path $programDataLogs 'corptv.log') -AllowedRoot $programDataLogs | Out-Null
     Rotate-CorporTVLog -Path (Join-Path $programDataLogs 'corptv-media-access.log') -AllowedRoot $programDataLogs | Out-Null
     Rotate-CorporTVLog -Path (Join-Path $root 'logs\corptv-media-access.log') -AllowedRoot (Join-Path $root 'logs') | Out-Null

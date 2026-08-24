@@ -1,6 +1,6 @@
 param(
-    [string]$Path = 'C:\ProgramData\CodexInstallLogs\corptv.log',
-    [string]$AllowedRoot = 'C:\ProgramData\CodexInstallLogs',
+    [string]$Path = 'C:\ProgramData\CorporTVLogs\corptv.log',
+    [string]$AllowedRoot = 'C:\ProgramData\CorporTVLogs',
     [long]$MaxBytes = 10MB,
     [int]$Keep = 5
 )
