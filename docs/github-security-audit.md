@@ -3,6 +3,23 @@
 Este documento registra a linha de base verificada em 24 de agosto de 2026 e
 define uma rotina curta para repetir a auditoria sem depender da interface web.
 
+## Verificação de 28 de agosto de 2026
+
+A revisão desta data confirmou a situação abaixo na `main`:
+
+| Verificação | Resultado |
+|---|---|
+| Code scanning | Zero alertas abertos |
+| Dependabot | Zero alertas abertos |
+| Secret scanning | Zero alertas abertos |
+| CI pós-merge | Node.js 22, Node.js 24 e scripts Windows aprovados |
+| CodeQL e Dependency Review | Aprovados |
+| Repository hygiene | Actions fixados por SHA de 40 caracteres |
+
+O único pull request aberto é uma atualização majoritária do Express mantida
+separada para revisão de compatibilidade. Nenhum alerta ou exceção foi criado
+durante esta verificação.
+
 ## Linha de base
 
 | Controle | Resultado verificado |
