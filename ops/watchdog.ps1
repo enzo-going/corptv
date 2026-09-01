@@ -45,7 +45,7 @@ try {
     }
     Write-CorporTVOpsLog -Path $logPath -Message 'watchdog: segunda falha consecutiva; reiniciando serviço'
     Stop-CorporTV -AppRoot $root -TaskName $TaskName
-    Rotate-CorporTVLog -Path 'C:\ProgramData\CodexInstallLogs\corptv.log' -AllowedRoot 'C:\ProgramData\CodexInstallLogs' | Out-Null
+    Rotate-CorporTVLog -Path 'C:\ProgramData\CorporTVLogs\corptv.log' -AllowedRoot 'C:\ProgramData\CorporTVLogs' | Out-Null
     $health = Start-CorporTV -TaskName $TaskName
     Remove-Item -LiteralPath $marker -Force -ErrorAction SilentlyContinue
     Write-CorporTVOpsLog -Path $logPath -Message "watchdog: serviço recuperado; pid na porta 3000; uptime=$($health.uptime_s)s"
