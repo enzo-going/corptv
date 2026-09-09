@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "express": "^5.2.1",
-    "express-rate-limit": "8.6.2",
+    "express-rate-limit": "8.7.0",
     "multer": "^2.3.0",
     "nedb-promises": "^6.2.4",
     "uuid": "14.0.2"
