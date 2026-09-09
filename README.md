@@ -3,12 +3,12 @@
 [![CI](https://github.com/enzo-going/corptv/actions/workflows/ci.yml/badge.svg)](https://github.com/enzo-going/corptv/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/enzo-going/corptv?display_name=tag)](https://github.com/enzo-going/corptv/releases)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![Express](https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white)](https://expressjs.com/)
+[![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
 [![License: MIT](https://img.shields.io/github/license/enzo-going/corptv)](LICENSE)
 
-Digital signage leve para distribuir conteúdo em TVs corporativas. O painel centraliza slides, playlists e agendamentos; cada TV Box abre uma URL permanente e recebe mudanças sem precisar ser reiniciada.
+Digital signage leve para distribuir conteúdo em TVs corporativas. O painel centraliza conteúdo, playlists e agendamentos; cada TV Box abre uma URL permanente e recebe mudanças sem precisar ser reiniciada.
 
-![Painel do CorporTV](docs/assets/painel.jpg)
+![Visão geral do painel do CorporTV, com telas online, programação no ar e conteúdo oculto por prazo vencido](docs/assets/painel.png)
 
 ## Por que o projeto existe
 
@@ -20,6 +20,8 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 - Vídeos em loop com áudio e título oculto, fixo ou temporário com fade
 - Contas individuais com perfis de TI administrador, editor e somente leitura
 - Sessões protegidas, limitação de tentativas e defesa CSRF
+- Senha de no mínimo 12 caracteres, derivada com `scrypt`
+- Limite de requisições por IP nas rotas de mídia, páginas e autenticação
 - Auditoria pesquisável de logins e alterações, com exportação CSV e verificação de integridade
 - Playlists e agendamentos independentes por ambiente
 - URL legível e permanente para cada dispositivo
@@ -29,7 +31,7 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 - Cache offline que respeita o prazo de cada conteúdo
 - HTTP Range, cache imutável e limite de banda por conexão para servir vídeos com eficiência
 - Validação de campos, MIME e assinatura real dos uploads
-- Remoção automática da mídia quando um slide é excluído
+- Remoção automática da mídia quando um conteúdo é excluído
 - Watchdog com confirmação de falha antes de reiniciar o serviço
 - Backup diário consistente de bancos e mídias, com retenção de sete snapshots
 - Rotação automática dos logs operacionais
@@ -46,7 +48,7 @@ flowchart LR
     E --> F[Cache offline com validade]
 ```
 
-O servidor é a fonte da programação. A cada consulta ele calcula quais slides estão ativos e por quanto tempo uma cópia offline continua válida. Assim, um conteúdo expirado sai da TV mesmo durante uma queda de rede.
+O servidor é a fonte da programação. A cada consulta ele calcula quais conteúdos estão ativos e por quanto tempo uma cópia offline continua válida. Assim, um conteúdo expirado sai da TV mesmo durante uma queda de rede.
 
 ## Requisitos
 
@@ -112,24 +114,35 @@ as APIs de gestão exigem uma conta.
 | Somente leitura | Visão geral e consultas, sem qualquer alteração |
 
 Administradores podem criar e desativar contas, redefinir senhas e encerrar
-sessões. Contas não são excluídas, preservando a autoria histórica. A auditoria
-registra sucessos, falhas e acessos negados sem guardar senhas, cookies ou
-tokens. Cada registro referencia criptograficamente o anterior; o painel avisa
-se a cadeia não conferir.
+sessões. A senha precisa ter pelo menos 12 caracteres e não pode conter o nome
+de usuário; trocar a senha ou mudar o perfil de alguém encerra as sessões
+abertas daquela conta. Contas não são excluídas, preservando a autoria
+histórica. A auditoria registra sucessos, falhas e acessos negados sem guardar
+senhas, cookies ou tokens. Cada registro referencia criptograficamente o
+anterior; o painel avisa se a cadeia não conferir.
 
 ## Fluxo de operação
 
-1. Crie os slides.
-2. Crie um ou mais grupos.
-3. Selecione os slides da playlist de cada grupo.
-4. Cadastre as telas e associe cada uma a um grupo.
+1. Cadastre o conteúdo: texto, imagem ou vídeo.
+2. Crie um ou mais ambientes, como Recepção ou Refeitório.
+3. Monte a playlist de cada ambiente e defina quando cada item aparece.
+4. Cadastre as telas e associe cada uma a um ambiente.
 5. Abra a URL da tela no navegador da TV Box em modo quiosque.
+
+No painel, **Conteúdo** é a biblioteca e **Ambientes** são os locais. O
+agendamento pertence ao par conteúdo–ambiente, e não ao conteúdo sozinho.
 
 ## Agendamento
 
 Todos os campos são opcionais; sem regra, o conteúdo toca sempre. A agenda
 pertence ao vínculo conteúdo–ambiente, então o mesmo vídeo pode ter horários
 diferentes em locais distintos.
+
+![Janela de agendamento do CorporTV, com período, dias da semana, faixa de horário e o resumo em linguagem comum](docs/assets/agendamento.png)
+
+O painel resume a regra em uma frase antes de salvar e recusa combinações que
+nunca apareceriam, como um fim anterior ao início ou uma faixa de horário pela
+metade.
 
 | Campo | Comportamento |
 |---|---|
@@ -163,11 +176,20 @@ offline. O workflow de CI executa a suíte em Node.js 22 e 24.
 
 ```text
 corptv/
-├── .github/workflows/ci.yml
+├── .github/workflows/
+│   ├── ci.yml                 # suíte em Node.js 22 e 24
+│   ├── codeql.yml
+│   ├── dependency-review.yml
+│   └── repository-hygiene.yml
+├── docs/
+│   ├── assets/                # imagens do README
+│   └── github-security-audit.md
+├── ops/                       # watchdog, backup e tarefas agendadas
 ├── public/
+│   ├── login/index.html       # login e cadastro inicial
 │   ├── painel/index.html
 │   ├── player/index.html
-│   └── uploads/             # execução; ignorado pelo Git
+│   └── uploads/               # execução; ignorado pelo Git
 ├── src/
 │   ├── db.js
 │   ├── auth.js
@@ -178,8 +200,9 @@ corptv/
 │   ├── uploads.js
 │   └── validation.js
 ├── test/
-├── data/                    # execução; ignorado pelo Git
-├── iniciar.bat              # iniciador Windows sem loop
+├── data/                      # execução; ignorado pelo Git
+├── .env.example
+├── iniciar.bat                # iniciador Windows sem loop
 └── package.json
 ```
 
