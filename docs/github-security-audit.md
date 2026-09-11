@@ -20,6 +20,25 @@ O único pull request aberto é uma atualização majoritária do Express mantid
 separada para revisão de compatibilidade. Nenhum alerta ou exceção foi criado
 durante esta verificação.
 
+## Verificação de 11 de setembro de 2026
+
+A revisão após o ciclo de atualizações de setembro confirmou que a versão
+publicada está em `1.4.1` e que as dependências recentes foram integradas com
+os checks obrigatórios aprovados:
+
+| Verificação | Resultado |
+|---|---|
+| Code scanning | Zero alertas abertos |
+| Dependabot | Zero alertas abertos e nenhuma atualização pendente |
+| Secret scanning | Zero alertas abertos |
+| CI da `main` | Node.js 22, Node.js 24 e scripts Windows aprovados |
+| CodeQL | Análise JavaScript aprovada |
+| Repository hygiene | Actions fixados por SHA de 40 caracteres |
+| Versão publicada | CorporTV `1.4.1`, com Express `5.2.1` |
+
+Não foram encontradas alterações locais pendentes para publicar durante esta
+revisão. O próximo ciclo deve repetir esta rotina antes de novos releases.
+
 ## Linha de base
 
 | Controle | Resultado verificado |
