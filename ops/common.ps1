@@ -99,7 +99,11 @@ function Start-CorporTV {
         [int]$Port = 3000
     )
     Start-ScheduledTask -TaskName $TaskName
-    for ($attempt = 1; $attempt -le 30; $attempt += 1) {
+    # 90s de tolerância (180 x 500ms). O serviço leva 20-25s para abrir a porta.
+    # Com os 15s que havia antes, o watchdog declarava falha em toda subida normal
+    # e, dois minutos depois, matava uma instância que estava quase pronta - um laço
+    # que se alimentava. Não reduzir sem medir o tempo real de subida.
+    for ($attempt = 1; $attempt -le 180; $attempt += 1) {
         Start-Sleep -Milliseconds 500
         $health = Invoke-CorporTVHealth -Port $Port
         if ($health) {
@@ -108,7 +112,7 @@ function Start-CorporTV {
             return $health
         }
     }
-    throw 'O CorporTV não voltou saudável dentro de 15 segundos.'
+    throw 'O CorporTV não voltou saudável dentro de 90 segundos.'
 }
 
 function Rotate-CorporTVLog {
