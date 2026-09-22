@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=CorporTV Quiosque
+Comment=Abre o player em tela cheia apontando para o agente local
+Exec=/opt/corptv-agente/iniciar-quiosque.sh
+X-GNOME-Autostart-enabled=true
