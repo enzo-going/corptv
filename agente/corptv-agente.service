@@ -1,0 +1,47 @@
+# Serviço do agente CorporTV para Raspberry Pi / Linux.
+#
+# Instalar:
+#   sudo cp corptv-agente.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now corptv-agente
+#
+# Acompanhar:
+#   journalctl -u corptv-agente -f
+#
+# Ajustar a tela e o limite: editar as linhas Environment abaixo e recarregar.
+
+[Unit]
+Description=CorporTV - agente local (baixa e serve a midia)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/opt/corptv-agente
+ExecStart=/usr/bin/node /opt/corptv-agente/agente.js
+
+# ── Configuração ─────────────────────────────────────────────
+Environment=CORPTV_SERVIDOR=http://SERVIDOR-CORPTV:3000
+# Trocar pelo nome da tela cadastrada no painel:
+Environment=CORPTV_TELA=recepcao
+Environment=CORPTV_PORTA=8080
+Environment=CORPTV_CACHE=/var/lib/corptv/cache
+# Ritmo do download, em Mb/s. Com 4 aparelhos: 4 x 2 = 8 Mb/s, abaixo do teto
+# de 12 Mb/s do servidor. Aumentar só se a rede tiver folga sobrando.
+Environment=CORPTV_LIMITE_MBPS=2
+# Espalha o início do download em até 90s, para vários aparelhos que ligam
+# juntos (queda de energia, por exemplo) não baixarem todos no mesmo instante.
+Environment=CORPTV_JITTER=90
+
+# Se cair, volta sozinho.
+Restart=always
+RestartSec=10
+
+# O cache precisa existir e ser gravável.
+StateDirectory=corptv
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
