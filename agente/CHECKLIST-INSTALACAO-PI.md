@@ -8,13 +8,16 @@ Checklist de operação. Siga na ordem. Cada passo tem como conferir se deu cert
 
 ## 0. Material
 
-- [ ] Raspberry Pi (anote o modelo: ____________)
-- [ ] Fonte oficial — **Pi 4: 3A / Pi 5: 5A (27W)**. Fonte de celular não serve: subtensão trava a Pi de forma intermitente e é difícil de diagnosticar depois.
-- [ ] Cartão microSD 32 GB ou mais (classe A1/A2)
-- [ ] Cabo HDMI (Pi 4 e 5 usam **micro-HDMI**, saída HDMI0, a mais perto da energia)
+- [ ] Raspberry Pi 4 Model B
+- [ ] Fonte oficial USB-C **5,1 V / 3 A (15 W)**. Fonte de celular não serve e a USB da TV muito menos: subtensão trava a Pi de forma intermitente e é difícil de diagnosticar depois.
+- [ ] Cartão microSD 32 GB de **alta durabilidade** (endurance) — aqui vale confiabilidade, não capacidade nem preço
+- [ ] Case com dissipação passiva — atrás da TV é abafado
+- [ ] Cabo **micro**-HDMI (não mini, não full), na saída **HDMI0**, a mais perto da energia
 - [ ] Cabo de rede — a TV fica no cabo, não no Wi-Fi
 - [ ] Teclado USB (só na bancada)
 - [ ] Pendrive com a pasta `agente/`
+
+> **Vídeo:** a Pi 4 decodifica H.264 em hardware, e o padrão do CorporTV é 720p H.264 a ~2,8 Mb/s. Sobra folga. Se o vídeo picotar, o problema é energia ou arquivo fora do padrão — não a placa.
 
 ---
 
@@ -191,6 +194,7 @@ Outros:
 | Vídeo picotando | Subtensão, ou vídeo fora do padrão | Conferir o raio amarelo na tela e a fonte; conferir a conversão do vídeo |
 | Baixa e baixa de novo sem parar | Arquivo mudando no servidor, ou disco cheio | `df -h` e `journalctl -u corptv-agente` |
 | Barra "restaurar páginas" cobrindo o vídeo | Chromium fechou de forma anormal | O script já limpa isso no boot; se persistir, reiniciar a Pi |
+| Tela volta sozinha de tempos em tempos | Chromium sem memória (a Pi 4 aqui tem 2 GB) | `journalctl -t corptv-quiosque` mostra de quanto em quanto tempo; se for frequente, investigar |
 
 Comandos de diagnóstico:
 
@@ -199,6 +203,16 @@ systemctl status corptv-agente
 journalctl -u corptv-agente -n 50
 curl -s localhost:8080/status
 ```
+
+---
+
+## Decisão em aberto: cartão SD somente-leitura
+
+Na revisão de equipamentos ficou a recomendação de deixar o sistema em modo somente-leitura (overlay) para que queda de energia não corrompa o cartão SD. Isso foi decidido quando o plano ainda era a TV puxar o vídeo do servidor.
+
+**Com o agente, overlay puro não serve:** ele guarda a mídia em disco, e no overlay toda escrita vai para a RAM e some no próximo boot. A Pi passaria a rebaixar todo o conteúdo a cada reinício — exatamente o tráfego que o agente existe para evitar.
+
+Se for adotar, a pasta do cache (`CORPTV_CACHE`) precisa ficar numa partição gravável de verdade, fora do overlay. Não fazer isso no piloto: primeiro provar que a operação funciona, depois endurecer.
 
 ---
 
