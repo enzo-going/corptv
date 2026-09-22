@@ -32,6 +32,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate shell scripts
+        run: bash -n agente/iniciar-quiosque.sh
+
       - name: Run tests
         run: npm test
 
