@@ -1,0 +1,12 @@
+# O repositório é editado no Windows, mas parte dele roda no Linux (Raspberry Pi).
+# Sem isto, o clone no Windows grava CRLF nos arquivos do agente e, ao copiar a
+# pasta para a Pi por pendrive, o shebang vira "#!/bin/bash\r" — o sistema
+# responde "bad interpreter" e a TV não abre.
+*.sh        text eol=lf
+*.service   text eol=lf
+*.desktop   text eol=lf
+
+# Os scripts de operação do servidor continuam com quebra de linha do Windows.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
