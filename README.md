@@ -184,6 +184,7 @@ corptv/
 ├── docs/
 │   ├── assets/                # imagens do README
 │   └── github-security-audit.md
+├── agente/                    # agente local do aparelho atrás da TV
 ├── ops/                       # watchdog, backup e tarefas agendadas
 ├── public/
 │   ├── login/index.html       # login e cadastro inicial
@@ -220,6 +221,14 @@ um proxy reverso. Nesse cenário, defina `CORPTV_TRUST_PROXY=1` para o Express
 reconhecer HTTPS e marcar o cookie como `Secure`; não habilite a opção quando o
 cliente puder acessar diretamente o servidor. Consulte [SECURITY.md](SECURITY.md) para reportar
 vulnerabilidades.
+
+## Agente local nos aparelhos
+
+O navegador não baixa o vídeo na velocidade em que o assiste: ele puxa o arquivo o mais rápido que a rede permitir, e repete isso a cada volta da playlist. Com poucas telas tocando direto do servidor, o tráfego fica permanentemente no teto e qualquer oscilação vira travamento na tela.
+
+A pasta [`agente`](agente/) resolve isso no aparelho atrás da TV (Raspberry Pi ou mini PC). O agente baixa a mídia **uma vez**, no ritmo configurado, com retomada e início espalhado entre os aparelhos, guarda no disco e serve em `127.0.0.1`. Durante a exibição o vídeo sai do disco e a rede não é usada — sobra apenas a consulta da programação, alguns KB por minuto. O player não muda: ele continua pedindo `/api/player/<tela>` e a mídia, só que ao agente.
+
+Instalação, configuração e o checklist de campo do Raspberry Pi estão em [agente/README.md](agente/README.md) e [agente/CHECKLIST-INSTALACAO-PI.md](agente/CHECKLIST-INSTALACAO-PI.md).
 
 ## Operação no Windows
 
