@@ -8,7 +8,7 @@ const { rateLimit } = require('express-rate-limit');
 const db = require('./db');
 const { createAudit } = require('./audit');
 const { createAuth } = require('./auth');
-const { validateGroupInput, validateScreenInput } = require('./validation');
+const { validateGroupInput, validateScreenInput, validateSlideInput } = require('./validation');
 const {
   acceptsUpload,
   inspectStoredUpload,
@@ -458,29 +458,8 @@ function tituloPadrao(title, file) {
   return file.originalname.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 80);
 }
 
-const VIDEO_TEXT_MODES = new Set(['none', 'fixed', 'timed']);
-function textoDoVideo(body, type, current) {
-  if (type !== 'vid') return { video_text_mode: 'none', video_text_seconds: 0 };
-  const mode = body.video_text_mode === undefined
-    ? ((current && current.video_text_mode) || 'fixed')
-    : body.video_text_mode;
-  if (!VIDEO_TEXT_MODES.has(mode)) return { error: 'Modo do texto do vídeo inválido.' };
-  if (mode !== 'timed') return { video_text_mode: mode, video_text_seconds: 0 };
-  const seconds = parseInt(
-    body.video_text_seconds === undefined
-      ? ((current && current.video_text_seconds) || 5)
-      : body.video_text_seconds,
-    10
-  );
-  if (!Number.isInteger(seconds) || seconds < 1 || seconds > 300) {
-    return { error: 'O texto temporário deve ficar entre 1 e 300 segundos.' };
-  }
-  return { video_text_mode: mode, video_text_seconds: seconds };
-}
-
 app.post('/api/slides', handleUpload, async (req, res) => {
   const fields = req.body || {};
-  const { title, body, type, duration, bg } = fields;
   const cleanupUpload = () => req.file && removeFile(req.file.path, uploadsDir);
   let uploadedType = null;
   if (req.file) {
@@ -497,20 +476,19 @@ app.post('/api/slides', handleUpload, async (req, res) => {
     }
     uploadedType = inspection.type;
   }
-  if (!title && !req.file) return res.status(400).json({ error: 'Título ou arquivo obrigatório' });
-  const slideType = uploadedType || type || 'txt';
-  const videoText = textoDoVideo(fields, slideType);
-  if (videoText.error) {
+  const valid = validateSlideInput(fields, { hasFile: Boolean(req.file), fileType: uploadedType });
+  if (valid.error) {
     await cleanupUpload();
-    return res.status(400).json({ error: videoText.error });
+    return res.status(400).json({ error: valid.error });
   }
+  const v = valid.value;
   const doc = {
-    id: uuidv4(), title: tituloPadrao(title, req.file), body: body || '',
-    type: slideType, duration: slideType === 'vid' ? 0 : (parseInt(duration) || 8),
-    bg: bg || '#111111', url: req.file ? '/uploads/' + req.file.filename : null,
+    id: uuidv4(), title: tituloPadrao(v.title, req.file), body: v.body,
+    type: v.type, duration: v.duration,
+    bg: v.bg, url: req.file ? '/uploads/' + req.file.filename : null,
     created_at: new Date(),
-    video_text_mode: videoText.video_text_mode,
-    video_text_seconds: videoText.video_text_seconds
+    video_text_mode: v.video_text_mode,
+    video_text_seconds: v.video_text_seconds
   };
   try {
     await db.slides.insert(doc);
@@ -526,18 +504,13 @@ app.post('/api/slides', handleUpload, async (req, res) => {
 app.put('/api/slides/:id', async (req, res) => {
   const current = await db.slides.findOne({ id: req.params.id });
   if (!current) return res.status(404).json({ error: 'Conteúdo não encontrado' });
-  const body = req.body || {};
-  const set = {};
-  if (body.title !== undefined) set.title = body.title;
-  if (body.body !== undefined) set.body = body.body;
-  if (body.duration !== undefined) set.duration = parseInt(body.duration) || 8;
-  if (body.bg !== undefined) set.bg = body.bg;
-  if (body.video_text_mode !== undefined || body.video_text_seconds !== undefined) {
-    const videoText = textoDoVideo(body, current.type, current);
-    if (videoText.error) return res.status(400).json({ error: videoText.error });
-    set.video_text_mode = videoText.video_text_mode;
-    set.video_text_seconds = videoText.video_text_seconds;
-  }
+  // O tipo não muda na edição: ele vem do arquivo que foi enviado.
+  const { type: _tipoIgnorado, ...body } = req.body || {};
+  // Antes esta rota gravava título, texto, cor e duração do jeito que chegavam, sem
+  // passar pela validação que o cadastro deveria usar.
+  const valid = validateSlideInput(body, { partial: true, current });
+  if (valid.error) return res.status(400).json({ error: valid.error });
+  const set = valid.value;
   if (!Object.keys(set).length) return res.status(400).json({ error: 'Nada para alterar' });
   const affected = await db.slides.update({ id: req.params.id }, { $set: set });
   res.json({ ok: true });

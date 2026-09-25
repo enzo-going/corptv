@@ -277,3 +277,25 @@ test('modo do texto do vídeo é salvo, atualizado e entregue ao player', async 
   });
   assert.equal(invalid.response.status, 400);
 });
+
+test('a edição de conteúdo passa pela mesma validação do cadastro', async () => {
+  const form = new FormData();
+  addPanelFields(form, 'Para editar');
+  form.set('type', 'txt');
+  const slide = await (await request('/api/slides', { method: 'POST', body: form })).json();
+
+  // Antes a rota de edição gravava tudo do jeito que chegava.
+  const cor = await json('/api/slides/' + slide.id, { method: 'PUT', body: { bg: 'red;display:none' } });
+  assert.equal(cor.response.status, 400);
+  const titulo = await json('/api/slides/' + slide.id, { method: 'PUT', body: { title: 'x'.repeat(121) } });
+  assert.equal(titulo.response.status, 400);
+  const vazio = await json('/api/slides/' + slide.id, { method: 'PUT', body: {} });
+  assert.equal(vazio.response.status, 400);
+
+  // O tipo vem do arquivo enviado; a edição não troca.
+  await json('/api/slides/' + slide.id, { method: 'PUT', body: { type: 'vid', title: 'Renomeado' } });
+  const salvo = (await (await request('/api/slides')).json()).find(s => s.id === slide.id);
+  assert.equal(salvo.type, 'txt');
+  assert.equal(salvo.title, 'Renomeado');
+  assert.equal(salvo.bg, '#111111');
+});
