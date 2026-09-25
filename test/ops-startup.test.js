@@ -18,6 +18,14 @@ test('os iniciadores deixam o watchdog como único mecanismo de reinício', () =
   assert.match(rootStarter, /CorporTV Watchdog/);
 });
 
+test('o watchdog dá 10 s ao health, mas a espera de subida segue com 3 s', () => {
+  const common = fs.readFileSync(path.join(__dirname, '../ops/common.ps1'), 'utf8');
+  // 3 s transformava lentidão (memória no disco durante a varredura do antivírus)
+  // em reinício — de 5 a 28 por dia.
+  assert.match(common, /\[int\]\$TimeoutSeconds = 10/);
+  assert.match(common, /Invoke-CorporTVHealth -Port \$Port -TimeoutSeconds 3/);
+});
+
 test('os iniciadores criam a pasta de log antes de redirecionar para ela', () => {
   // No cmd, um ">>" para pasta inexistente aborta a linha inteira: o Node nem
   // roda. Foi o que aconteceria no servidor ao trocar a pasta de log antiga

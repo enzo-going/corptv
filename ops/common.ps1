@@ -25,9 +25,14 @@ function Test-CorporTVPathInside {
 }
 
 function Invoke-CorporTVHealth {
+    # 10s por tentativa. Com 3s, o watchdog reiniciava o serviço de 5 a 28 vezes por
+    # dia: com pouca RAM livre, o Windows joga a memória do Node no disco, e durante a
+    # varredura diária do antivírus trazê-la de volta passa de 3s. O serviço estava
+    # vivo, só lento; cada reinício custava ~25s fora do ar. Um travamento de verdade
+    # continua sendo pego: são 3 tentativas por rodada e duas rodadas seguidas.
     param(
         [int]$Port = 3000,
-        [int]$TimeoutSeconds = 3
+        [int]$TimeoutSeconds = 10
     )
     try {
         $health = Invoke-RestMethod "http://127.0.0.1:$Port/health" -TimeoutSec $TimeoutSeconds
@@ -105,7 +110,9 @@ function Start-CorporTV {
     # que se alimentava. Não reduzir sem medir o tempo real de subida.
     for ($attempt = 1; $attempt -le 180; $attempt += 1) {
         Start-Sleep -Milliseconds 500
-        $health = Invoke-CorporTVHealth -Port $Port
+        # Prazo curto aqui de propósito: na subida a porta ainda recusa conexão, e os
+        # 90s acima foram medidos com 3s por tentativa.
+        $health = Invoke-CorporTVHealth -Port $Port -TimeoutSeconds 3
         if ($health) {
             $listeners = @(Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
             if ($listeners.Count -ne 1) { throw "Esperado um listener; encontrados $($listeners.Count)." }
