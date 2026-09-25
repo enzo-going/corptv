@@ -24,13 +24,14 @@ const servidor = {
   midia: MIDIA_V1,
   etag: '"v1"',
   playlist: null,
+  paginaPlayer: '<html><body>player v1</body></html>',
   heartbeats: 0,
   downloads: 0
 };
 
 function playlistCom(arquivo) {
   return {
-    screen: { id: TELA, name: 'Recepção' },
+    screen: { id: TELA, name: 'Recepção', volume: 40 },
     slides: arquivo
       ? [{ id: 's1', type: 'video', duration: 10, url: '/uploads/' + arquivo }]
       : []
@@ -87,7 +88,7 @@ test.before(async () => {
 
     if (pathname.startsWith('/player/')) {
       res.writeHead(200, { 'Content-Type': 'text/html' });
-      return res.end('<html><body>player</body></html>');
+      return res.end(servidor.paginaPlayer);
     }
 
     if (pathname === '/uploads/' + ARQUIVO) {
@@ -121,7 +122,8 @@ test.before(async () => {
       CORPTV_CACHE: cache,
       CORPTV_LIMITE_MBPS: '0',   // sem limite: o teste não pode depender do relógio
       CORPTV_JITTER: '0',        // sem espera aleatória
-      CORPTV_INTERVALO: '1'      // sincroniza a cada segundo
+      CORPTV_INTERVALO: '1',     // sincroniza a cada segundo
+      CORPTV_INTERVALO_PLAYER: '1'
     },
     stdio: ['ignore', 'pipe', 'pipe']
   });
@@ -161,6 +163,12 @@ test('reescreve a programação para o endereço local, sem apontar para o servi
   assert.equal(playlist.slides.length, 1);
   assert.equal(playlist.slides[0].url, '/midia/' + ARQUIVO);
   assert.doesNotMatch(JSON.stringify(playlist), /\/uploads\//);
+});
+
+test('repassa ao player o volume que o painel definiu para a tela', async () => {
+  const resposta = await fetch(`http://127.0.0.1:${portaAgente}/api/player/${TELA}`);
+  const playlist = await resposta.json();
+  assert.equal(playlist.screen.volume, 40);
 });
 
 test('serve a mídia do disco, com Range, sem tocar no servidor', async () => {
@@ -233,4 +241,54 @@ test('recusa subir sem CORPTV_SERVIDOR, em vez de tentar um endereço chutado', 
   const codigo = await new Promise(resolve => semServidor.once('exit', resolve));
   assert.equal(codigo, 1);
   assert.match(erro, /CORPTV_SERVIDOR/);
+});
+
+test('baixa de novo a página do player quando ela muda no servidor', async () => {
+  // Antes a página era lida uma vez só: correção publicada no servidor só
+  // chegava à TV reiniciando o aparelho.
+  const pagina = async () => (await fetch(`http://127.0.0.1:${portaAgente}/`)).text();
+  assert.match(await pagina(), /player v1/);
+  servidor.paginaPlayer = '<html><body>player v2</body></html>';
+  await esperar(async () => /player v2/.test(await pagina()), 'o agente trazer a página nova do player');
+});
+
+test('não fica preso no aviso de erro quando o servidor volta', async () => {
+  // Pi que liga antes do servidor, sem cópia local do player: o aviso de erro
+  // ficava guardado na memória e a TV seguia nele depois de o servidor voltar.
+  const portaServidor = await portaLivre();
+  const portaOutroAgente = await portaLivre();
+  const outro = spawn(process.execPath, [agenteJs], {
+    env: {
+      ...process.env,
+      CORPTV_SERVIDOR: `http://127.0.0.1:${portaServidor}`,
+      CORPTV_TELA: TELA,
+      CORPTV_PORTA: String(portaOutroAgente),
+      CORPTV_CACHE: path.join(sandbox, 'cache-servidor-fora'),
+      CORPTV_JITTER: '0',
+      CORPTV_INTERVALO: '1',
+      CORPTV_INTERVALO_PLAYER: '1'
+    },
+    stdio: ['ignore', 'ignore', 'ignore']
+  });
+  const pagina = async () => {
+    try { return await (await fetch(`http://127.0.0.1:${portaOutroAgente}/`)).text(); } catch (e) { return ''; }
+  };
+  try {
+    await esperar(async () => /sem contato com o servidor/.test(await pagina()), 'o agente responder sem servidor');
+
+    const voltou = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<html><body>player de volta</body></html>');
+    });
+    await new Promise(resolve => voltou.listen(portaServidor, '127.0.0.1', resolve));
+    try {
+      await esperar(async () => /player de volta/.test(await pagina()), 'a TV sair do aviso quando o servidor volta');
+    } finally {
+      voltou.closeAllConnections();
+      await new Promise(resolve => voltou.close(resolve));
+    }
+  } finally {
+    outro.kill();
+    await new Promise(resolve => outro.once('exit', resolve));
+  }
 });

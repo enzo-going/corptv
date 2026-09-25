@@ -42,6 +42,8 @@ const CONFIG = {
   intervaloProgramacaoS: parseInt(process.env.CORPTV_INTERVALO || '60', 10),
   // Espalha o início dos downloads para vários aparelhos não baixarem juntos.
   jitterMaxS: parseInt(process.env.CORPTV_JITTER || '90', 10),
+  // De quanto em quanto tempo baixa de novo a página do player.
+  intervaloPlayerS: parseInt(process.env.CORPTV_INTERVALO_PLAYER || '600', 10),
   heartbeatS: 20
 };
 
@@ -312,23 +314,39 @@ async function heartbeat() {
 // ── SERVIDOR LOCAL ───────────────────────────────────────────────────────────
 const TIPOS = { '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp' };
 let paginaPlayer = null;
+const arqPlayer = path.join(CONFIG.pasta, 'player.html');
+
+// Baixa de novo a página do player de tempos em tempos. Antes ela era lida uma
+// vez só, quando o agente subia: qualquer correção publicada no servidor só
+// chegava à TV reiniciando o aparelho. O navegador pega a versão nova no
+// recarregamento da meia-noite (ou num reinício).
+async function atualizarPlayer() {
+  try {
+    const res = await pedir(CONFIG.servidor + '/player/' + encodeURIComponent(CONFIG.tela));
+    if (res.statusCode !== 200) { res.destroy(); return false; }
+    const html = await lerTudo(res);
+    if (html !== paginaPlayer) {
+      const primeira = paginaPlayer === null;
+      paginaPlayer = html;
+      fs.writeFileSync(arqPlayer, html);
+      if (!primeira) log('INFO', 'pagina do player atualizada', { bytes: Buffer.byteLength(html) });
+    }
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
 
 async function obterPlayer() {
   if (paginaPlayer) return paginaPlayer;
-  const cache = path.join(CONFIG.pasta, 'player.html');
+  if (await atualizarPlayer()) return paginaPlayer;
   try {
-    const res = await pedir(CONFIG.servidor + '/player/' + encodeURIComponent(CONFIG.tela));
-    if (res.statusCode === 200) {
-      paginaPlayer = await lerTudo(res);
-      fs.writeFileSync(cache, paginaPlayer);
-      return paginaPlayer;
-    }
-    res.destroy();
-  } catch (e) { /* usa a copia local */ }
-  try { paginaPlayer = fs.readFileSync(cache, 'utf8'); } catch (e) {
-    paginaPlayer = '<h1 style="color:#fff;background:#000;font-family:sans-serif">CorporTV: sem contato com o servidor e sem cópia local do player.</h1>';
-  }
-  return paginaPlayer;
+    paginaPlayer = fs.readFileSync(arqPlayer, 'utf8');
+    return paginaPlayer;
+  } catch (e) { /* sem cópia local */ }
+  // Sem servidor e sem cópia: mostra o aviso, mas não o guarda. Antes ele ficava
+  // fixo na memória e a TV seguia no erro mesmo depois de o servidor voltar.
+  return '<h1 style="color:#fff;background:#000;font-family:sans-serif">CorporTV: sem contato com o servidor e sem cópia local do player.</h1>';
 }
 
 const servidor = http.createServer(async (req, res) => {
@@ -415,6 +433,8 @@ servidor.listen(CONFIG.porta, '127.0.0.1', () => {
   setInterval(sincronizar, CONFIG.intervaloProgramacaoS * 1000);
   heartbeat();
   setInterval(heartbeat, CONFIG.heartbeatS * 1000);
+  atualizarPlayer();
+  setInterval(atualizarPlayer, CONFIG.intervaloPlayerS * 1000);
 });
 
 function encerrar(sinal) {

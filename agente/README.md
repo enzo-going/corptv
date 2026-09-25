@@ -81,6 +81,7 @@ Sem Node.js no aparelho: `winget install OpenJS.NodeJS.LTS`
 | `CORPTV_LIMITE_MBPS` | `2` | Ritmo do download |
 | `CORPTV_JITTER` | `90` | Espalha o início do download, em segundos |
 | `CORPTV_INTERVALO` | `60` | De quanto em quanto tempo confere a programação |
+| `CORPTV_INTERVALO_PLAYER` | `600` | De quanto em quanto tempo baixa de novo a página do player (a TV pega a versão nova no recarregamento da meia-noite) |
 
 ### Como escolher o limite
 
@@ -111,6 +112,8 @@ continua exibindo o conteúdo anterior enquanto o novo baixa.
   todos baixem no mesmo instante.
 - **Limpa o disco**: mídia que saiu da programação é apagada.
 - **Heartbeat**: o painel continua mostrando a tela como online.
+- **Player sempre atualizado**: a página do player é baixada de novo a cada 10
+  minutos, então correções publicadas no servidor chegam sem reiniciar a Pi.
 
 ## Verificação
 
