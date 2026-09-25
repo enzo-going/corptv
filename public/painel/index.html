@@ -182,7 +182,9 @@
               <option value="vid">Vídeo</option>
             </select>
           </div>
-          <div id="sl-duration-wrap"><label>Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300"></div>
+          <div id="sl-duration-wrap"><label>Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300">
+            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;text-transform:none;letter-spacing:0;font-size:12px;cursor:pointer"><input type="checkbox" id="sl-sem-tempo" onchange="semTempoChange()" style="width:auto;margin:0"> Sem tempo — fica na tela até ser tirado</label>
+          </div>
           <div class="form-full"><label>Título</label><input type="text" id="sl-title" placeholder="Ex: Bom dia, equipe!"></div>
           <div class="form-full" id="sl-body-wrap"><label>Texto</label><input type="text" id="sl-body" placeholder="Ex: Reunião às 14h"></div>
           <div class="form-full" id="sl-video-text-wrap" style="display:none">
@@ -424,8 +426,19 @@ function slTypeChange(){
   document.getElementById('sl-duration-wrap').style.display=t==='vid'?'none':'block';
   document.getElementById('sl-video-text-wrap').style.display=t==='vid'?'block':'none';
   document.getElementById('sl-dur').value=t==='vid'?'0':'8';
+  // Imagem quase sempre fica até alguém tirar; texto costuma entrar num rodízio.
+  document.getElementById('sl-sem-tempo').checked=t==='img';
+  semTempoChange();
   videoTextModeChange('sl');
   if(t==='txt') cancelFile();
+}
+function semTempoChange(){
+  document.getElementById('sl-dur').disabled=document.getElementById('sl-sem-tempo').checked;
+}
+function tempoDe(s){
+  if(s.type==='vid')return '';
+  const d=parseInt(s.duration,10);
+  return d===0?'sem tempo':(d||8)+'s';
 }
 
 function videoTextModeChange(scope){
@@ -469,7 +482,7 @@ async function addSlide(){
   const type=document.getElementById('sl-type').value;
   const title=document.getElementById('sl-title').value.trim();
   const body=document.getElementById('sl-body').value.trim();
-  const dur=document.getElementById('sl-dur').value;
+  const dur=type!=='vid'&&document.getElementById('sl-sem-tempo').checked?'0':document.getElementById('sl-dur').value;
   const bg=document.getElementById('sl-bg').value;
   if(!title&&!pendingFile){toast('Adicione um título ou arquivo');return;}
 
@@ -504,7 +517,7 @@ function renderSlides(){
   const el=document.getElementById('slide-list');
   if(!slides.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum conteúdo ainda.</div>';return;}
   el.innerHTML=slides.map(s=>{
-    const meta=[s.body||'', s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem':'texto', s.type!=='vid'&&s.duration?s.duration+'s':'']
+    const meta=[s.body||'', s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem':'texto', tempoDe(s)]
       .filter(Boolean).join(' · ');
     const uso=s.em_uso
       ? `<span class="state state-on">● em ${s.em_uso} ambiente${s.em_uso>1?'s':''}</span>`
@@ -516,7 +529,7 @@ function renderSlides(){
         <div class="item-meta">${uso} · ${esc(meta)}</div>
       </div>
       <div class="item-actions editor-only">
-        ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:''}
+        ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:`<button class="btn btn-ghost btn-sm" onclick="editDuration('${s.id}')">Tempo</button>`}
         <button class="btn btn-ghost btn-sm" onclick="renameSlide('${s.id}')">Renomear</button>
         <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')" title="Remover da biblioteca">✕</button>
       </div>
@@ -564,6 +577,19 @@ async function renameSlide(id){
   const r=await api('PUT','/api/slides/'+id,{title:limpo});
   if(r&&r.error){toast(r.error);return;}
   await load();toast('Renomeado');
+}
+async function editDuration(id){
+  const s=slides.find(x=>x.id===id);
+  if(!s)return;
+  const atual=parseInt(s.duration,10);
+  const resp=prompt('Quanto tempo este conteúdo fica na tela, em segundos (3 a 300)?\n\nDigite 0 para SEM TEMPO: ele fica na tela até ser tirado do ambiente.',String(Number.isInteger(atual)?atual:8));
+  if(resp===null)return;
+  const n=Number(resp.trim());
+  if(!Number.isInteger(n)||(n!==0&&(n<3||n>300))){toast('Use 0 (sem tempo) ou de 3 a 300 segundos');return;}
+  if(n===atual)return;
+  const r=await api('PUT','/api/slides/'+id,{duration:n});
+  if(r&&r.error){toast(r.error);return;}
+  await load();toast(n===0?'Sem tempo: fica na tela até ser tirado':'Fica '+n+'s na tela');
 }
 // Nome legivel: sem titulo, dois videos apareciam ambos como "vid"
 function nomeDe(s){
@@ -793,7 +819,7 @@ async function renderGroups(){
         <div class="item-thumb">${thumbDe(item)}</div>
         <div class="item-info">
           <div class="item-name">${esc(nomeDe(item))}${regra}</div>
-          <div class="item-meta">${estado}</div>
+          <div class="item-meta">${estado}${tempoDe(item)?' · '+tempoDe(item):''}</div>
         </div>
         <div class="item-actions editor-only">
           <button class="btn btn-ghost btn-sm" onclick="openSched('${g.id}','${item.id}')">Agendar</button>
@@ -813,6 +839,13 @@ async function renderGroups(){
     const alerta=(telas.length&&!noAr)
       ? `<div class="sched-hint bad" style="margin:0 0 12px">⚠ Este ambiente tem ${telas.length} tela(s) e <b>nada no ar agora</b> — elas estão em branco.</div>`
       : '';
+    // Conteúdo sem tempo não sai da tela sozinho: num ambiente com mais coisas no ar,
+    // a TV para nele e o resto só volta quando ele sair.
+    const noArLista=pl.filter(x=>!x.status||x.status.active);
+    const parado=noArLista.find(x=>x.type!=='vid'&&parseInt(x.duration,10)===0);
+    const alertaSemTempo=(parado&&noArLista.length>1)
+      ? `<div class="sched-hint" style="margin:0 0 12px">⏸ <b>${esc(nomeDe(parado))}</b> está sem tempo: quando a TV chegar nele, fica parada ali. Os outros ${noArLista.length-1} conteúdo(s) no ar deste ambiente só voltam quando ele sair (tirado daqui ou fim do prazo).</div>`
+      : '';
 
     return `<div class="card" style="border-left:3px solid ${g.color||'#333'}">
       <div class="card-row" style="margin-bottom:4px">
@@ -822,7 +855,7 @@ async function renderGroups(){
       <div class="card-sub" style="margin-bottom:14px">
         ${telas.length?telas.map(t=>esc(t.name)).join(', '):'nenhuma tela neste ambiente'} · ${noAr} de ${pl.length} no ar
       </div>
-      ${alerta}
+      ${alerta}${alertaSemTempo}
       <div class="item-list">${itens}</div>
       <div style="margin-top:12px">${seletor}</div>
     </div>`;

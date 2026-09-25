@@ -35,6 +35,24 @@ test('o painel ajusta o volume de cada tela e não perde o ajuste no redesenho',
   assert.match(inicioRender, /classList\.contains\('volume-range'\)\)return;/);
 });
 
+test('o painel oferece "sem tempo" para imagem e texto, e deixa mudar depois', () => {
+  assert.match(panel, /id="sl-sem-tempo"[^>]*onchange="semTempoChange\(\)"/);
+  assert.match(panel, /Sem tempo — fica na tela até ser tirado/);
+  // Imagem nasce sem tempo: é o caso de quase sempre.
+  assert.match(panel, /getElementById\('sl-sem-tempo'\)\.checked=t==='img'/);
+  assert.match(panel, /const dur=type!=='vid'&&document\.getElementById\('sl-sem-tempo'\)\.checked\?'0':/);
+  assert.match(panel, /return d===0\?'sem tempo':/);
+  // Conteúdo que já existe muda sem precisar ser enviado de novo.
+  assert.match(panel, /onclick="editDuration\('\$\{s\.id\}'\)">Tempo<\/button>/);
+  assert.match(panel, /api\('PUT','\/api\/slides\/'\+id,\{duration:n\}\)/);
+});
+
+test('o painel avisa quando um conteúdo sem tempo prende o rodízio do ambiente', () => {
+  assert.match(panel, /x\.type!=='vid'&&parseInt\(x\.duration,10\)===0/);
+  assert.match(panel, /\(parado&&noArLista\.length>1\)/);
+  assert.match(panel, /quando a TV chegar nele, fica parada ali/);
+});
+
 test('o painel aplica sessão, CSRF, perfis e escape aos dados renderizados', () => {
   assert.match(panel, /\/api\/auth\/me/);
   assert.match(panel, /X-CSRF-Token/);

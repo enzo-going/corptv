@@ -36,6 +36,16 @@ test('rejeita campos longos e cores fora do formato hexadecimal', () => {
   assert.match(validateGroupInput({ name: 'Grupo', color: 'red;display:none' }).error, /cor inválida/i);
 });
 
+test('aceita 0 como "sem tempo" para imagem e texto', () => {
+  assert.equal(normalizeDuration('0', 'img').value, 0);
+  assert.equal(normalizeDuration(0, 'txt').value, 0);
+  assert.equal(normalizeDuration('', 'img').value, 8);         // campo vazio: padrão de sempre
+  assert.equal(normalizeDuration(undefined, 'img').value, 8);
+  for (const invalida of ['1', '2', '-1', '7.5', 'oito']) {
+    assert.match(normalizeDuration(invalida, 'img').error, /0 \(sem tempo\)/);
+  }
+});
+
 test('limita a duração de slides e ignora duração em vídeo', () => {
   assert.equal(normalizeDuration('3', 'txt').value, 3);
   assert.match(normalizeDuration('301', 'txt').error, /3 e 300/);

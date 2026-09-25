@@ -72,3 +72,25 @@ test('o player suporta texto oculto, fixo ou temporário com fade', () => {
   assert.match(activeScript, /classList\.add\('video-text-fade'\)/);
   assert.match(activeScript, /video_text_seconds: list\[i\]\.video_text_seconds/);
 });
+
+test('conteúdo sem tempo não liga o cronômetro: não troca e não redesenha', () => {
+  const fonte = extrair(scriptAtivo(), 'startTimer');
+  const montar = new Function('slides', 'current', 'setInterval', 'clearInterval', 'resetProgress', 'document',
+    'var timer = null; var elapsed = 0;\n' + fonte + '\nreturn startTimer;');
+  let intervalos = 0;
+  let zerou = 0;
+  const contar = () => { intervalos++; return 1; };
+  const nada = () => {};
+
+  montar([{ type: 'img', duration: 0 }], 0, contar, nada, () => { zerou++; }, null)();
+  assert.equal(intervalos, 0, 'sem tempo não pode agendar troca');
+  assert.equal(zerou, 1, 'a barra de progresso fica zerada');
+
+  montar([{ type: 'txt', duration: '0' }], 0, contar, nada, nada, null)();
+  assert.equal(intervalos, 0);
+
+  // Com tempo, continua trocando; duração ausente segue caindo nos 8 s de sempre.
+  montar([{ type: 'img', duration: 12 }], 0, contar, nada, nada, null)();
+  montar([{ type: 'img' }], 0, contar, nada, nada, null)();
+  assert.equal(intervalos, 2);
+});
