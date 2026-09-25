@@ -736,7 +736,14 @@
     if (!slides.length) return;
     var slide = slides[current];
     if (slide.type === 'vid') return;
-    var duration = parseInt(slide.duration, 10) || 8;
+    var duration = parseInt(slide.duration, 10);
+    // Sem tempo (0): fica na tela até sair da programação. Sem cronômetro, não troca
+    // e não redesenha — uma imagem sozinha também para de "piscar" a cada ciclo.
+    if (duration === 0) {
+      resetProgress();
+      return;
+    }
+    if (!duration) duration = 8;
     timer = setInterval(function () {
       elapsed += 1;
       document.getElementById('progress-fill').style.width = Math.round((elapsed / duration) * 100) + '%';

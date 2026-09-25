@@ -278,6 +278,37 @@ test('modo do texto do vídeo é salvo, atualizado e entregue ao player', async 
   assert.equal(invalid.response.status, 400);
 });
 
+test('imagem e texto aceitam "sem tempo" (0) no cadastro e na edição', async () => {
+  const png = Buffer.from([0x89,0x50,0x4e,0x47,0x0d,0x0a,0x1a,0x0a,0x00]);
+  const imagem = new FormData();
+  addPanelFields(imagem, 'Cartaz fixo');
+  imagem.set('duration', '0');
+  imagem.set('file', new Blob([png], { type: 'image/png' }), 'cartaz.png');
+  const criada = await (await request('/api/slides', { method: 'POST', body: imagem })).json();
+  assert.equal(criada.type, 'img');
+  assert.equal(criada.duration, 0);
+
+  const texto = new FormData();
+  addPanelFields(texto, 'Aviso fixo');
+  texto.set('type', 'txt');
+  texto.set('duration', '0');
+  const aviso = await (await request('/api/slides', { method: 'POST', body: texto })).json();
+  assert.equal(aviso.type, 'txt');
+  assert.equal(aviso.duration, 0);
+
+  const duracaoDe = async id => (await (await request('/api/slides')).json()).find(s => s.id === id).duration;
+  assert.equal((await json('/api/slides/' + criada.id, { method: 'PUT', body: { duration: 12 } })).response.status, 200);
+  assert.equal(await duracaoDe(criada.id), 12);
+  assert.equal((await json('/api/slides/' + criada.id, { method: 'PUT', body: { duration: 0 } })).response.status, 200);
+  assert.equal(await duracaoDe(criada.id), 0);
+
+  for (const invalida of [2, 301, 'abc', 7.5]) {
+    const r = await json('/api/slides/' + criada.id, { method: 'PUT', body: { duration: invalida } });
+    assert.equal(r.response.status, 400, `duração ${invalida} deveria ser recusada`);
+  }
+  assert.equal(await duracaoDe(criada.id), 0);
+});
+
 test('a edição de conteúdo passa pela mesma validação do cadastro', async () => {
   const form = new FormData();
   addPanelFields(form, 'Para editar');

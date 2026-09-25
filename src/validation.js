@@ -24,11 +24,14 @@ function normalizeColor(value, fallback) {
   return { value: color.toLowerCase() };
 }
 
+// Segundos na tela para imagem e texto. 0 = sem tempo: o conteúdo fica até sair da
+// programação (alguém tirar do ambiente ou o prazo vencer). Vídeo dura o próprio vídeo.
 function normalizeDuration(value, type) {
   if (type === 'vid') return { value: 0 };
-  const duration = Number.parseInt(value, 10);
-  if (!Number.isInteger(duration) || duration < 3 || duration > 300) {
-    return { error: 'A duração deve estar entre 3 e 300 segundos.' };
+  if (value === undefined || value === null || String(value).trim() === '') return { value: 8 };
+  const duration = Number(String(value).trim());
+  if (!Number.isInteger(duration) || (duration !== 0 && (duration < 3 || duration > 300))) {
+    return { error: 'A duração deve ser 0 (sem tempo) ou ficar entre 3 e 300 segundos.' };
   }
   return { value: duration };
 }
