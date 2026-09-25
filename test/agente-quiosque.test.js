@@ -31,6 +31,17 @@ test('o quiosque aponta para o agente local, nunca para o servidor', () => {
   assert.doesNotMatch(quiosque, /chromium.*:3000/is);
 });
 
+test('o quiosque manda o som para a HDMI no volume máximo antes de abrir o navegador', () => {
+  const configura = quiosque.indexOf('\nconfigurar_audio\n');
+  const abre = quiosque.indexOf('chromium-browser \\');
+  assert.ok(configura > 0, 'o quiosque não configura o som');
+  assert.ok(configura < abre, 'o som precisa ser configurado antes de abrir o navegador');
+  assert.match(quiosque, /grep -m1 'fef00700\.\*hdmi'/);
+  assert.match(quiosque, /pactl set-default-sink "\$saida"/);
+  assert.match(quiosque, /pactl set-sink-mute "\$saida" 0/);
+  assert.match(quiosque, /pactl set-sink-volume "\$saida" 100%/);
+});
+
 test('o serviço do agente volta sozinho depois de uma falha', () => {
   assert.match(servico, /^Restart=always$/m);
   assert.match(servico, /^RestartSec=/m);
