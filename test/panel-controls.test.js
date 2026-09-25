@@ -43,6 +43,19 @@ test('a configuração inicial remota pede o código de ativação descartável'
   assert.match(login, /body\.setup\.remote \.remote-only/);
 });
 
+test('o mínimo de 12 caracteres vale só para senha nova, nunca para entrar', () => {
+  // Com minlength fixo no campo, o navegador barrava no login quem tinha senha
+  // antiga mais curta — o servidor aceitaria, mas o pedido nem saía da página.
+  const campoSenha = login.match(/<input id="password"[^>]*>/)[0];
+  const campoConfirma = login.match(/<input id="confirm"[^>]*>/)[0];
+  assert.doesNotMatch(campoSenha, /minlength/i);
+  assert.doesNotMatch(campoConfirma, /minlength/i);
+
+  const blocoCadastro = login.slice(login.indexOf('if(setup){'));
+  assert.match(blocoCadastro, /getElementById\('password'\)\.minLength=12/);
+  assert.match(blocoCadastro, /getElementById\('confirm'\)\.minLength=12/);
+});
+
 test('o login não redireciona para um destino fornecido pela URL', () => {
   assert.doesNotMatch(login, /params\.get\(['"]next['"]\)/);
   assert.match(login, /location\.href=['"]\/painel['"]/);

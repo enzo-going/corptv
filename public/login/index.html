@@ -30,9 +30,9 @@
         <div class="remote-only"><label for="setup-code">Código de ativação</label><input id="setup-code" name="setup_code" maxlength="20" autocomplete="one-time-code" autocapitalize="characters"><div class="hint">Código único fornecido pelo setor de implantação.</div></div>
         <div class="setup-only"><label for="name">Nome completo</label><input id="name" name="name" maxlength="80" autocomplete="name"></div>
         <label for="username">Usuário</label><input id="username" name="username" minlength="3" maxlength="40" autocomplete="username" autocapitalize="none" required autofocus>
-        <label for="password">Senha</label><input id="password" name="password" type="password" minlength="12" maxlength="128" autocomplete="current-password" required>
+        <label for="password">Senha</label><input id="password" name="password" type="password" maxlength="128" autocomplete="current-password" required>
         <div class="setup-only hint">Use pelo menos 12 caracteres. Frases longas são bem-vindas.</div>
-        <div class="setup-only"><label for="confirm">Confirmar senha</label><input id="confirm" name="confirm" type="password" minlength="12" maxlength="128" autocomplete="new-password"></div>
+        <div class="setup-only"><label for="confirm">Confirmar senha</label><input id="confirm" name="confirm" type="password" maxlength="128" autocomplete="new-password"></div>
         <div id="error" class="error" role="alert"></div>
         <button id="submit" type="submit"><span class="login-only">Entrar</span><span class="setup-only">Criar administrador</span></button>
         <div class="secure-note"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg><span>A sessão fica protegida em cookie inacessível ao JavaScript e expira automaticamente.</span></div>
@@ -47,7 +47,12 @@
       document.getElementById('remote-setup').style.display='block';
       document.getElementById('form').style.display='none';
     }
+    // O mínimo de 12 caracteres vale para senha NOVA. No login ele não pode
+    // existir: o navegador barraria antes de enviar quem tem senha antiga
+    // mais curta, e o servidor (que só confere o hash) nem chegaria a ver.
     if(setup){
+      document.getElementById('password').minLength=12;
+      document.getElementById('confirm').minLength=12;
       document.getElementById('name').required=true;
       document.getElementById('confirm').required=true;
       document.getElementById('password').autocomplete='new-password';
