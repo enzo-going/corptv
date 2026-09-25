@@ -112,6 +112,9 @@ continua exibindo o conteúdo anterior enquanto o novo baixa.
   todos baixem no mesmo instante.
 - **Limpa o disco**: mídia que saiu da programação é apagada.
 - **Heartbeat**: o painel continua mostrando a tela como online.
+- **Som pela HDMI**: o quiosque escolhe a saída HDMI e deixa o volume do sistema
+  em 100% a cada início. O volume de cada tela se ajusta no painel (Telas) e
+  chega à TV em até 1 minuto; o controle remoto da TV continua valendo por cima.
 - **Player sempre atualizado**: a página do player é baixada de novo a cada 10
   minutos, então correções publicadas no servidor chegam sem reiniciar a Pi.
 

@@ -47,6 +47,32 @@ limpar_flags_de_crash() {
   fi
 }
 
+# Som pela HDMI e volume do sistema em 100%. Quem regula o volume é o painel
+# (por tela) e o controle remoto da TV. Se o volume do sistema ficasse nos 40%
+# que às vezes vêm de fábrica, o "100%" do painel sairia baixo sem ninguém
+# entender por quê. E se a saída padrão fosse o fone (P2), a TV ficaria muda.
+# Nunca impede o quiosque de abrir: sem som é ruim, sem imagem é pior.
+configurar_audio() {
+  command -v pactl >/dev/null 2>&1 || { registrar "som: pactl ausente, saida nao configurada"; return; }
+  for i in $(seq 1 15); do pactl info >/dev/null 2>&1 && break; sleep 1; done
+  local saida
+  # HDMI0 (fef00700 na Pi 4) é a porta mais perto da energia, a que o checklist manda usar.
+  saida=$(pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -m1 'fef00700.*hdmi')
+  [ -z "$saida" ] && saida=$(pactl list short sinks 2>/dev/null | awk '{print $2}' | grep -m1 -i 'hdmi')
+  if [ -z "$saida" ]; then
+    # Sem TV ligada a Pi não enxerga a HDMI e ela nem aparece na lista. A escolha
+    # feita num boot com a TV ligada fica guardada e volta a valer quando ela aparece.
+    registrar "som: nenhuma saida HDMI encontrada (TV desligada na hora do boot?)"
+    return
+  fi
+  pactl set-default-sink "$saida"
+  pactl set-sink-mute "$saida" 0
+  pactl set-sink-volume "$saida" 100%
+  registrar "som: saida $saida, volume do sistema em 100%"
+}
+
+configurar_audio
+
 # Se o Chromium fechar — travou, ficou sem memória, alguém fechou sem querer —
 # a TV não pode ficar preta esperando alguém ir até lá reiniciar o aparelho.
 # O systemd cuida do agente (Restart=always), mas não do navegador: quem faz
