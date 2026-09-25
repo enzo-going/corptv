@@ -19,6 +19,18 @@ test('normaliza nomes, cores e telas', () => {
   });
 });
 
+test('valida o volume da tela como inteiro entre 0 e 100', () => {
+  assert.equal(validateScreenInput({ name: 'TV', group_id: 'g', volume: 60 }).value.volume, 60);
+  assert.equal(validateScreenInput({ name: 'TV', group_id: 'g', volume: ' 0 ' }).value.volume, 0);
+  assert.equal(validateScreenInput({ name: 'TV', group_id: 'g', volume: '100' }).value.volume, 100);
+  // Ausente não entra no objeto: editar nome ou ambiente não pode mexer no volume.
+  assert.equal('volume' in validateScreenInput({ name: 'TV', group_id: 'g' }).value, false);
+  assert.equal('volume' in validateScreenInput({ name: 'TV', group_id: 'g', volume: '' }).value, false);
+  for (const invalido of [-1, 101, 50.5, 'alto', true]) {
+    assert.match(validateScreenInput({ name: 'TV', group_id: 'g', volume: invalido }).error, /0 e 100/);
+  }
+});
+
 test('rejeita campos longos e cores fora do formato hexadecimal', () => {
   assert.match(validateGroupInput({ name: 'x'.repeat(81), color: '#123456' }).error, /80/);
   assert.match(validateGroupInput({ name: 'Grupo', color: 'red;display:none' }).error, /cor inválida/i);

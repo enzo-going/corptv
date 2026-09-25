@@ -847,6 +847,10 @@ async function addScreen(){
   await load();toast('Tela adicionada!');
 }
 async function renderScreens(){
+  // Não redesenha enquanto alguém mexe no volume: o load() de 30 em 30 s trocaria
+  // o controle no meio do arraste e o ajuste se perderia. Atualiza no ciclo seguinte.
+  const ativo=document.activeElement;
+  if(ativo&&ativo.classList&&ativo.classList.contains('volume-range'))return;
   const el=document.getElementById('screen-list');
   const sel=document.getElementById('sc-group');
   sel.innerHTML=groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
@@ -856,6 +860,7 @@ async function renderScreens(){
     const g=groups.find(g=>g.id===s.group_id);
     const online=s.last_seen&&(Date.now()-new Date(s.last_seen).getTime())<60000;
     const playerUrl=`${origin}/player/${s.id}`;
+    const vol=Number.isInteger(s.volume)?s.volume:100;
     return `<div class="card">
       <div class="card-row">
         <div class="flex-gap">
@@ -868,6 +873,10 @@ async function renderScreens(){
         </div>
       </div>
       <div class="sep" style="margin:12px 0"></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Volume <span id="vol-txt-${s.id}" style="color:var(--text)">${volumeText(vol)}</span></div>
+      <input class="editor-only volume-range" type="range" min="0" max="100" step="5" value="${vol}" style="width:100%;accent-color:var(--accent)" aria-label="Volume da tela ${esc(s.name)}" oninput="document.getElementById('vol-txt-${s.id}').textContent=volumeText(+this.value)" onchange="saveVolume('${s.id}',this.value)">
+      <div class="editor-only" style="font-size:11px;color:var(--muted);margin-top:4px">A TV aplica em até 1 minuto. O controle remoto da TV continua valendo por cima deste ajuste.</div>
+      <div class="sep" style="margin:12px 0"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
       <div class="url-box">
         <input class="url-value" value="${esc(playerUrl)}" readonly aria-label="URL do player">
@@ -876,6 +885,16 @@ async function renderScreens(){
       </div>
     </div>`;
   }).join('');
+}
+function volumeText(v){return v===0?'Mudo':v+'%';}
+async function saveVolume(id,value){
+  const s=screens.find(x=>x.id===id);
+  if(!s)return;
+  const volume=parseInt(value,10);
+  const r=await api('PUT','/api/screens/'+id,{name:s.name,group_id:s.group_id,volume});
+  if(r.error){toast(r.error);await load();return;}
+  s.volume=volume;
+  toast(volume===0?'Tela sem som':'Volume da tela em '+volume+'%');
 }
 async function delScreen(id){
   const s=screens.find(x=>x.id===id);

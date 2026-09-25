@@ -124,6 +124,44 @@ test('API valida relações, entradas e impede cache de programação', async ()
   assert.match(player.headers.get('cache-control'), /no-store/);
 });
 
+test('o volume da tela chega ao player e sobrevive à edição do nome', async () => {
+  const group = await json('/api/groups', { method: 'POST', body: { name: 'Refeitório', color: '#123456' } });
+  const screen = await json('/api/screens', {
+    method: 'POST', body: { name: 'TV do Refeitório', group_id: group.body.id }
+  });
+  assert.equal(screen.body.volume, 100);
+
+  const player = async () => (await request('/api/player/' + screen.body.id)).json();
+  assert.equal((await player()).screen.volume, 100);
+
+  const ajuste = await json('/api/screens/' + screen.body.id, {
+    method: 'PUT', body: { name: 'TV do Refeitório', group_id: group.body.id, volume: 35 }
+  });
+  assert.equal(ajuste.response.status, 200);
+  assert.equal((await player()).screen.volume, 35);
+
+  // Renomear sem mandar o volume não pode devolver a TV ao máximo.
+  await json('/api/screens/' + screen.body.id, {
+    method: 'PUT', body: { name: 'TV Refeitório', group_id: group.body.id }
+  });
+  assert.equal((await player()).screen.volume, 35);
+
+  const invalido = await json('/api/screens/' + screen.body.id, {
+    method: 'PUT', body: { name: 'TV Refeitório', group_id: group.body.id, volume: 150 }
+  });
+  assert.equal(invalido.response.status, 400);
+  assert.equal((await player()).screen.volume, 35);
+});
+
+test('tela cadastrada antes do controle de volume segue tocando no máximo', async () => {
+  const group = await json('/api/groups', { method: 'POST', body: { name: 'Sala antiga', color: '#654321' } });
+  await db.screens.insert({
+    id: 'tela-sem-volume', name: 'Tela sem volume', group_id: group.body.id, last_seen: null, created_at: new Date()
+  });
+  const player = await (await request('/api/player/tela-sem-volume')).json();
+  assert.equal(player.screen.volume, 100);
+});
+
 test('API rejeita corpos JSON ausentes sem responder erro interno', async () => {
   const group = await json('/api/groups', { method: 'POST' });
   assert.equal(group.response.status, 400);

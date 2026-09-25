@@ -26,6 +26,15 @@ test('o painel oferece os três modos de texto do vídeo', () => {
   assert.match(panel, /Texto do vídeo/);
 });
 
+test('o painel ajusta o volume de cada tela e não perde o ajuste no redesenho', () => {
+  assert.match(panel, /class="editor-only volume-range" type="range" min="0" max="100" step="5"/);
+  assert.match(panel, /api\('PUT','\/api\/screens\/'\+id,\{name:s\.name,group_id:s\.group_id,volume\}\)/);
+  assert.match(panel, /function volumeText\(v\)\{return v===0\?'Mudo':v\+'%';\}/);
+  // O load() redesenha tudo a cada 30 s; no meio de um arraste, o controle era trocado.
+  const inicioRender = panel.slice(panel.indexOf('async function renderScreens(){'), panel.indexOf("const el=document.getElementById('screen-list');"));
+  assert.match(inicioRender, /classList\.contains\('volume-range'\)\)return;/);
+});
+
 test('o painel aplica sessão, CSRF, perfis e escape aos dados renderizados', () => {
   assert.match(panel, /\/api\/auth\/me/);
   assert.match(panel, /X-CSRF-Token/);
