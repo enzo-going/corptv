@@ -23,8 +23,12 @@ Checklist de operação. Siga na ordem. Cada passo tem como conferir se deu cert
 
 ## 1. Antes de encostar na Pi: cadastrar a tela no painel
 
-Endereço do servidor neste ambiente: `http://________________:3000`
+Endereço do servidor neste ambiente: `http://________________`
 (preencha antes de imprimir; é o valor que vai no `CORPTV_SERVIDOR` no passo 4)
+
+> **Use o nome completo, com o domínio** (ex.: `http://corportv.seu-dominio`), ou o IP com a porta (`http://IP:3000`).
+> O nome curto (`http://corportv`) só funciona em computador que é membro do domínio Windows: ele completa o nome sozinho. A Pi não é membro de domínio, e só completaria se o DHCP da rede entregasse o sufixo — se não entrega, o nome curto não resolve.
+> Não resolva isso com `/etc/hosts` em cada Pi: no dia em que o servidor mudar de IP, cada aparelho quebra calado.
 
 1. [ ] Abrir o painel nesse endereço → **Telas** → criar a tela (ex.: `Recepção`)
 2. [ ] Copiar o **slug** da URL do player que o painel mostra — é a parte final de `/player/<slug>`
@@ -75,6 +79,17 @@ sudo raspi-config
 - [ ] **System Options → Boot / Auto Login → Desktop Autologin** (sem isso a sessão gráfica não sobe sozinha depois de uma queda de energia)
 - [ ] Reiniciar e confirmar que voltou direto ao desktop, sem pedir senha
 
+### Som pela HDMI
+
+Com a **TV ligada** (sem TV ligada a Pi não enxerga a saída HDMI):
+
+```bash
+pactl list short sinks
+```
+
+- [ ] Aparece uma linha com `hdmi` — na Pi 4, a HDMI0 é a que tem `fef00700`
+- [ ] Nada a ajustar à mão: o quiosque escolhe a HDMI e põe o volume do sistema em 100% a cada início. Quem regula o volume é o painel (por tela) e o controle remoto da TV
+
 ---
 
 ## 4. Instalar o agente
@@ -89,6 +104,7 @@ sudo nano /etc/systemd/system/corptv-agente.service
 
 No editor, ajustar:
 
+- [ ] `CORPTV_SERVIDOR=` → **o endereço anotado no passo 1** (nome completo com domínio, ou IP:3000)
 - [ ] `CORPTV_TELA=` → **o slug anotado no passo 1**
 - [ ] `CORPTV_LIMITE_MBPS=` → pela conta `aparelhos × limite ≤ 8 Mb/s` (teto do QoS do servidor é 12)
 
@@ -163,7 +179,17 @@ Esse teste é a resposta à pergunta da rede: se toca sem cabo, é porque está 
 - [ ] A tela volta a tocar sozinha em poucos segundos, sem reiniciar a Pi
 - [ ] `journalctl -t corptv-quiosque` registrou a saída e a reabertura
 
-### 6.5 Número de rede para levar ao supervisor
+### 6.5 Som e volume
+
+- [ ] O vídeo sai **com som** pela TV
+- [ ] `journalctl -t corptv-quiosque | grep som` mostra a saída HDMI e `volume do sistema em 100%`
+- [ ] No painel, **Telas** → volume da tela em **30%**: em até 1 minuto o som abaixa, **sem o vídeo reiniciar**
+- [ ] Volume em **0% (Mudo)**: em até 1 minuto a TV fica sem som, sem aviso na tela
+- [ ] De volta a 100%: o som volta no início do próximo vídeo (religar o som no meio do vídeo faz alguns navegadores pausarem)
+
+O controle de volume no painel só existe depois que o servidor estiver na versão com ele. Antes disso a TV toca sempre no máximo, e o volume se ajusta no controle remoto.
+
+### 6.6 Número de rede para levar ao supervisor
 
 Com o agente, o esperado é **~106 KB por hora por aparelho** em regime normal, contra **11,7 Mb/s de pico** quando o navegador toca direto do servidor.
 
@@ -195,6 +221,10 @@ Outros:
 | Baixa e baixa de novo sem parar | Arquivo mudando no servidor, ou disco cheio | `df -h` e `journalctl -u corptv-agente` |
 | Barra "restaurar páginas" cobrindo o vídeo | Chromium fechou de forma anormal | O script já limpa isso no boot; se persistir, reiniciar a Pi |
 | Tela volta sozinha de tempos em tempos | Chromium sem memória (a Pi 4 aqui tem 2 GB) | `journalctl -t corptv-quiosque` mostra de quanto em quanto tempo; se for frequente, investigar |
+| Imagem sem som | TV desligada quando a Pi ligou, tela em **Mudo** no painel, ou TV mutada | `journalctl -t corptv-quiosque \| grep som`: se disser "nenhuma saida HDMI", ligar a TV e reiniciar a Pi. Conferir o volume da tela no painel e o controle da TV |
+| Som baixo mesmo em 100% no painel | Volume da própria TV baixo | Controle remoto da TV. O volume do sistema da Pi o quiosque já deixa em 100% |
+| Aviso "Som bloqueado pelo navegador" | Chromium aberto sem o quiosque (sem `--autoplay-policy`) | Abrir pelo `iniciar-quiosque.sh`, não pelo menu. Enquanto isso, Enter no teclado libera o som |
+| Agente não alcança o servidor pelo nome | Nome curto (`corportv`) sem o domínio | Trocar o `CORPTV_SERVIDOR` pelo nome completo ou pelo IP:3000 (passo 1) |
 
 Comandos de diagnóstico:
 
