@@ -373,6 +373,35 @@
     cacheRecord = { saved_at: 0, slides: [] };
   }
 
+  // Volume da tela (0 a 1), ajustado no painel. Vai para o cache junto com a
+  // programação: sem rede, a TV fica no volume combinado em vez de voltar ao máximo.
+  var screenVolume = normalizeVolume(cacheRecord.volume);
+
+  function normalizeVolume(value) {
+    var percent = parseInt(value, 10);
+    if (isNaN(percent)) return 1;
+    if (percent < 0) percent = 0;
+    if (percent > 100) percent = 100;
+    return percent / 100;
+  }
+
+  // Chamado a cada consulta da programação. Mudar entre volumes com som vale na
+  // hora; religar o som de uma tela que estava muda fica para o próximo vídeo,
+  // porque desmutar sem gesto do usuário faz alguns navegadores pausarem.
+  function setScreenVolume(nextVolume) {
+    var previous = screenVolume;
+    var video = document.getElementById('tv-video');
+    screenVolume = nextVolume;
+    if (!video || previous === nextVolume) return;
+    if (nextVolume === 0) {
+      video.muted = true;
+      setAudioBlocked(false);
+      return;
+    }
+    if (previous === 0) return;
+    try { video.volume = nextVolume; } catch (e) {}
+  }
+
   function showStatus(message) {
     var status = document.getElementById('conn-status');
     status.innerHTML = message;
@@ -404,8 +433,14 @@
 
   function playWithSound(video) {
     var playback;
+    if (screenVolume === 0) {
+      // Mudo pelo painel: toca sem som de propósito, sem aviso de bloqueio.
+      setAudioBlocked(false);
+      playMutedFallback(video);
+      return;
+    }
     video.muted = false;
-    try { video.volume = 1; } catch (e) {}
+    try { video.volume = screenVolume; } catch (e) {}
     video.removeAttribute('muted');
     try {
       playback = video.play();
@@ -432,11 +467,11 @@
   function unlockAudio() {
     var video;
     var playback;
-    if (!audioBlocked) return;
+    if (!audioBlocked || screenVolume === 0) return;
     video = document.getElementById('tv-video');
     if (!video) return;
     video.muted = false;
-    try { video.volume = 1; } catch (e) {}
+    try { video.volume = screenVolume; } catch (e) {}
     video.removeAttribute('muted');
     try {
       playback = video.play();
@@ -478,7 +513,7 @@
   }
 
   function saveCache(list) {
-    cacheRecord = { saved_at: Date.now(), slides: list };
+    cacheRecord = { saved_at: Date.now(), slides: list, volume: Math.round(screenVolume * 100) };
     try { localStorage.setItem(cacheKey, JSON.stringify(cacheRecord)); } catch (e) {}
   }
 
@@ -545,6 +580,9 @@
           var nextSlides = data.slides || [];
           handled = true;
           offline = false;
+          // Servidor antigo não manda volume: normalizeVolume devolve o máximo,
+          // que é como sempre tocou.
+          setScreenVolume(normalizeVolume(data.screen && data.screen.volume));
           saveCache(nextSlides);
           applyPlaylist(nextSlides);
           hideStatus();
@@ -637,7 +675,7 @@
       video.autoplay = true;
       video.muted = false;
       video.defaultMuted = false;
-      video.volume = 1;
+      video.volume = screenVolume;
       video.preload = 'auto';
       video.setAttribute('playsinline', 'playsinline');
       video.setAttribute('webkit-playsinline', 'webkit-playsinline');

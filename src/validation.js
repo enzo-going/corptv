@@ -117,12 +117,27 @@ function validateGroupInput(body = {}) {
   return { value: { name: name.value, color: color.value } };
 }
 
+// Volume da tela em porcentagem. Ausente = não mexer (a edição de nome ou de
+// ambiente não pode zerar o volume de quem não mandou o campo).
+function normalizeVolume(value) {
+  if (value === undefined || value === null || value === '') return { value: undefined };
+  const volume = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isInteger(volume) || volume < 0 || volume > 100) {
+    return { error: 'Volume deve ser um número inteiro entre 0 e 100.' };
+  }
+  return { value: volume };
+}
+
 function validateScreenInput(body = {}) {
   const name = normalizeText(body.name, 'Nome', 80, true);
   if (name.error) return name;
   const groupId = normalizeText(body.group_id, 'Grupo', 80, true);
   if (groupId.error) return groupId;
-  return { value: { name: name.value, group_id: groupId.value } };
+  const volume = normalizeVolume(body.volume);
+  if (volume.error) return volume;
+  const value = { name: name.value, group_id: groupId.value };
+  if (volume.value !== undefined) value.volume = volume.value;
+  return { value };
 }
 
 module.exports = {
@@ -130,6 +145,7 @@ module.exports = {
   normalizeDuration,
   normalizeText,
   normalizeVideoText,
+  normalizeVolume,
   validateGroupInput,
   validateScreenInput,
   validateSlideInput

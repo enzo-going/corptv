@@ -637,7 +637,7 @@ app.post('/api/screens', async (req, res) => {
   const group = await db.groups.findOne({ id: fields.value.group_id });
   if (!group) return res.status(404).json({ error: 'Ambiente não encontrado' });
   const slug = await db.uniqueSlug(fields.value.name);
-  const doc = { id: slug, ...fields.value, last_seen: null, created_at: new Date() };
+  const doc = { id: slug, volume: 100, ...fields.value, last_seen: null, created_at: new Date() };
   await db.screens.insert(doc);
   res.json(doc);
 });
@@ -668,7 +668,10 @@ app.get('/api/player/:slug', async (req, res) => {
     if (!statusAgenda(agendaDoVinculo(v), now).active) return null;
     return db.slides.findOne({ id: v.slide_id });
   }));
-  res.json({ screen, slides: itens.filter(Boolean) });
+  // Telas cadastradas antes do controle de volume não têm o campo: tocam no máximo,
+  // como sempre tocaram.
+  const volume = Number.isInteger(screen.volume) ? screen.volume : 100;
+  res.json({ screen: { ...screen, volume }, slides: itens.filter(Boolean) });
 });
 
 // Registra no log quando uma tela aparece ou volta depois de sumir, para dar
