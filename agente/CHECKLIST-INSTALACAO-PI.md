@@ -183,8 +183,8 @@ Esse teste é a resposta à pergunta da rede: se toca sem cabo, é porque está 
 
 - [ ] O vídeo sai **com som** pela TV
 - [ ] `journalctl -t corptv-quiosque | grep som` mostra a saída HDMI e `volume do sistema em 100%`
-- [ ] No painel, **Telas** → volume da tela em **30%**: em até 1 minuto o som abaixa, **sem o vídeo reiniciar**
-- [ ] Volume em **0% (Mudo)**: em até 1 minuto a TV fica sem som, sem aviso na tela
+- [ ] No painel, **Telas** → volume da tela em **30%**: em até 2 minutos o som abaixa, **sem o vídeo reiniciar**
+- [ ] Volume em **0% (Mudo)**: em até 2 minutos a TV fica sem som, sem aviso na tela
 - [ ] De volta a 100%: o som volta no início do próximo vídeo (religar o som no meio do vídeo faz alguns navegadores pausarem)
 
 O controle de volume no painel só existe depois que o servidor estiver na versão com ele. Antes disso a TV toca sempre no máximo, e o volume se ajusta no controle remoto.

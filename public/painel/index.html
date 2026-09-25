@@ -875,7 +875,7 @@ async function renderScreens(){
       <div class="sep" style="margin:12px 0"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Volume <span id="vol-txt-${s.id}" style="color:var(--text)">${volumeText(vol)}</span></div>
       <input class="editor-only volume-range" type="range" min="0" max="100" step="5" value="${vol}" style="width:100%;accent-color:var(--accent)" aria-label="Volume da tela ${esc(s.name)}" oninput="document.getElementById('vol-txt-${s.id}').textContent=volumeText(+this.value)" onchange="saveVolume('${s.id}',this.value)">
-      <div class="editor-only" style="font-size:11px;color:var(--muted);margin-top:4px">A TV aplica em até 1 minuto. O controle remoto da TV continua valendo por cima deste ajuste.</div>
+      <div class="editor-only" style="font-size:11px;color:var(--muted);margin-top:4px">A TV aplica em até 2 minutos. O controle remoto da TV continua valendo por cima deste ajuste.</div>
       <div class="sep" style="margin:12px 0"></div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
       <div class="url-box">
