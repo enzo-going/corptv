@@ -295,6 +295,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     const parts = cleanPath.split('/').filter(Boolean);
     const method = req.method.toLowerCase();
     if (parts[0] === 'slides') return { action: `content.${method === 'post' ? 'create' : method === 'put' ? 'update' : 'delete'}`, entity_type: 'content', entity_id: parts[1] };
+    if (parts[0] === 'screens' && parts[2] === 'recarregar') return { action: 'screen.reload', entity_type: 'screen', entity_id: parts[1] };
     if (parts[0] === 'screens') return { action: `screen.${method === 'post' ? 'create' : method === 'put' ? 'update' : 'delete'}`, entity_type: 'screen', entity_id: parts[1] };
     if (parts[0] === 'groups' && parts[2] === 'slides') {
       return {

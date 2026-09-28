@@ -28,6 +28,7 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 - Agendamento por início, expiração, dias da semana e faixa de horário
 - Janelas que atravessam a meia-noite com semântica previsível
 - Atualização automática, heartbeat e visão consolidada da programação
+- Status de cada tela com "visto há X min" e recarga do player à distância pelo painel
 - Cache offline que respeita o prazo de cada conteúdo
 - HTTP Range, cache imutável e limite de banda por conexão para servir vídeos com eficiência
 - Validação de campos, MIME e assinatura real dos uploads

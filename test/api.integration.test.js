@@ -163,6 +163,30 @@ test('tela cadastrada antes do controle de volume segue tocando no máximo', asy
   assert.equal(player.screen.volume, 100);
 });
 
+test('recarregar tela deixa uma marca nova para o player e fica na auditoria', async () => {
+  const group = await json('/api/groups', { method: 'POST', body: { name: 'Sala de recarga', color: '#224466' } });
+  const screen = await json('/api/screens', { method: 'POST', body: { name: 'TV Recarga', group_id: group.body.id } });
+  const marca = async () => (await (await request('/api/player/' + screen.body.id)).json()).screen.reload_at;
+
+  assert.equal(await marca(), undefined);
+
+  const pedido = await json('/api/screens/' + screen.body.id + '/recarregar', { method: 'POST', body: {} });
+  assert.equal(pedido.response.status, 200);
+  assert.equal(await marca(), pedido.body.reload_at);
+
+  // Editar a tela depois não pode apagar a marca, senão o player recarregaria de novo.
+  await json('/api/screens/' + screen.body.id, {
+    method: 'PUT', body: { name: 'TV Recarga', group_id: group.body.id, volume: 50 }
+  });
+  assert.equal(await marca(), pedido.body.reload_at);
+
+  const inexistente = await json('/api/screens/inexistente/recarregar', { method: 'POST', body: {} });
+  assert.equal(inexistente.response.status, 404);
+
+  const registro = await db.audit.findOne({ action: 'screen.reload', entity_id: screen.body.id });
+  assert.ok(registro, 'o pedido de recarga não entrou na auditoria');
+});
+
 test('API rejeita corpos JSON ausentes sem responder erro interno', async () => {
   const group = await json('/api/groups', { method: 'POST' });
   assert.equal(group.response.status, 400);

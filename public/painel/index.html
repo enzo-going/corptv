@@ -903,10 +903,11 @@ async function renderScreens(){
       <div class="card-row">
         <div class="flex-gap">
           <span class="online-dot ${online?'on':'off'}"></span>
-           <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(g?g.name:'Sem grupo')}</div></div>
+           <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(g?g.name:'Sem grupo')}${online?'':' · '+esc(lastSeenText(s.last_seen))}</div></div>
         </div>
         <div class="flex-gap">
           <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
+          <button class="btn btn-ghost btn-sm editor-only" onclick="reloadScreen('${s.id}')" title="A TV recarrega o player em até 2 minutos">Recarregar</button>
            <button class="btn btn-danger btn-sm btn-icon editor-only" onclick="delScreen('${s.id}')">✕</button>
         </div>
       </div>
@@ -930,6 +931,26 @@ async function renderScreens(){
   }).join('');
 }
 function volumeText(v){return v===0?'Mudo':v+'%';}
+// Quanto tempo faz que a tela deu sinal. "Offline" sozinho não diz se caiu agora
+// ou se nunca foi ligada.
+function lastSeenText(v){
+  if(!v)return 'nunca conectou';
+  const seg=Math.max(0,Math.round((Date.now()-new Date(v).getTime())/1000));
+  if(seg<120)return 'visto há 1 min';
+  const min=Math.round(seg/60);
+  if(min<60)return 'visto há '+min+' min';
+  const h=Math.round(min/60);
+  if(h<48)return 'visto há '+h+' h';
+  return 'visto em '+new Date(v).toLocaleDateString('pt-BR');
+}
+// Não mexe no indicador: pede à TV que recarregue. Ela fica online de verdade
+// quando o player voltar e avisar o servidor.
+async function reloadScreen(id){
+  const s=screens.find(x=>x.id===id);
+  const r=await api('POST','/api/screens/'+id+'/recarregar');
+  if(r.error){toast(r.error);return;}
+  toast('Pedido enviado: '+(s?s.name:'a tela')+' recarrega em até 2 minutos');
+}
 async function saveVolume(id,value){
   const s=screens.find(x=>x.id===id);
   if(!s)return;
@@ -1068,7 +1089,7 @@ async function renderDash(){
         <div class="flex-gap"><span class="online-dot ${online?'on':'off'}"></span><span class="card-title">${esc(s.name)}</span></div>
         <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
       </div>
-      <div class="card-sub mt8">${esc(g?g.name:'Sem grupo')}</div>
+      <div class="card-sub mt8">${esc(g?g.name:'Sem grupo')}${online?'':' · '+esc(lastSeenText(s.last_seen))}</div>
       <div class="url-box mt8" style="font-size:11px">
         <input class="url-value" value="${esc(origin+'/player/'+s.id)}" readonly aria-label="URL do player">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}',this)">Copiar</button>

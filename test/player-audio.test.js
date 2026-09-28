@@ -94,3 +94,27 @@ test('conteúdo sem tempo não liga o cronômetro: não troca e não redesenha',
   montar([{ type: 'img' }], 0, contar, nada, nada, null)();
   assert.equal(intervalos, 2);
 });
+
+test('o player só recarrega quando o painel pede depois que ele abriu', () => {
+  const script = scriptAtivo();
+  const fabrica = new Function('location',
+    'var reloadMark = null;\n' + extrair(script, 'reloadRequested') + '\nreturn reloadRequested;');
+  let recargas = 0;
+  const pedido = fabrica({ reload: () => { recargas++; } });
+
+  // A primeira resposta só registra a marca, mesmo que seja antiga: senão a TV
+  // recarregaria em laço a cada abertura.
+  assert.equal(pedido('2026-09-28T10:00:00.000Z'), false);
+  assert.equal(pedido('2026-09-28T10:00:00.000Z'), false);
+  assert.equal(recargas, 0);
+  assert.equal(pedido('2026-09-28T15:00:00.000Z'), true);
+  assert.equal(recargas, 1);
+
+  // Servidor antigo, sem o campo: nunca recarrega.
+  const semCampo = fabrica({ reload: () => { recargas++; } });
+  assert.equal(semCampo(undefined), false);
+  assert.equal(semCampo(undefined), false);
+  assert.equal(recargas, 1);
+
+  assert.match(script, /if \(reloadRequested\(data\.screen && data\.screen\.reload_at\)\) return;/);
+});
