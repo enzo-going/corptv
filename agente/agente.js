@@ -43,8 +43,7 @@ const CONFIG = {
   // Espalha o início dos downloads para vários aparelhos não baixarem juntos.
   jitterMaxS: parseInt(process.env.CORPTV_JITTER || '90', 10),
   // De quanto em quanto tempo baixa de novo a página do player.
-  intervaloPlayerS: parseInt(process.env.CORPTV_INTERVALO_PLAYER || '600', 10),
-  heartbeatS: 20
+  intervaloPlayerS: parseInt(process.env.CORPTV_INTERVALO_PLAYER || '600', 10)
 };
 
 if (!CONFIG.servidor) {
@@ -219,6 +218,10 @@ async function sincronizar() {
     const estado = lerEstado();
     const slides = dados.slides || [];
 
+    // Os ajustes da tela (volume, pedido de recarregar) chegam ao player já,
+    // sem esperar o download de uma mídia nova terminar.
+    if (playlistLocal && dados.screen) playlistLocal.screen = dados.screen;
+
     for (const slide of slides) {
       if (!slide.url) continue;
       const nome = nomeLocal(slide.url);
@@ -298,7 +301,9 @@ function limparAntigos(slides) {
 }
 
 // ── HEARTBEAT ────────────────────────────────────────────────────────────────
-// Continua avisando o servidor que a tela está viva, para o painel mostrar online.
+// Só repassa o aviso que o player manda: "Online" no painel tem de querer dizer
+// "a TV está exibindo". Se o agente avisasse sozinho, o painel mostraria a tela
+// online com o navegador fechado e a TV preta.
 async function heartbeat() {
   try {
     const corpo = JSON.stringify({ screen_id: CONFIG.tela });
@@ -359,7 +364,7 @@ const servidor = http.createServer(async (req, res) => {
     return res.end(JSON.stringify(playlistLocal || { screen: { id: CONFIG.tela }, slides: [] }));
   }
 
-  // Heartbeat: o player continua chamando; repassamos ao servidor.
+  // Heartbeat: o player chama a cada 20 s; repassamos ao servidor.
   if (caminho === '/api/heartbeat') {
     req.resume();
     heartbeat();
@@ -431,8 +436,6 @@ servidor.listen(CONFIG.porta, '127.0.0.1', () => {
   });
   sincronizar();
   setInterval(sincronizar, CONFIG.intervaloProgramacaoS * 1000);
-  heartbeat();
-  setInterval(heartbeat, CONFIG.heartbeatS * 1000);
   atualizarPlayer();
   setInterval(atualizarPlayer, CONFIG.intervaloPlayerS * 1000);
 });

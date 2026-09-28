@@ -111,7 +111,9 @@ continua exibindo o conteúdo anterior enquanto o novo baixa.
 - **Espalha a carga**: com vários aparelhos ligando juntos, o jitter evita que
   todos baixem no mesmo instante.
 - **Limpa o disco**: mídia que saiu da programação é apagada.
-- **Heartbeat**: o painel continua mostrando a tela como online.
+- **Heartbeat**: repassa ao servidor o aviso que o player manda a cada 20 s.
+  O agente não avisa sozinho: se o navegador fechar, a tela aparece offline no
+  painel em até 1 minuto, em vez de ficar "online" com a TV preta.
 - **Som pela HDMI**: o quiosque escolhe a saída HDMI e deixa o volume do sistema
   em 100% a cada início. O volume de cada tela se ajusta no painel (Telas) e
   chega à TV em até 2 minutos; o controle remoto da TV continua valendo por cima.

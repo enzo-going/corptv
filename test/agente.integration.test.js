@@ -198,8 +198,19 @@ test('não baixa de novo enquanto o arquivo não muda no servidor', async () => 
   assert.equal(servidor.downloads, antes);
 });
 
-test('avisa o servidor que a tela está viva', () => {
-  assert.ok(servidor.heartbeats > 0, 'nenhum heartbeat chegou ao servidor');
+test('só avisa o servidor que a tela está viva quando o player está aberto', async () => {
+  // Sem player chamando, o painel não pode mostrar a tela online: o navegador
+  // pode estar fechado e a TV preta.
+  assert.equal(servidor.heartbeats, 0, 'o agente avisou sozinho, sem o player');
+
+  const res = await fetch(`http://127.0.0.1:${portaAgente}/api/heartbeat`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ screen_id: TELA })
+  });
+  assert.equal(res.status, 200);
+
+  await esperar(() => servidor.heartbeats > 0, 'o aviso do player chegar ao servidor');
 });
 
 test('baixa de novo quando o ETag muda', async () => {
