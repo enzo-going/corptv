@@ -599,6 +599,21 @@ app.delete('/api/groups/:id/slides/:slide_id', async (req, res) => {
 });
 
 // ── TELAS ────────────────────────────────────────────────
+// Endereço que o painel usa nos links do player. Sem ele, o painel monta o link com o
+// endereço pelo qual foi aberto — e quem abre pelo IP distribui links com IP e porta.
+// Aceita só esquema + host (+ porta): nada de caminho, que o painel completa sozinho.
+function enderecoPublico(valor) {
+  // Uma expressão só, sem retrocesso: o host não aceita "/", então as barras finais
+  // não disputam caracteres com ele (um replace(/\/+$/) separado era quadrático).
+  const achado = /^(https?:\/\/[a-z0-9.-]+(?::\d{1,5})?)\/*$/i.exec(String(valor || '').trim());
+  return achado ? achado[1] : null;
+}
+const ENDERECO_PUBLICO = enderecoPublico(process.env.CORPTV_ENDERECO_PUBLICO);
+
+app.get('/api/config', (req, res) => {
+  res.json({ endereco_publico: ENDERECO_PUBLICO });
+});
+
 app.get('/api/screens', async (req, res) => {
   const screens = await db.screens.find({}).sort({ name: 1 });
   res.json(screens);
@@ -846,4 +861,4 @@ function iniciar() {
 
 if (require.main === module) iniciar();
 
-module.exports = { app, iniciar };
+module.exports = { app, iniciar, enderecoPublico };

@@ -10,6 +10,8 @@ REM "Em execucao" e recusava subir outra instancia. O servico ficava fora do ar
 REM sem ninguem conseguir reinicia-lo remotamente. Nao reintroduzir o loop.
 cd /d C:\corptv
 set PORT=3000
+REM Endereco que o painel mostra nos links do player (nome oficial, via nginx).
+set CORPTV_ENDERECO_PUBLICO=http://corportv
 REM Se a pasta do ">>" nao existir, o cmd aborta a linha inteira e o Node nem
 REM chega a rodar - sem erro visivel, so o servico fora do ar.
 if not exist "C:\ProgramData\CorporTVLogs" mkdir "C:\ProgramData\CorporTVLogs"

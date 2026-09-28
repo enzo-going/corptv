@@ -376,6 +376,7 @@ async function bootstrap(){
   try{
     const auth=await api('GET','/api/auth/me');
     currentUser=auth.user;permissions=auth.permissions;csrfToken=auth.csrf_token;
+    try{const cfg=await api('GET','/api/config');enderecoPublicoConfig=cfg.endereco_publico||null;}catch(e){}
     document.body.classList.toggle('readonly',!permissions.edit);
     document.querySelectorAll('[data-admin-only]').forEach(el=>el.hidden=!permissions.users);
     document.getElementById('account-name').textContent=currentUser.name;
@@ -406,7 +407,11 @@ function toSlug(name){
   return name.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s-]/g,'').trim().replace(/\s+/g,'-');
 }
 const NETWORK_ORIGIN=location.origin;
+// Endereço oficial configurado no servidor (CORPTV_ENDERECO_PUBLICO). Sem ele, o link
+// saía com o endereço pelo qual o painel foi aberto — pelo IP, virava IP:porta.
+let enderecoPublicoConfig=null;
 function publicOrigin(){
+  if(enderecoPublicoConfig)return enderecoPublicoConfig;
   return ['localhost','127.0.0.1','::1'].includes(location.hostname) ? NETWORK_ORIGIN : location.origin;
 }
 function previewSlug(name){
@@ -916,6 +921,11 @@ async function renderScreens(){
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}',this)">Copiar</button>
         <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Abrir</a>
       </div>
+      <div style="font-size:11px;color:var(--muted);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px">Nome da tela no agente (Raspberry) · CORPTV_TELA</div>
+      <div class="url-box">
+        <input class="url-value" value="${esc(s.id)}" readonly aria-label="Nome da tela para o agente">
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${s.id}',this,'Nome da tela copiado!')">Copiar</button>
+      </div>
     </div>`;
   }).join('');
 }
@@ -953,13 +963,14 @@ function selectUrlForManualCopy(url,trigger){
   if(!visible)throw new Error('campo da URL indisponível');
   visible.focus({preventScroll:true});visible.select();visible.setSelectionRange(0,visible.value.length);
 }
-async function copyUrl(url,trigger){
+async function copyUrl(url,trigger,msg){
+  const ok=msg||'URL copiada!';
   try{
     if(window.isSecureContext&&navigator.clipboard&&navigator.clipboard.writeText)await navigator.clipboard.writeText(url);
     else{legacyCopy(url,trigger);selectUrlForManualCopy(url,trigger);}
-    toast('URL copiada!');
+    toast(ok);
   }catch(e){
-    try{legacyCopy(url,trigger);selectUrlForManualCopy(url,trigger);toast('URL copiada!');}
+    try{legacyCopy(url,trigger);selectUrlForManualCopy(url,trigger);toast(ok);}
     catch(f){try{selectUrlForManualCopy(url,trigger);toast('Cópia bloqueada pelo navegador — pressione Ctrl+C');}
     catch(g){toast('Não foi possível copiar — selecione a URL manualmente');}}
   }

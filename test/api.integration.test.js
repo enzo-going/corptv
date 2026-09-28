@@ -14,9 +14,10 @@ process.env.CORPTV_DISABLE_SEED = '1';
 process.env.CORPTV_DISABLE_MAINTENANCE = '1';
 process.env.CORPTV_MEDIA_REQUESTS_PER_MINUTE = '2';
 process.env.CORPTV_PAGE_REQUESTS_PER_MINUTE = '2';
+process.env.CORPTV_ENDERECO_PUBLICO = 'http://corportv/';
 
 const db = require('../src/db');
-const { app } = require('../src/server');
+const { app, enderecoPublico } = require('../src/server');
 
 let server;
 let baseUrl;
@@ -329,4 +330,18 @@ test('a edição de conteúdo passa pela mesma validação do cadastro', async (
   assert.equal(salvo.type, 'txt');
   assert.equal(salvo.title, 'Renomeado');
   assert.equal(salvo.bg, '#111111');
+});
+
+test('o painel recebe o endereço oficial para montar os links do player', async () => {
+  const cfg = await json('/api/config');
+  assert.equal(cfg.response.status, 200);
+  assert.equal(cfg.body.endereco_publico, 'http://corportv');   // barra final removida
+});
+
+test('o endereço oficial aceita só esquema, host e porta', () => {
+  assert.equal(enderecoPublico('http://corportv'), 'http://corportv');
+  assert.equal(enderecoPublico(' https://corportv.exemplo.local:8443/ '), 'https://corportv.exemplo.local:8443');
+  for (const invalido of ['', undefined, 'corportv', 'http://corportv/painel', 'javascript:alert(1)', 'http://a b', 'ftp://corportv']) {
+    assert.equal(enderecoPublico(invalido), null, `"${invalido}" deveria ser recusado`);
+  }
 });
