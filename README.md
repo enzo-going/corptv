@@ -100,6 +100,7 @@ As variáveis abaixo são opcionais. O arquivo `.env.example` serve como referê
 | `CORPTV_SESSION_HOURS` | `8` | Duração máxima de uma sessão do painel |
 | `CORPTV_SESSION_IDLE_MINUTES` | `60` | Expiração após inatividade |
 | `CORPTV_TRUST_PROXY` | `0` | Use `1` somente atrás de um proxy reverso confiável que encerra HTTPS |
+| `CORPTV_ENDERECO_PUBLICO` | vazio | Endereço que o painel usa nos links do player, ex.: `http://corportv`. Vazio = o endereço pelo qual o painel foi aberto |
 
 ## Usuários e auditoria
 

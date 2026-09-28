@@ -37,3 +37,9 @@ test('os iniciadores criam a pasta de log antes de redirecionar para ela', () =>
     assert.ok(redireciona > criaPasta, 'a pasta precisa ser criada antes do redirecionamento');
   }
 });
+
+test('os iniciadores de produção definem o endereço oficial dos links', () => {
+  for (const starter of [rootStarter, opsStarter]) {
+    assert.match(starter, /^set CORPTV_ENDERECO_PUBLICO=http:\/\/corportv\r?$/m);
+  }
+});

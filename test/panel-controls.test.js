@@ -87,3 +87,11 @@ test('o login não redireciona para um destino fornecido pela URL', () => {
   assert.doesNotMatch(login, /params\.get\(['"]next['"]\)/);
   assert.match(login, /location\.href=['"]\/painel['"]/);
 });
+
+test('o painel usa o endereço oficial nos links e mostra o nome da tela para o agente', () => {
+  // Aberto pelo IP, o painel distribuía links com IP e porta.
+  assert.match(panel, /api\('GET','\/api\/config'\);enderecoPublicoConfig=cfg\.endereco_publico\|\|null/);
+  assert.match(panel, /if\(enderecoPublicoConfig\)return enderecoPublicoConfig;/);
+  assert.match(panel, /Nome da tela no agente \(Raspberry\) · CORPTV_TELA/);
+  assert.match(panel, /onclick="copyUrl\('\$\{s\.id\}',this,'Nome da tela copiado!'\)"/);
+});
