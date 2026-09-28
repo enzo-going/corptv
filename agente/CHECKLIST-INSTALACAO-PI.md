@@ -214,6 +214,7 @@ Outros:
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
 | Tela preta, agente rodando | Slug errado em `CORPTV_TELA` | `curl -s localhost:8080/status` e comparar com a URL do player no painel |
+| Painel mostra a tela **offline**, agente rodando | O navegador não está exibindo: o agente só repassa o aviso que o player manda | `journalctl -t corptv-quiosque -n 20`; se o Chromium estiver aberto e travado, **Recarregar** no painel |
 | "sem contato com o servidor e sem cópia local" | A Pi nunca alcançou o servidor | `curl -I http://SEU-SERVIDOR:3000/health` — se falhar, é rede/VLAN, não é a Pi |
 | Nada abre depois do boot | Sessão em Wayland ou sem autologin | Refazer o passo 3 |
 | Tela apaga sozinha depois de um tempo | Screen Blanking ligado | `raspi-config` → Display Options → Screen Blanking → Disable |
