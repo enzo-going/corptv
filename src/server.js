@@ -640,6 +640,17 @@ app.put('/api/screens/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// Pede à TV que recarregue o player. Age na TV, não no indicador: o player compara
+// esta marca a cada consulta da programação (30 s) e recarrega quando ela muda.
+// Serve para manutenção remota — tela congelada, player antigo, conteúdo preso.
+app.post('/api/screens/:id/recarregar', async (req, res) => {
+  const reload_at = new Date().toISOString();
+  const affected = await db.screens.update({ id: req.params.id }, { $set: { reload_at } });
+  if (!affected) return res.status(404).json({ error: 'Tela não encontrada' });
+  log('INFO', 'recarga da tela pedida', { screen: req.params.id });
+  res.json({ ok: true, reload_at });
+});
+
 app.delete('/api/screens/:id', async (req, res) => {
   const removed = await db.screens.remove({ id: req.params.id }, {});
   if (!removed) return res.status(404).json({ error: 'Tela não encontrada' });

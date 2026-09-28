@@ -35,6 +35,16 @@ test('o painel ajusta o volume de cada tela e não perde o ajuste no redesenho',
   assert.match(inicioRender, /classList\.contains\('volume-range'\)\)return;/);
 });
 
+test('o painel mostra desde quando a tela sumiu e pede recarga à TV', () => {
+  assert.match(panel, /function lastSeenText\(v\)\{/);
+  assert.match(panel, /if\(!v\)return 'nunca conectou';/);
+  assert.match(panel, /\$\{online\?'':' · '\+esc\(lastSeenText\(s\.last_seen\)\)\}/);
+  // O botão age na TV; o indicador continua sendo só o aviso que a TV manda.
+  assert.match(panel, /class="btn btn-ghost btn-sm editor-only" onclick="reloadScreen\('\$\{s\.id\}'\)"/);
+  assert.match(panel, /api\('POST','\/api\/screens\/'\+id\+'\/recarregar'\)/);
+  assert.doesNotMatch(panel, /last_seen\s*=/);
+});
+
 test('o painel oferece "sem tempo" para imagem e texto, e deixa mudar depois', () => {
   assert.match(panel, /id="sl-sem-tempo"[^>]*onchange="semTempoChange\(\)"/);
   assert.match(panel, /Sem tempo — fica na tela até ser tirado/);

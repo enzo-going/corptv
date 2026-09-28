@@ -402,6 +402,21 @@
     try { video.volume = nextVolume; } catch (e) {}
   }
 
+  // Pedido de recarga feito no painel ("Recarregar tela"). A primeira resposta só
+  // registra a marca atual; recarrega quando ela mudar depois disso.
+  var reloadMark = null;
+
+  function reloadRequested(mark) {
+    mark = mark || '';
+    if (reloadMark === null) {
+      reloadMark = mark;
+      return false;
+    }
+    if (mark === reloadMark) return false;
+    location.reload();
+    return true;
+  }
+
   function showStatus(message) {
     var status = document.getElementById('conn-status');
     status.innerHTML = message;
@@ -580,6 +595,7 @@
           var nextSlides = data.slides || [];
           handled = true;
           offline = false;
+          if (reloadRequested(data.screen && data.screen.reload_at)) return;
           // Servidor antigo não manda volume: normalizeVolume devolve o máximo,
           // que é como sempre tocou.
           setScreenVolume(normalizeVolume(data.screen && data.screen.volume));
