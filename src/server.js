@@ -763,6 +763,33 @@ app.get('/health', async (req, res) => {
 });
 
 // ── HTML ──────────────────────────────────────────────────
+// ── RASPBERRY PI ──────────────────────────────────────────
+// O painel mostra, em cada tela, o comando que prepara uma Pi nova. O script e os
+// arquivos do agente saem daqui, na mesma versão do servidor: ninguém precisa
+// lembrar onde está o script nem buscar no repositório. Nada disso é segredo (o
+// agente é o mesmo do repositório), por isso fica público como o player.
+const PASTA_AGENTE = path.join(__dirname, '../agente');
+const ARQUIVOS_PI = new Set(['agente.js', 'corptv-agente.service']);
+// Limite próprio: preparar várias Pis seguidas não pode esbarrar no limite das páginas.
+const piRequestLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
+
+app.get('/pi/preparar.sh', piRequestLimiter, (req, res) => {
+  // O endereço vai para dentro de um script que roda como root na Pi: só aceita
+  // esquema + host validado, nunca o cabeçalho Host cru.
+  const servidor = ENDERECO_PUBLICO || enderecoPublico(`${req.protocol}://${req.get('host')}`);
+  if (!servidor) return res.status(400).type('text/plain').send('Endereço do servidor inválido\n');
+  const script = fs.readFileSync(path.join(PASTA_AGENTE, 'preparar-pi.sh'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace('__SERVIDOR__', servidor);
+  res.set('Cache-Control', 'no-store').type('text/x-shellscript; charset=utf-8').send(script);
+});
+
+app.get('/pi/agente/:arquivo', piRequestLimiter, (req, res) => {
+  if (!ARQUIVOS_PI.has(req.params.arquivo)) return res.status(404).type('text/plain').send('Não encontrado\n');
+  const conteudo = fs.readFileSync(path.join(PASTA_AGENTE, req.params.arquivo), 'utf8').replace(/\r\n/g, '\n');
+  res.set('Cache-Control', 'no-store').type('text/plain; charset=utf-8').send(conteudo);
+});
+
 app.get('/player/:slug', pageRequestLimiter, (req, res) => res.sendFile(path.join(__dirname, '../public/player/index.html')));
 app.use('/painel', pageRequestLimiter, (req, res, next) => {
   Promise.resolve(auth.requirePanelPage(req, res, next)).catch(next);

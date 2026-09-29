@@ -42,17 +42,25 @@ que ao agente, que responde com os arquivos locais.
 
 ## Instalação — Raspberry Pi
 
+Não precisa decorar nada nem procurar este arquivo: no painel, em **Telas**, cada
+tela mostra o comando **"Preparar uma Raspberry para esta tela"**. Numa Pi nova,
+com rede, abrir o terminal e colar:
+
 ```bash
-sudo apt install -y nodejs
-sudo mkdir -p /opt/corptv-agente
-sudo cp agente.js iniciar-quiosque.sh /opt/corptv-agente/
-sudo chmod +x /opt/corptv-agente/iniciar-quiosque.sh
-sudo cp corptv-agente.service /etc/systemd/system/
-sudo nano /etc/systemd/system/corptv-agente.service   # ajustar CORPTV_TELA
-sudo systemctl daemon-reload
-sudo systemctl enable --now corptv-agente
-mkdir -p ~/.config/autostart && cp corptv-quiosque.desktop ~/.config/autostart/
+curl -fsSL http://SEU-SERVIDOR/pi/preparar.sh | sudo bash -s -- <tela>
 ```
+
+O script (`preparar-pi.sh`) vem do próprio servidor, na mesma versão dele, e:
+
+- confere que o servidor responde e que a tela existe;
+- põe o domínio do servidor como sufixo nas redes da Pi — o nome curto
+  (`corportv/`) passa a abrir no navegador, sem mexer no roteador;
+- desliga a economia de energia do Wi-Fi;
+- instala o Node.js (se faltar), o agente e o serviço, com a configuração do
+  aparelho em `/etc/corptv/agente.env`.
+
+Pode ser repetido sem risco: para trocar a tela ou atualizar o agente, rode de
+novo. Mexe só na Pi — nada na rede, no roteador ou no servidor.
 
 Conferir: `journalctl -u corptv-agente -f` e `curl localhost:8080/status`
 

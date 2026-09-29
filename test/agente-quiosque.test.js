@@ -58,3 +58,24 @@ test('nenhum arquivo do agente carrega endereço de servidor real', () => {
     assert.deepEqual(vazados, [], `${nome} traz endereço de rede interna: ${vazados.join(', ')}`);
   }
 });
+
+test('o serviço do agente roda com usuário próprio e config do aparelho fora da unit', () => {
+  assert.match(servico, /^DynamicUser=yes$/m);
+  assert.match(servico, /^StateDirectory=corptv$/m);
+  assert.ok(servico.includes('\nEnvironmentFile=/etc/corptv/agente.env\n'));
+  assert.doesNotMatch(servico, /^User=/m, 'usuário fixo quebra em Pi com outro usuário');
+  assert.doesNotMatch(servico, /^Environment=CORPTV_(SERVIDOR|TELA)=/m);
+});
+
+test('o script de preparo da Pi é válido e seguro para "curl | bash"', () => {
+  const arquivo = path.join(__dirname, '../agente/preparar-pi.sh');
+  const script = fs.readFileSync(arquivo, 'utf8');
+  // Tudo dentro de main(): o bash lê o script inteiro antes de executar.
+  assert.ok(script.includes('\nmain() {\n'));
+  assert.ok(script.includes('\nmain "$@"\n'));
+  assert.ok(script.includes('apt-get install -y -qq nodejs </dev/null'));
+  // Reaplicar a rede derruba o SSH: tem de ser o último passo.
+  assert.ok(script.indexOf('nmcli device reapply') > script.indexOf('systemctl restart corptv-agente'));
+  const bash = require('node:child_process').spawnSync('bash', ['-n', arquivo], { encoding: 'utf8' });
+  if (!bash.error) assert.equal(bash.status, 0, bash.stderr);
+});

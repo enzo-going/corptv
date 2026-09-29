@@ -45,6 +45,11 @@ test('o painel mostra desde quando a tela sumiu e pede recarga à TV', () => {
   assert.doesNotMatch(panel, /last_seen\s*=/);
 });
 
+test('cada tela mostra o comando que prepara uma Raspberry nova', () => {
+  assert.ok(panel.includes("function piCommand(origin,id){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash -s -- '+id;}"));
+  assert.match(panel, /Preparar uma Raspberry para esta tela/);
+});
+
 test('o painel oferece "sem tempo" para imagem e texto, e deixa mudar depois', () => {
   assert.match(panel, /id="sl-sem-tempo"[^>]*onchange="semTempoChange\(\)"/);
   assert.match(panel, /Sem tempo — fica na tela até ser tirado/);

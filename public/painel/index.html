@@ -927,10 +927,19 @@ async function renderScreens(){
         <input class="url-value" value="${esc(s.id)}" readonly aria-label="Nome da tela para o agente">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${s.id}',this,'Nome da tela copiado!')">Copiar</button>
       </div>
+      <div class="editor-only" style="font-size:11px;color:var(--muted);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px">Preparar uma Raspberry para esta tela</div>
+      <div class="url-box editor-only">
+        <input class="url-value" value="${esc(piCommand(origin,s.id))}" readonly aria-label="Comando para preparar uma Raspberry">
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl(piCommand('${origin}','${s.id}'),this,'Comando copiado!')">Copiar</button>
+      </div>
+      <div class="editor-only" style="font-size:11px;color:var(--muted);margin-top:4px">Numa Raspberry nova, com rede: abra o terminal e cole. Instala o agente, deixa o nome curto funcionando e pode ser repetido sem risco.</div>
     </div>`;
   }).join('');
 }
 function volumeText(v){return v===0?'Mudo':v+'%';}
+// O comando que prepara uma Pi nova. O script vem do próprio servidor, então
+// ninguém precisa lembrar que ele existe: está aqui, na tela que a Pi vai exibir.
+function piCommand(origin,id){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash -s -- '+id;}
 // Quanto tempo faz que a tela deu sinal. "Offline" sozinho não diz se caiu agora
 // ou se nunca foi ligada.
 function lastSeenText(v){
