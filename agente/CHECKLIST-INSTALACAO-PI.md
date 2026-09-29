@@ -46,7 +46,7 @@ Slug desta tela: `________________`
 1. [ ] Raspberry Pi Imager → **Raspberry Pi OS (64-bit), versão com desktop**
 2. [ ] Na engrenagem de configuração, antes de gravar:
    - [ ] hostname: `corptv-<setor>` (ex.: `corptv-recepcao`)
-   - [ ] usuário: **`pi`** — o `corptv-agente.service` está escrito para o usuário `pi`; se usar outro nome, tem que editar o serviço
+   - [ ] usuário: **`ti`** — o `corptv-agente.service` está escrito para o usuário `ti`; se usar outro nome, tem que editar a linha `User=` do serviço
    - [ ] SSH ligado (facilita o suporte sem levar teclado até a TV)
    - [ ] Wi-Fi: **não configurar**
 3. [ ] Gravar, colocar na Pi, ligar no cabo de rede e no HDMI, ligar a energia
