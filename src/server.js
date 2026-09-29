@@ -696,6 +696,62 @@ app.post('/api/heartbeat', async (req, res) => {
   res.json({ ok: true, ts: Date.now() });
 });
 
+// ── APARELHOS (Raspberry Pi, mini PC) ─────────────────────
+// Cada aparelho atrás de uma TV se registra sozinho a cada minuto, com um id que
+// ele mesmo gerou, e recebe de volta qual tela deve exibir. Assim a Pi é
+// preparada com um comando igual para todas e a tela se escolhe no painel.
+const ID_APARELHO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const LIMITE_APARELHOS = 500;
+const aparelhoLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
+
+function nomeAparelho(valor) {
+  return String(valor || '').replace(/[^\w .-]/g, '').trim().slice(0, 60) || 'aparelho';
+}
+
+async function telaExiste(id) {
+  return typeof id === 'string' && id !== '' && !!(await db.screens.findOne({ id }));
+}
+
+app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
+  const { id, nome, tela_local } = req.body || {};
+  if (typeof id !== 'string' || !ID_APARELHO.test(id)) return res.status(400).json({ error: 'Aparelho inválido' });
+  const agora = new Date().toISOString();
+  let aparelho = await db.devices.findOne({ id });
+  if (!aparelho) {
+    if (await db.devices.count({}) >= LIMITE_APARELHOS) return res.status(429).json({ error: 'Aparelhos demais cadastrados' });
+    // Aparelho instalado antes desta versão já tinha a tela na configuração local:
+    // entra no painel com ela, sem ninguém precisar escolher de novo.
+    const screen_id = (await telaExiste(tela_local)) ? tela_local : null;
+    aparelho = { id, name: nomeAparelho(nome), screen_id, last_seen: agora, created_at: agora };
+    await db.devices.insert(aparelho);
+    log('INFO', 'aparelho novo', { aparelho: id, nome: aparelho.name, tela: screen_id });
+  } else {
+    await db.devices.update({ id }, { $set: { last_seen: agora, name: nomeAparelho(nome) } });
+  }
+  // Tela apagada no painel: o aparelho volta a "aguardando tela".
+  const screen_id = (await telaExiste(aparelho.screen_id)) ? aparelho.screen_id : null;
+  res.json({ screen_id });
+});
+
+app.get('/api/aparelhos', async (req, res) => {
+  res.json(await db.devices.find({}).sort({ name: 1 }));
+});
+
+app.put('/api/aparelhos/:id', async (req, res) => {
+  const screen_id = req.body && req.body.screen_id;
+  if (screen_id !== null && !(await telaExiste(screen_id))) return res.status(400).json({ error: 'Escolha uma tela que exista' });
+  const affected = await db.devices.update({ id: req.params.id }, { $set: { screen_id } });
+  if (!affected) return res.status(404).json({ error: 'Aparelho não encontrado' });
+  log('INFO', 'tela do aparelho escolhida no painel', { aparelho: req.params.id, tela: screen_id });
+  res.json({ ok: true });
+});
+
+app.delete('/api/aparelhos/:id', async (req, res) => {
+  const removed = await db.devices.remove({ id: req.params.id }, {});
+  if (!removed) return res.status(404).json({ error: 'Aparelho não encontrado' });
+  res.json({ ok: true });
+});
+
 // ── PROGRAMAÇÃO ───────────────────────────────────────────
 // Responde "o que esta no ar, em qual tela, e o que esta oculto por que".
 // Usado pela Visao geral do painel.

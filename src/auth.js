@@ -55,6 +55,10 @@ function cleanName(value) {
   return { value: name };
 }
 
+// Chamadas que as TVs fazem sozinhas, sem login: o aviso de "estou exibindo" e
+// o registro do aparelho. Ficam fora do login e da auditoria.
+const ROTAS_DOS_APARELHOS = new Set(['/heartbeat', '/aparelhos/registro']);
+
 function permissionsFor(role) {
   return {
     read: true,
@@ -273,7 +277,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
   }
 
   async function requireManagementApi(req, res, next) {
-    if (req.path === '/heartbeat' || req.path.startsWith('/player/')) return next();
+    if (ROTAS_DOS_APARELHOS.has(req.path) || req.path.startsWith('/player/')) return next();
     await requireSession(req, res, async () => {
       if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
         if (req.user.role === 'viewer') {
@@ -303,12 +307,16 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
         entity_type: 'group_content', entity_id: [parts[1], parts[3]].filter(Boolean).join(':')
       };
     }
+    if (parts[0] === 'aparelhos') return { action: `device.${method === 'put' ? 'update' : 'delete'}`, entity_type: 'device', entity_id: parts[1] };
     if (parts[0] === 'groups') return { action: `group.${method === 'post' ? 'create' : method === 'put' ? 'update' : 'delete'}`, entity_type: 'group', entity_id: parts[1] };
     return { action: 'management.' + method, entity_type: parts[0] || 'api', entity_id: parts[1] };
   }
 
   function auditManagementMutation(req, res, next) {
     if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+    // Aviso automático das TVs (a cada 20-60 s) não é ação de pessoa: auditar
+    // gerava milhares de linhas por dia e escondia o que alguém fez de verdade.
+    if (ROTAS_DOS_APARELHOS.has(req.path)) return next();
     const originalJson = res.json.bind(res);
     let sent = false;
     res.json = function auditedJson(body) {

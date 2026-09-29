@@ -1,15 +1,16 @@
 #!/bin/bash
 # CorporTV - prepara uma Raspberry Pi para exibir uma tela.
 #
-# Não precisa guardar este arquivo nem lembrar que ele existe: o painel mostra,
-# em cada tela (Telas → "Instalar numa Raspberry (TI)"), o comando pronto, e o
-# servidor entrega o script na mesma versão dele. Numa Pi nova, com rede:
+# Não precisa guardar este arquivo nem lembrar que ele existe: o painel mostra o
+# comando em Telas → Aparelhos, e o servidor entrega o script na mesma versão
+# dele. Uma vez em cada Pi nova, com rede — o comando é igual para todas:
 #
-#   curl -fsSL http://SEU-SERVIDOR/pi/preparar.sh | sudo bash -s -- <tela>
+#   curl -fsSL http://SEU-SERVIDOR/pi/preparar.sh | sudo bash
 #
-# Pode rodar de novo quantas vezes quiser (trocar de tela, atualizar o agente):
-# cada passo confere antes de mexer. Mexe só nesta Pi — nada na rede, no
-# roteador ou no servidor.
+# Depois a Pi aparece sozinha no painel (Telas → Aparelhos) e a tela que ela
+# exibe se escolhe ali. Opcional: "... | sudo bash -s -- <tela>" já deixa uma
+# tela escolhida. Pode rodar de novo (atualizar o agente): cada passo confere
+# antes de mexer. Mexe só nesta Pi — nada na rede, no roteador ou no servidor.
 set -euo pipefail
 
 # Tudo dentro de main: com "curl | bash", o bash só começa a executar depois de
@@ -28,12 +29,16 @@ case "$SERVIDOR" in
   http://*|https://*) ;;
   *) falha "endereço do servidor desconhecido; baixe o script pelo comando do painel" ;;
 esac
-[[ "$TELA" =~ ^[a-z0-9-]+$ ]] || falha "informe a tela, ex.: ... | sudo bash -s -- recepcao"
+[[ -z "$TELA" || "$TELA" =~ ^[a-z0-9-]+$ ]] || falha "nome de tela inválido: $TELA"
 
-passo "Servidor e tela"
+passo "Servidor"
 curl -fsS -m 15 -o /dev/null "$SERVIDOR/health" || falha "servidor $SERVIDOR não respondeu"
-curl -fsS -m 15 -o /dev/null "$SERVIDOR/api/player/$TELA" || falha "a tela '$TELA' não existe no painel"
-ok "$SERVIDOR, tela $TELA"
+if [ -n "$TELA" ]; then
+  curl -fsS -m 15 -o /dev/null "$SERVIDOR/api/player/$TELA" || falha "a tela '$TELA' não existe no painel"
+  ok "$SERVIDOR, tela $TELA"
+else
+  ok "$SERVIDOR (a tela se escolhe no painel)"
+fi
 
 # ── 1. Nome curto (corportv/) ────────────────────────────────────────────────
 # A Pi não é do domínio e a rede não entrega o sufixo; sem ele, só o nome
@@ -98,13 +103,17 @@ node --check "$tmp/agente.js" || falha "agente.js baixado veio corrompido"
 install -m 644 "$tmp/agente.js" /opt/corptv-agente/agente.js
 install -m 644 "$tmp/corptv-agente.service" /etc/systemd/system/corptv-agente.service
 
-# Configuração do aparelho: troca servidor e tela, mantém qualquer outro ajuste.
+# Configuração do aparelho: grava o servidor (e a tela, se foi informada) e
+# mantém qualquer outro ajuste que já estivesse ali.
 env=/etc/corptv/agente.env
 {
   echo "# Configuração desta Pi. Gerado por preparar.sh; pode ajustar à mão."
   echo "CORPTV_SERVIDOR=$SERVIDOR"
-  echo "CORPTV_TELA=$TELA"
-  [ -f "$env" ] && grep -Ev '^(#|CORPTV_SERVIDOR=|CORPTV_TELA=)' "$env" || true
+  if [ -n "$TELA" ]; then echo "CORPTV_TELA=$TELA"; fi
+  if [ -f "$env" ]; then
+    if [ -n "$TELA" ]; then grep -Ev '^(#|CORPTV_SERVIDOR=|CORPTV_TELA=)' "$env" || true
+    else grep -Ev '^(#|CORPTV_SERVIDOR=)' "$env" || true; fi
+  fi
 } > "$tmp/agente.env"
 install -m 644 "$tmp/agente.env" "$env"
 
@@ -117,7 +126,7 @@ for _ in $(seq 1 30); do
 done
 curl -fsS -m 2 http://127.0.0.1:8080/status >/dev/null 2>&1 \
   || falha "o agente não respondeu; veja: journalctl -u corptv-agente -n 30"
-ok "agente no ar em http://127.0.0.1:8080 (tela $TELA)"
+ok "agente no ar em http://127.0.0.1:8080"
 
 # ── Rede: aplicar o sufixo por último ────────────────────────────────────────
 # Reaplicar a conexão pode derrubar o SSH por um instante. Por isso fica no fim,
@@ -128,7 +137,11 @@ if [ "$mudou_rede" -eq 1 ]; then
     | while read -r dev; do nmcli device reapply "$dev" >/dev/null 2>&1 || true; done
 fi
 
-printf '\nPronto. Esta Pi exibe a tela "%s".\n' "$TELA"
+if [ -n "$TELA" ]; then
+  printf '\nPronto. Esta Pi (%s) exibe a tela "%s". Para trocar: painel, Telas → Aparelhos.\n' "$(hostname)" "$TELA"
+else
+  printf '\nPronto. Esta Pi (%s) já aparece no painel. Escolha a tela dela em Telas → Aparelhos.\n' "$(hostname)"
+fi
 printf 'Conferir: curl -s localhost:8080/status   e   journalctl -u corptv-agente -f\n'
 }
 

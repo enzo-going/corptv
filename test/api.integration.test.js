@@ -207,6 +207,61 @@ test('o servidor entrega o script de preparo da Pi com o próprio endereço', as
   assert.equal((await request('/pi/agente/..%2Fsrc%2Fserver.js')).status, 404);
 });
 
+test('aparelho se registra sozinho e a tela se escolhe no painel', async () => {
+  const group = await json('/api/groups', { method: 'POST', body: { name: 'Refeitório', color: '#335577' } });
+  const tela = await json('/api/screens', { method: 'POST', body: { name: 'TV Refeitório Aparelho', group_id: group.body.id } });
+  const outra = await json('/api/screens', { method: 'POST', body: { name: 'TV Pátio Aparelho', group_id: group.body.id } });
+  const id = '0f8fad5b-d9cb-469f-a165-70867728950e';
+  // O registro é feito pela Pi, sem login.
+  const registrar = async corpo => {
+    const r = await fetch(baseUrl + '/api/aparelhos/registro', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo)
+    });
+    return { status: r.status, body: await r.json() };
+  };
+  const auditoriaAntes = await db.audit.count({});
+
+  assert.equal((await registrar({ id: 'nao-e-uuid', nome: 'x' })).status, 400);
+
+  // Pi instalada antes desta versão: entra já com a tela da configuração local.
+  const primeiro = await registrar({ id, nome: 'raspberry-recepcao', tela_local: tela.body.id });
+  assert.equal(primeiro.status, 200);
+  assert.equal(primeiro.body.screen_id, tela.body.id);
+
+  const lista = await json('/api/aparelhos');
+  const aparelho = lista.body.find(a => a.id === id);
+  assert.equal(aparelho.name, 'raspberry-recepcao');
+  assert.equal(aparelho.screen_id, tela.body.id);
+
+  // Trocar pelo painel: a Pi recebe a tela nova no próximo registro.
+  const troca = await json('/api/aparelhos/' + id, { method: 'PUT', body: { screen_id: outra.body.id } });
+  assert.equal(troca.response.status, 200);
+  assert.equal((await registrar({ id, nome: 'raspberry-recepcao', tela_local: tela.body.id })).body.screen_id, outra.body.id);
+
+  const invalida = await json('/api/aparelhos/' + id, { method: 'PUT', body: { screen_id: 'nao-existe' } });
+  assert.equal(invalida.response.status, 400);
+
+  // Tela apagada: o aparelho volta a "aguardando tela" em vez de apontar para o nada.
+  await json('/api/screens/' + outra.body.id, { method: 'DELETE', body: {} });
+  assert.equal((await registrar({ id, nome: 'raspberry-recepcao' })).body.screen_id, null);
+
+  // O aviso automático das TVs não é ação de pessoa: não entra na auditoria.
+  await fetch(baseUrl + '/api/heartbeat', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ screen_id: tela.body.id })
+  });
+  const registrosAutomaticos = await db.audit.count({ action: 'management.post' });
+  assert.equal(registrosAutomaticos, 0, 'heartbeat ou registro do aparelho foi parar na auditoria');
+  assert.ok(await db.audit.findOne({ action: 'device.update', entity_id: id }), 'a troca de tela pelo painel precisa ficar na auditoria');
+  assert.ok((await db.audit.count({})) > auditoriaAntes);
+
+  // Gestão exige login.
+  const semLogin = await fetch(baseUrl + '/api/aparelhos');
+  assert.equal(semLogin.status, 401);
+
+  assert.equal((await json('/api/aparelhos/' + id, { method: 'DELETE', body: {} })).response.status, 200);
+  assert.equal((await json('/api/aparelhos/' + id, { method: 'DELETE', body: {} })).response.status, 404);
+});
+
 test('API rejeita corpos JSON ausentes sem responder erro interno', async () => {
   const group = await json('/api/groups', { method: 'POST' });
   assert.equal(group.response.status, 400);
