@@ -187,6 +187,26 @@ test('recarregar tela deixa uma marca nova para o player e fica na auditoria', a
   assert.ok(registro, 'o pedido de recarga não entrou na auditoria');
 });
 
+test('o servidor entrega o script de preparo da Pi com o próprio endereço', async () => {
+  const script = await request('/pi/preparar.sh');
+  assert.equal(script.status, 200);
+  const texto = await script.text();
+  // CORPTV_ENDERECO_PUBLICO do teste: o script sai apontando para ele.
+  assert.ok(texto.includes('SERVIDOR="${CORPTV_SERVIDOR:-http://corportv}"'));
+  assert.doesNotMatch(texto, /__SERVIDOR__/);
+  assert.ok(!texto.includes(String.fromCharCode(13)), 'CRLF quebra o bash da Pi');
+  assert.equal(script.headers.get('cache-control'), 'no-store');
+
+  const agente = await request('/pi/agente/agente.js');
+  assert.equal(agente.status, 200);
+  assert.match(await agente.text(), /CORPTV_SERVIDOR/);
+  assert.equal((await request('/pi/agente/corptv-agente.service')).status, 200);
+
+  // Só os arquivos da lista; nada de caminho para fora da pasta do agente.
+  assert.equal((await request('/pi/agente/preparar-pi.sh')).status, 404);
+  assert.equal((await request('/pi/agente/..%2Fsrc%2Fserver.js')).status, 404);
+});
+
 test('API rejeita corpos JSON ausentes sem responder erro interno', async () => {
   const group = await json('/api/groups', { method: 'POST' });
   assert.equal(group.response.status, 400);

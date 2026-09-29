@@ -94,19 +94,16 @@ pactl list short sinks
 
 ## 4. Instalar o agente
 
-```bash
-sudo mkdir -p /opt/corptv-agente
-sudo cp agente.js iniciar-quiosque.sh /opt/corptv-agente/
-sudo chmod +x /opt/corptv-agente/iniciar-quiosque.sh
-sudo cp corptv-agente.service /etc/systemd/system/
-sudo nano /etc/systemd/system/corptv-agente.service
-```
+No painel, **Telas** → na tela desta Pi → **Preparar uma Raspberry para esta tela** → **Copiar**.
+Na Pi, abrir o terminal, colar e digitar a senha quando pedir.
 
-No editor, ajustar:
+- [ ] Terminou com `Pronto. Esta Pi exibe a tela "<slug>".`
+- [ ] No navegador da Pi, `corportv/` abre o painel (nome curto funcionando)
+- [ ] `curl -s localhost:8080/status` mostra o slug certo em `"tela"`
 
-- [ ] `CORPTV_SERVIDOR=` → **o endereço anotado no passo 1** (nome completo com domínio, ou IP:3000)
-- [ ] `CORPTV_TELA=` → **o slug anotado no passo 1**
-- [ ] `CORPTV_LIMITE_MBPS=` → pela conta `aparelhos × limite ≤ 8 Mb/s` (teto do QoS do servidor é 12)
+O script pode ser repetido sem risco. A configuração do aparelho fica em
+`/etc/corptv/agente.env`; o limite de download (`CORPTV_LIMITE_MBPS`) segue a
+conta `aparelhos × limite ≤ 8 Mb/s`:
 
 | Aparelhos no total | Limite por aparelho | Baixar 170 MB leva |
 |---|---|---|
@@ -114,28 +111,7 @@ No editor, ajustar:
 | 4 | 2 | ~11 min |
 | 8 | 1 | ~23 min |
 
-Subir o serviço:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now corptv-agente
-journalctl -u corptv-agente -f
-```
-
-- [ ] O log mostra `midia nova, baixando` e depois `download concluido`
-- [ ] Enquanto baixa, **não é erro** a tela ainda não ter conteúdo — a playlist só aceita o que já está inteiro no disco
-
-**Confere:**
-
-```bash
-curl -s localhost:8080/status
-```
-
-- [ ] `"tela"` é o slug certo
-- [ ] `"conteudos_prontos"` é maior que zero
-- [ ] `"no_disco": true` nos arquivos
-
----
+Para mudar, acrescentar a linha no `agente.env` e `sudo systemctl restart corptv-agente`.
 
 ## 5. Ligar o quiosque
 
