@@ -18,16 +18,31 @@
 PORTA="${CORPTV_PORTA:-8080}"
 URL="http://127.0.0.1:${PORTA}/"
 
+# Um quiosque só: a sessão gráfica pode chamar este script por mais de um caminho,
+# e dois navegadores disputariam a tela e o som.
+exec 9>"/tmp/corptv-quiosque-$(id -u).lock"
+if command -v flock >/dev/null 2>&1 && ! flock -n 9; then
+  echo "quiosque ja aberto nesta sessao"
+  exit 0
+fi
+
+# Raspberry Pi OS antigo chama o navegador de chromium-browser; o atual, de chromium.
+NAVEGADOR=$(command -v chromium-browser || command -v chromium || echo chromium-browser)
+
 # Espera o agente responder antes de abrir a tela (evita erro na inicialização).
 for i in $(seq 1 60); do
   if curl -sf "http://127.0.0.1:${PORTA}/status" >/dev/null 2>&1; then break; fi
   sleep 2
 done
 
-# Não deixa a tela apagar nem entrar protetor de tela.
-xset s off
-xset -dpms
-xset s noblank
+# Não deixa a tela apagar nem entrar protetor de tela. O xset só existe no X11;
+# no Wayland (labwc, padrão do Raspberry Pi OS atual) quem desliga o apagamento é
+# o raspi-config, que o preparar.sh já chama.
+if [ -n "${DISPLAY:-}" ] && [ -z "${WAYLAND_DISPLAY:-}" ] && command -v xset >/dev/null 2>&1; then
+  xset s off
+  xset -dpms
+  xset s noblank
+fi
 
 # Registra no journal do sistema, para conferir depois com:
 #   journalctl -t corptv-quiosque
@@ -90,7 +105,8 @@ while [ "$encerrando" -eq 0 ]; do
   limpar_flags_de_crash
   inicio=$(date +%s)
 
-  chromium-browser \
+  "$NAVEGADOR" \
+    --ozone-platform-hint=auto \
     --kiosk \
     --noerrdialogs \
     --disable-infobars \

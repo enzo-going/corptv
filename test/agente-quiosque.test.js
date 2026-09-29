@@ -31,9 +31,30 @@ test('o quiosque aponta para o agente local, nunca para o servidor', () => {
   assert.doesNotMatch(quiosque, /chromium.*:3000/is);
 });
 
+test('o quiosque funciona no Wayland (labwc) e no X11, com um navegador só', () => {
+  // xset só existe no X11: no labwc, rodar sem condição só gerava erro.
+  assert.match(quiosque, /if \[ -n "\$\{DISPLAY:-\}" \] && \[ -z "\$\{WAYLAND_DISPLAY:-\}" \] && command -v xset/);
+  assert.doesNotMatch(quiosque, /^xset /m);
+  // Pi OS atual chama o navegador de chromium; o antigo, de chromium-browser.
+  assert.match(quiosque, /NAVEGADOR=\$\(command -v chromium-browser \|\| command -v chromium/);
+  assert.match(quiosque, /--ozone-platform-hint=auto/);
+  // Trava: dois quiosques disputariam tela e som.
+  assert.match(quiosque, /flock -n 9/);
+});
+
+test('o preparo da Pi instala o quiosque e deixa ela ligar direto na tela', () => {
+  const script = fs.readFileSync(path.join(__dirname, '../agente/preparar-pi.sh'), 'utf8');
+  assert.ok(script.includes('install -m 755 "$tmp/iniciar-quiosque.sh" /opt/corptv-agente/iniciar-quiosque.sh'));
+  assert.ok(script.includes('"$casa/.config/autostart/corptv-quiosque.desktop"'));
+  assert.ok(script.includes('raspi-config nonint do_blanking 1'));
+  assert.ok(script.includes('raspi-config nonint do_boot_behaviour B4'));
+  // A rede continua sendo o último passo (reaplicar derruba o SSH).
+  assert.ok(script.indexOf('nmcli device reapply') > script.indexOf('corptv-quiosque.desktop"'));
+});
+
 test('o quiosque manda o som para a HDMI no volume máximo antes de abrir o navegador', () => {
   const configura = quiosque.indexOf('\nconfigurar_audio\n');
-  const abre = quiosque.indexOf('chromium-browser \\');
+  const abre = quiosque.indexOf('"$NAVEGADOR" \\');
   assert.ok(configura > 0, 'o quiosque não configura o som');
   assert.ok(configura < abre, 'o som precisa ser configurado antes de abrir o navegador');
   assert.match(quiosque, /grep -m1 'fef00700\.\*hdmi'/);

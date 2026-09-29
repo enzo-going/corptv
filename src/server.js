@@ -825,7 +825,7 @@ app.get('/health', async (req, res) => {
 // lembrar onde está o script nem buscar no repositório. Nada disso é segredo (o
 // agente é o mesmo do repositório), por isso fica público como o player.
 const PASTA_AGENTE = path.join(__dirname, '../agente');
-const ARQUIVOS_PI = new Set(['agente.js', 'corptv-agente.service']);
+const ARQUIVOS_PI = new Set(['agente.js', 'corptv-agente.service', 'iniciar-quiosque.sh', 'corptv-quiosque.desktop']);
 // Limite próprio: preparar várias Pis seguidas não pode esbarrar no limite das páginas.
 const piRequestLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
 
