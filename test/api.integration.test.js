@@ -389,3 +389,26 @@ test('o endereço oficial aceita só esquema, host e porta', () => {
     assert.equal(enderecoPublico(invalido), null, `"${invalido}" deveria ser recusado`);
   }
 });
+
+test('renomear a tela muda só o nome: o endereço do player continua o mesmo', async () => {
+  const group = await json('/api/groups', { method: 'POST', body: { name: 'Sala para renomear', color: '#445566' } });
+  const screen = await json('/api/screens', {
+    method: 'POST', body: { name: 'Coworking', group_id: group.body.id, volume: 55 }
+  });
+  const id = screen.body.id;
+  assert.equal(id, 'coworking');
+
+  const r = await json('/api/screens/' + id, { method: 'PUT', body: { name: 'Coworking 2º andar', group_id: group.body.id } });
+  assert.equal(r.response.status, 200);
+
+  // As TVs e as Raspberries já instaladas usam o endereço antigo: ele tem de seguir valendo.
+  const player = await request('/api/player/' + id);
+  assert.equal(player.status, 200);
+  const dados = await player.json();
+  assert.equal(dados.screen.id, 'coworking');
+  assert.equal(dados.screen.name, 'Coworking 2º andar');
+  assert.equal(dados.screen.volume, 55);
+
+  const vazio = await json('/api/screens/' + id, { method: 'PUT', body: { name: '   ', group_id: group.body.id } });
+  assert.equal(vazio.response.status, 400);
+});

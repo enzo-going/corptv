@@ -251,3 +251,10 @@ test('o volume salva o toque no WebKit mesmo sem change e agrupa eventos repetid
   assert.match(panel, /saveVolume\(id,value\)\.catch/);
   assert.match(panel, /if\(volume===s\.volume\)return/);
 });
+
+test('o painel renomeia a tela sem trocar o endereço nem o volume', () => {
+  assert.match(panel, /onclick="renameScreen\('\$\{s\.id\}'\)"[^>]*>Renomear<\/button>/);
+  const fn = panel.slice(panel.indexOf('async function renameScreen('), panel.indexOf('async function delScreen('));
+  assert.match(fn, /api\('PUT','\/api\/screens\/'\+id,\{name:limpo,group_id:s\.group_id\}\)/);
+  assert.doesNotMatch(fn, /volume/);
+});
