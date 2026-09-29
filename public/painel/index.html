@@ -1038,6 +1038,7 @@ async function renderScreens(){
         </div>
         <div class="flex-gap">
           <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
+          <button class="btn btn-ghost btn-sm editor-only" onclick="renameScreen('${s.id}')" title="Muda só o nome; o endereço da tela continua o mesmo">Renomear</button>
           <button class="btn btn-ghost btn-sm editor-only" onclick="reloadScreen('${s.id}')" title="A TV recarrega o player em até 2 minutos">Recarregar</button>
            <button class="btn btn-danger btn-sm btn-icon editor-only" onclick="delScreen('${s.id}')">✕</button>
         </div>
@@ -1122,6 +1123,20 @@ async function saveVolume(id,value){
   if(r.error){toast(r.error);await load();return;}
   s.volume=volume;
   toast(volume===0?'Tela sem som':'Volume da tela em '+volume+'%');
+}
+// Muda só o nome exibido. O endereço (id da tela) fica igual de propósito: ele está no
+// link das TVs e no CORPTV_TELA das Raspberries já instaladas.
+async function renameScreen(id){
+  const s=screens.find(x=>x.id===id);
+  if(!s)return;
+  const novo=prompt('Novo nome da tela:\n\nO endereço continua '+id+' — as TVs e Raspberries já configuradas não precisam de ajuste.',s.name);
+  if(novo===null)return;
+  const limpo=novo.trim();
+  if(!limpo){toast('O nome não pode ficar vazio');return;}
+  if(limpo===s.name)return;
+  const r=await api('PUT','/api/screens/'+id,{name:limpo,group_id:s.group_id});
+  if(r.error){toast(r.error);return;}
+  await load();toast('Tela renomeada');
 }
 async function delScreen(id){
   const s=screens.find(x=>x.id===id);
