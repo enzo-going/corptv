@@ -26,6 +26,10 @@ const servidor = {
   playlist: null,
   paginaPlayer: '<html><body>player v1</body></html>',
   heartbeats: 0,
+  // Resposta do registro do aparelho; null = servidor antigo, sem a rota (404).
+  registro: null,
+  ultimoRegistro: null,
+  telasPedidas: [],
   downloads: 0
 };
 
@@ -74,7 +78,19 @@ test.before(async () => {
   http1 = http.createServer((req, res) => {
     const { pathname } = new URL(req.url, 'http://127.0.0.1');
 
+    if (pathname === '/api/aparelhos/registro' && servidor.registro) {
+      let corpo = '';
+      req.on('data', c => { corpo += c; });
+      req.on('end', () => {
+        servidor.ultimoRegistro = JSON.parse(corpo);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(servidor.registro));
+      });
+      return;
+    }
+
     if (pathname.startsWith('/api/player/')) {
+      servidor.telasPedidas.push(decodeURIComponent(pathname.slice('/api/player/'.length)));
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(servidor.playlist));
     }
@@ -302,4 +318,31 @@ test('não fica preso no aviso de erro quando o servidor volta', async () => {
     outro.kill();
     await new Promise(resolve => outro.once('exit', resolve));
   }
+});
+
+test('segue a tela escolhida no painel e avisa quando fica sem tela', async () => {
+  // Servidor antigo (sem a rota de registro): seguia na tela da configuração local.
+  assert.equal((await status()).tela, TELA);
+
+  servidor.registro = { screen_id: 'refeitorio' };
+  await esperar(async () => (await status()).tela === 'refeitorio', 'o agente adotar a tela escolhida no painel');
+  await esperar(() => servidor.telasPedidas.includes('refeitorio'), 'o agente pedir a programação da tela nova');
+
+  // O aparelho se apresenta com um id próprio e a tela que tinha na configuração.
+  assert.match(servidor.ultimoRegistro.id, /^[0-9a-f-]{36}$/);
+  assert.equal(servidor.ultimoRegistro.tela_local, TELA);
+  const salvo = JSON.parse(fs.readFileSync(path.join(cache, 'aparelho.json'), 'utf8'));
+  assert.equal(salvo.tela, 'refeitorio', 'a escolha tem de sobreviver a um reinício sem rede');
+  // A limpeza de mídia antiga não pode levar junto a cópia do player (TV sem rede).
+  assert.ok(fs.existsSync(path.join(cache, 'player.html')), 'a limpeza apagou a cópia local do player');
+
+  servidor.registro = { screen_id: null };
+  await esperar(async () => (await status()).tela === null, 'o agente ficar sem tela');
+  const pagina = await (await fetch(`http://127.0.0.1:${portaAgente}/`)).text();
+  assert.match(pagina, /Falta escolher a tela/);
+  const lista = await (await fetch(`http://127.0.0.1:${portaAgente}/api/player/x`)).json();
+  assert.equal(lista.screen.reload_at, 'aguardando-tela', 'o player aberto precisa recarregar para mostrar o aviso');
+
+  servidor.registro = { screen_id: TELA };
+  await esperar(async () => (await status()).tela === TELA, 'o agente voltar para a tela original');
 });

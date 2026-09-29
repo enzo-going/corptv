@@ -13,6 +13,9 @@ const db = {
   users: Datastore.create({ filename: path.join(dbPath, 'users.db'), autoload: true }),
   sessions: Datastore.create({ filename: path.join(dbPath, 'sessions.db'), autoload: true }),
   audit: Datastore.create({ filename: path.join(dbPath, 'audit.db'), autoload: true }),
+  // Raspberry Pis e mini PCs atrás das TVs. Cada um se registra sozinho e o
+  // painel escolhe qual tela ele exibe.
+  devices: Datastore.create({ filename: path.join(dbPath, 'devices.db'), autoload: true }),
 };
 
 // O NeDB grava em log append-only: cada update anexa uma linha nova em vez de
@@ -22,7 +25,7 @@ const db = {
 // o servico fica lento e pesado com o tempo. Compacta a cada 30 min, reescrevendo
 // so o estado atual. Os dados sao preservados: muda apenas o formato em disco.
 const COMPACTION_MS = 30 * 60 * 1000;
-const stores = ['groups', 'slides', 'gslides', 'screens', 'users', 'sessions', 'audit'];
+const stores = ['groups', 'slides', 'gslides', 'screens', 'users', 'sessions', 'audit', 'devices'];
 stores.forEach(name => {
   const store = db[name];
   if (process.env.CORPTV_DISABLE_MAINTENANCE !== '1' && store && typeof store.setAutocompactionInterval === 'function') {

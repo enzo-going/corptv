@@ -26,13 +26,16 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const os = require('os');
 const { URL } = require('url');
 
 const CONFIG = {
   // Sem padrão de propósito: um endereço chutado aqui vira tela preta silenciosa
   // no dia em que alguém esquecer de configurar. Melhor recusar a subir.
   servidor: process.env.CORPTV_SERVIDOR,
-  tela: process.env.CORPTV_TELA || 'teste',
+  // Tela inicial, opcional. Normalmente a tela é escolhida no painel (Telas →
+  // Aparelhos); esta variável só vale para quem instalou antes disso ou sem painel.
+  tela: process.env.CORPTV_TELA || '',
   porta: parseInt(process.env.CORPTV_PORTA || '8080', 10),
   pasta: process.env.CORPTV_CACHE || path.join(__dirname, 'cache'),
   // Ritmo do download. 2 Mb/s por aparelho: 4 aparelhos = 8 Mb/s, abaixo do
@@ -57,6 +60,25 @@ const arqEstado = path.join(CONFIG.pasta, 'estado.json');
 const arqPlaylist = path.join(CONFIG.pasta, 'playlist.json');
 
 fs.mkdirSync(CONFIG.pasta, { recursive: true });
+
+// ── IDENTIDADE DO APARELHO ───────────────────────────────────────────────────
+// Id gerado uma vez e guardado no cache: é por ele que o painel reconhece este
+// aparelho e escolhe a tela. A última tela escolhida fica junto, para a TV
+// voltar a exibi-la mesmo se ligar sem rede.
+const arqAparelho = path.join(CONFIG.pasta, 'aparelho.json');
+const aparelho = (() => {
+  let salvo = {};
+  try { salvo = JSON.parse(fs.readFileSync(arqAparelho, 'utf8')); } catch (e) { /* primeira vez */ }
+  return { id: salvo.id || crypto.randomUUID(), tela: typeof salvo.tela === 'string' ? salvo.tela : CONFIG.tela };
+})();
+let telaAtual = aparelho.tela;
+
+function salvarAparelho() {
+  try { fs.writeFileSync(arqAparelho, JSON.stringify({ id: aparelho.id, tela: telaAtual })); } catch (err) {
+    log('ERRO', 'nao consegui salvar a identidade do aparelho', { msg: err.message });
+  }
+}
+salvarAparelho();
 
 function log(nivel, msg, extra) {
   const linha = `[${new Date().toISOString()}] ${nivel} ${msg}` + (extra ? ' ' + JSON.stringify(extra) : '');
@@ -212,7 +234,9 @@ async function sincronizar() {
   if (sincronizando) return;
   sincronizando = true;
   try {
-    const res = await pedir(CONFIG.servidor + '/api/player/' + encodeURIComponent(CONFIG.tela));
+    await registrar();
+    if (!telaAtual) { playlistLocal = null; return; }
+    const res = await pedir(CONFIG.servidor + '/api/player/' + encodeURIComponent(telaAtual));
     if (res.statusCode !== 200) { res.destroy(); throw new Error('HTTP ' + res.statusCode); }
     const dados = JSON.parse(await lerTudo(res));
     const estado = lerEstado();
@@ -273,8 +297,12 @@ async function sincronizar() {
     limparAntigos(slides);
   } catch (err) {
     log('AVISO', 'sem contato com o servidor, seguindo com o que esta no disco', { erro: err.message });
-    if (!playlistLocal) {
-      try { playlistLocal = JSON.parse(fs.readFileSync(arqPlaylist, 'utf8')); } catch (e) {}
+    if (!playlistLocal && telaAtual) {
+      // Só a cópia da tela atual: se a tela foi trocada, a lista antiga não vale.
+      try {
+        const salva = JSON.parse(fs.readFileSync(arqPlaylist, 'utf8'));
+        if (salva.screen && salva.screen.id === telaAtual) playlistLocal = salva;
+      } catch (e) {}
     }
   } finally {
     sincronizando = false;
@@ -286,8 +314,10 @@ function limparAntigos(slides) {
   const usados = new Set(slides.filter(s => s.url).map(s => nomeLocal(s.url)));
   let removidos = 0;
   for (const arq of fs.readdirSync(CONFIG.pasta)) {
-    if (arq === 'estado.json' || arq === 'playlist.json') continue;
-    if (arq.endsWith('.parcial')) continue;
+    // Só mídia. A pasta também guarda a identidade do aparelho, a programação e
+    // a cópia do player que deixa a TV funcionar sem rede: apagar isso fazia a
+    // Pi "esquecer" quem é e perder o player offline a cada troca de conteúdo.
+    if (!TIPOS[path.extname(arq).toLowerCase()]) continue;
     if (!usados.has(arq)) {
       try { fs.unlinkSync(path.join(CONFIG.pasta, arq)); removidos++; } catch (e) {}
     }
@@ -304,9 +334,32 @@ function limparAntigos(slides) {
 // Só repassa o aviso que o player manda: "Online" no painel tem de querer dizer
 // "a TV está exibindo". Se o agente avisasse sozinho, o painel mostraria a tela
 // online com o navegador fechado e a TV preta.
-async function heartbeat() {
+// ── REGISTRO NO PAINEL ───────────────────────────────────────────────────────
+// A cada sincronização o aparelho diz ao servidor que existe e pergunta qual
+// tela deve exibir. Servidor antigo (sem essa rota) ou fora do ar: segue com a
+// última tela conhecida.
+async function registrar() {
   try {
-    const corpo = JSON.stringify({ screen_id: CONFIG.tela });
+    const corpo = JSON.stringify({ id: aparelho.id, nome: os.hostname(), tela_local: CONFIG.tela });
+    const res = await pedir(CONFIG.servidor + '/api/aparelhos/registro', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(corpo) },
+      corpo
+    });
+    if (res.statusCode !== 200) { res.resume(); return; }
+    const nova = JSON.parse(await lerTudo(res)).screen_id || '';
+    if (nova === telaAtual) return;
+    log('INFO', nova ? 'tela escolhida no painel' : 'painel tirou a tela deste aparelho', { de: telaAtual || null, para: nova || null });
+    telaAtual = nova;
+    playlistLocal = null;
+    salvarAparelho();
+  } catch (e) { /* sem servidor: segue com a última tela conhecida */ }
+}
+
+async function heartbeat() {
+  if (!telaAtual) return;
+  try {
+    const corpo = JSON.stringify({ screen_id: telaAtual });
     const res = await pedir(CONFIG.servidor + '/api/heartbeat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(corpo) },
@@ -327,7 +380,8 @@ const arqPlayer = path.join(CONFIG.pasta, 'player.html');
 // recarregamento da meia-noite (ou num reinício).
 async function atualizarPlayer() {
   try {
-    const res = await pedir(CONFIG.servidor + '/player/' + encodeURIComponent(CONFIG.tela));
+    // A página do player é a mesma para qualquer tela.
+    const res = await pedir(CONFIG.servidor + '/player/' + encodeURIComponent(telaAtual || 'aparelho'));
     if (res.statusCode !== 200) { res.destroy(); return false; }
     const html = await lerTudo(res);
     if (html !== paginaPlayer) {
@@ -354,6 +408,16 @@ async function obterPlayer() {
   return '<h1 style="color:#fff;background:#000;font-family:sans-serif">CorporTV: sem contato com o servidor e sem cópia local do player.</h1>';
 }
 
+function paginaAguardando() {
+  const nome = os.hostname().replace(/[^\w .-]/g, '');
+  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30">' +
+    '<title>CorporTV</title></head><body style="margin:0;height:100vh;display:flex;align-items:center;' +
+    'justify-content:center;background:#000;color:#fff;font-family:sans-serif;text-align:center">' +
+    '<div><h1 style="font-size:48px;margin:0 0 16px">CorporTV</h1>' +
+    '<p style="font-size:28px">Este aparelho (<b>' + nome + '</b>) está pronto.</p>' +
+    '<p style="font-size:24px;color:#aaa">Falta escolher a tela: no painel, Telas → Aparelhos.</p></div></body></html>';
+}
+
 const servidor = http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://127.0.0.1');
   const caminho = decodeURIComponent(u.pathname);
@@ -361,7 +425,10 @@ const servidor = http.createServer(async (req, res) => {
   // A programação: sempre a versão local, com os arquivos que já estão no disco.
   if (caminho.startsWith('/api/player/')) {
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end(JSON.stringify(playlistLocal || { screen: { id: CONFIG.tela }, slides: [] }));
+    // Sem tela: a marca de recarga muda e o player aberto recarrega, caindo no aviso
+    // de "aguardando tela" em vez de ficar numa lista vazia.
+    if (!telaAtual) return res.end(JSON.stringify({ screen: { id: '', reload_at: 'aguardando-tela' }, slides: [] }));
+    return res.end(JSON.stringify(playlistLocal || { screen: { id: telaAtual }, slides: [] }));
   }
 
   // Heartbeat: o player chama a cada 20 s; repassamos ao servidor.
@@ -414,12 +481,19 @@ const servidor = http.createServer(async (req, res) => {
     }));
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     return res.end(JSON.stringify({
-      tela: CONFIG.tela, servidor: CONFIG.servidor,
+      aparelho: aparelho.id, nome: os.hostname(),
+      tela: telaAtual || null, servidor: CONFIG.servidor,
       limite_mbps: CONFIG.limiteMbps,
       baixando: sincronizando,
       conteudos_prontos: playlistLocal ? playlistLocal.slides.length : 0,
       arquivos
     }, null, 2));
+  }
+
+  // Ainda sem tela escolhida: a TV mostra como resolver, e confere de novo sozinha.
+  if (!telaAtual) {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+    return res.end(paginaAguardando());
   }
 
   // Qualquer outra coisa: o player.
@@ -430,7 +504,7 @@ const servidor = http.createServer(async (req, res) => {
 
 servidor.listen(CONFIG.porta, '127.0.0.1', () => {
   log('INFO', 'agente iniciado', {
-    tela: CONFIG.tela, servidor: CONFIG.servidor,
+    aparelho: aparelho.id, tela: telaAtual || null, servidor: CONFIG.servidor,
     endereco: 'http://127.0.0.1:' + CONFIG.porta,
     limite_mbps: CONFIG.limiteMbps, cache: CONFIG.pasta
   });

@@ -1,8 +1,8 @@
 # Serviço do agente CorporTV para Raspberry Pi / Linux.
 #
-# Numa Pi nova não instale à mão: use o comando que o painel mostra em cada
-# tela (Telas → "Instalar numa Raspberry (TI)"). Ele instala este arquivo e cria a
-# configuração do aparelho.
+# Numa Pi nova não instale à mão: use o comando que o painel mostra em
+# Telas → Aparelhos (o mesmo para todas as Pis). Ele instala este arquivo e cria
+# a configuração do aparelho; a tela se escolhe no painel.
 #
 # Acompanhar:
 #   journalctl -u corptv-agente -f
@@ -34,7 +34,7 @@ Environment=CORPTV_LIMITE_MBPS=2
 # Espalha o início do download em até 90s, para vários aparelhos que ligam
 # juntos (queda de energia, por exemplo) não baixarem todos no mesmo instante.
 Environment=CORPTV_JITTER=90
-# Deste aparelho: CORPTV_SERVIDOR e CORPTV_TELA. Vale por cima dos padrões.
+# Deste aparelho: CORPTV_SERVIDOR (e, opcional, CORPTV_TELA). Vale por cima dos padrões.
 EnvironmentFile=/etc/corptv/agente.env
 
 # Se cair, volta sozinho.

@@ -91,9 +91,6 @@
   .preview-img{margin-top:8px;border-radius:8px;overflow:hidden;max-height:120px;background:#000;display:flex;align-items:center;justify-content:center}
   .field-label{font-size:11px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px}
   .field-hint{font-size:11px;color:var(--muted);margin-top:4px}
-  details.tecnico{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
-  details.tecnico summary{cursor:pointer;font-size:12px;color:var(--muted);user-select:none}
-  details.tecnico[open] summary{color:var(--text)}
   body:not(.admin) .admin-only{display:none!important}
   details.sched{grid-column:span 2;margin-top:4px;border-top:1px solid var(--border);padding-top:12px}
   details.sched summary{cursor:pointer;font-size:12px;color:var(--muted);list-style:none;user-select:none}
@@ -209,7 +206,6 @@
     .mobile-fold>.desktop-form-title{display:none}
     .screen-connection{margin-top:16px;border-top:1px solid var(--border);padding-top:8px}
     .screen-connection>.sep:first-of-type{display:none}
-    details.tecnico summary{min-height:48px;padding:12px 0;font-size:15px;line-height:1.5}
     .field-label,.field-hint{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
     .screen-volume-label{font-size:15px!important}.screen-volume-hint{font-size:14px!important;line-height:1.5}
   }
@@ -365,6 +361,17 @@
         <button class="btn btn-primary" style="margin-top:12px" onclick="addScreen()">Adicionar tela</button>
       </details>
       <div id="screen-list"></div>
+      <div class="page-title" style="font-size:15px;margin:28px 0 4px">Aparelhos</div>
+      <div class="card-sub" style="margin-bottom:12px">As Raspberry Pi atrás das TVs. Cada uma aparece aqui sozinha; escolha qual tela ela exibe.</div>
+      <div class="card admin-only">
+        <div class="card-title">Preparar uma Raspberry nova (TI)</div>
+        <div class="field-hint" style="margin:6px 0 10px">Uma vez em cada Raspberry nova, com rede: abra o terminal dela, cole e digite a senha. O comando é o mesmo para todas. Depois ela aparece na lista abaixo. Só na Raspberry — não rode no computador.</div>
+        <div class="url-box">
+          <input class="url-value" id="pi-command" readonly aria-label="Comando para preparar uma Raspberry nova">
+          <button class="btn btn-ghost btn-sm" onclick="copyUrl(piCommand(officialOrigin()),this,'Comando copiado!')">Copiar</button>
+        </div>
+      </div>
+      <div id="device-list"></div>
     </div>
 
     <!-- MINHA CONTA -->
@@ -450,7 +457,7 @@
 
 <script>
 const BASE='';
-let slides=[],groups=[],screens=[];
+let slides=[],groups=[],screens=[],devices=[];
 let pendingFile=null;
 let videoTextEditId=null;
 let currentUser=null,permissions=null,csrfToken='';
@@ -521,12 +528,13 @@ async function logout(){const result=await api('POST','/api/auth/logout',{});if(
 // com os últimos dados; a próxima passagem se recupera sozinha.
 async function load(){
   try{
-    [slides,groups,screens]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens')]);
+    [slides,groups,screens,devices]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens'),api('GET','/api/aparelhos')]);
+    if(!Array.isArray(devices))devices=[];
   }catch(e){
     toast('Sem conexão com o servidor — tentando de novo em 30s');
     return;
   }
-  renderSlides();renderGroups();renderScreens();renderDash();
+  renderSlides();renderGroups();renderScreens();renderDevices();renderDash();
 }
 
 // slug preview ao digitar nome da tela
@@ -537,6 +545,9 @@ const NETWORK_ORIGIN=location.origin;
 // Endereço oficial configurado no servidor (CORPTV_ENDERECO_PUBLICO). Sem ele, o link
 // saía com o endereço pelo qual o painel foi aberto — pelo IP, virava IP:porta.
 let enderecoPublicoConfig=null;
+// Endereço oficial do servidor, mesmo no celular: o comando da Raspberry tira dele
+// o domínio que faz o corportv/ curto funcionar na Pi. Um IP ali não serviria.
+function officialOrigin(){return enderecoPublicoConfig||publicOrigin();}
 function publicOrigin(){
   // No celular, conserva o endereço que já abriu (inclusive IP e porta).
   // O nome curto configurado no servidor pode depender do DNS do computador.
@@ -1057,33 +1068,62 @@ async function renderScreens(){
         <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Abrir</a>
       </div>
       <div class="field-hint">Abre no navegador o que esta TV está exibindo.</div>
-      <details class="tecnico admin-only" ${piAbertos.has(s.id)?'open':''} ontoggle="lembrarPi('${s.id}',this.open)">
-        <summary>Instalar numa Raspberry (TI)</summary>
-        <div class="field-label">Comando — colar no terminal da Raspberry</div>
-        <div class="url-box">
-          <input class="url-value" value="${esc(piCommand(origin,s.id))}" readonly aria-label="Comando para preparar uma Raspberry">
-          <button class="btn btn-ghost btn-sm" onclick="copyUrl(piCommand('${origin}','${s.id}'),this,'Comando copiado!')">Copiar</button>
-        </div>
-        <div class="field-hint">Uma vez por Raspberry, com rede: instala o agente e deixa a Pi exibindo esta tela. Pode ser repetido sem risco. Só na Raspberry — não rodar no computador.</div>
-        <div class="field-label">Nome da tela no agente · CORPTV_TELA</div>
-        <div class="url-box">
-          <input class="url-value" value="${esc(s.id)}" readonly aria-label="Nome da tela para o agente">
-          <button class="btn btn-ghost btn-sm" onclick="copyUrl('${s.id}',this,'Nome da tela copiado!')">Copiar</button>
-        </div>
-        <div class="field-hint">Só para instalação manual (mini PC, Windows). O comando acima já inclui.</div>
-      </details>
+      ${aparelhosDaTela(s.id)}
       </details>
     </div>`;
   }).join('');
 }
 function volumeText(v){return v===0?'Mudo':v+'%';}
-// O comando que prepara uma Pi nova. O script vem do próprio servidor, então
-// ninguém precisa lembrar que ele existe: está aqui, na tela que a Pi vai exibir.
-// Quais telas estão com a parte de instalação aberta: o painel redesenha a cada
-// 30 s e, sem isso, a seção fecharia sozinha no meio do uso.
-const piAbertos=new Set();
-function lembrarPi(id,aberto){if(aberto)piAbertos.add(id);else piAbertos.delete(id);}
-function piCommand(origin,id){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash -s -- '+id;}
+// O comando que prepara uma Raspberry nova: o mesmo para todas, rodado uma vez em
+// cada uma. O script vem do próprio servidor, então ninguém precisa guardá-lo.
+function piCommand(origin){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash';}
+// Aparelho manda sinal a cada minuto; com folga para uma rede lenta.
+function deviceOnline(d){return !!d.last_seen&&(Date.now()-new Date(d.last_seen).getTime())<150000;}
+function aparelhosDaTela(id){
+  const nomes=devices.filter(d=>d.screen_id===id).map(d=>d.name);
+  return nomes.length?'<div class="field-hint">Exibida em: '+esc(nomes.join(', '))+'</div>':'';
+}
+async function renderDevices(){
+  // Não redesenha com a lista de telas aberta: o load() de 30 s fecharia a escolha.
+  const ativo=document.activeElement;
+  if(ativo&&ativo.classList&&ativo.classList.contains('device-select'))return;
+  const cmd=document.getElementById('pi-command');
+  if(cmd)cmd.value=piCommand(officialOrigin());
+  const el=document.getElementById('device-list');
+  if(!el)return;
+  if(!devices.length){el.innerHTML='<div class="card" style="text-align:center;padding:24px;color:var(--muted)">Nenhum aparelho ainda. Depois de preparar uma Raspberry, ela aparece aqui em até 1 minuto.</div>';return;}
+  el.innerHTML=devices.map(d=>{
+    const on=deviceOnline(d);
+    const tela=screens.find(s=>s.id===d.screen_id);
+    const exibindo=tela?'exibindo '+tela.name:'aguardando escolher a tela';
+    const opcoes='<option value="">— Nenhuma (a TV mostra o aviso) —</option>'+screens.map(s=>`<option value="${esc(s.id)}" ${s.id===d.screen_id?'selected':''}>${esc(s.name)}</option>`).join('');
+    return `<div class="card">
+      <div class="card-row">
+        <div class="flex-gap"><span class="online-dot ${on?'on':'off'}"></span><div><div class="card-title">${esc(d.name)}</div><div class="card-sub">${on?'Ligado':'Desligado · '+esc(lastSeenText(d.last_seen))} · ${esc(exibindo)}</div></div></div>
+        <button class="btn btn-danger btn-sm btn-icon editor-only" onclick="delDevice('${esc(d.id)}')" aria-label="Remover ${esc(d.name)} da lista">✕</button>
+      </div>
+      <div class="field-label editor-only">Tela que este aparelho exibe</div>
+      <select class="device-select editor-only" style="width:100%" onchange="setDeviceScreen('${esc(d.id)}',this.value)" aria-label="Tela exibida por ${esc(d.name)}">${opcoes}</select>
+      <div class="field-hint editor-only">A TV muda sozinha em até 2 minutos.</div>
+    </div>`;
+  }).join('');
+}
+async function setDeviceScreen(id,value){
+  const r=await api('PUT','/api/aparelhos/'+id,{screen_id:value||null});
+  if(r.error){toast(r.error);await load();return;}
+  const d=devices.find(x=>x.id===id);
+  if(d)d.screen_id=value||null;
+  if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
+  renderDevices();renderScreens();
+  toast(value?'Pronto: a TV muda para esta tela em até 2 minutos':'Aparelho sem tela: a TV mostra o aviso para escolher');
+}
+async function delDevice(id){
+  const d=devices.find(x=>x.id===id);
+  if(!confirm('Remover "'+(d?d.name:'aparelho')+'" da lista? Se ele continuar ligado, volta a aparecer sozinho, sem tela.'))return;
+  const r=await api('DELETE','/api/aparelhos/'+id);
+  if(r.error){toast(r.error);return;}
+  await load();toast('Aparelho removido da lista');
+}
 // Quanto tempo faz que a tela deu sinal. "Offline" sozinho não diz se caiu agora
 // ou se nunca foi ligada.
 function lastSeenText(v){

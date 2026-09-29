@@ -30,14 +30,8 @@ Endereço do servidor neste ambiente: `http://________________`
 > O nome curto (`http://corportv`) só funciona em computador que é membro do domínio Windows: ele completa o nome sozinho. A Pi não é membro de domínio, e só completaria se o DHCP da rede entregasse o sufixo — se não entrega, o nome curto não resolve.
 > Não resolva isso com `/etc/hosts` em cada Pi: no dia em que o servidor mudar de IP, cada aparelho quebra calado.
 
-1. [ ] Abrir o painel nesse endereço → **Telas** → criar a tela (ex.: `Recepção`)
-2. [ ] Copiar o **slug** da URL do player que o painel mostra — é a parte final de `/player/<slug>`
-
-> **Atenção:** o slug **não** é o nome da tela. `Recepção` vira `recepcao`. É esse valor, sem acento, que vai no `CORPTV_TELA` mais adiante. Errar aqui é a causa nº 1 de tela preta.
-
-Slug desta tela: `________________`
-
-3. [ ] Deixar pelo menos um conteúdo agendado para essa tela, senão não há o que baixar e o teste não prova nada
+1. [ ] Abrir o painel nesse endereço → **Telas** → criar a tela (ex.: `Recepção`), se ainda não existir
+2. [ ] Deixar pelo menos um conteúdo agendado para essa tela, senão não há o que baixar e o teste não prova nada
 
 ---
 
@@ -94,12 +88,13 @@ pactl list short sinks
 
 ## 4. Instalar o agente
 
-No painel (entrando como TI), **Telas** → na tela desta Pi → **Instalar numa Raspberry (TI)** → **Copiar** o comando.
-Na Pi, abrir o terminal, colar e digitar a senha quando pedir.
+No painel (entrando como TI), **Telas → Aparelhos → Preparar uma Raspberry nova** → **Copiar**.
+Na Pi, abrir o terminal, colar e digitar a senha quando pedir. O comando é o mesmo para todas as Pis.
 
-- [ ] Terminou com `Pronto. Esta Pi exibe a tela "<slug>".`
+- [ ] Terminou com `Pronto. Esta Pi (<nome>) já aparece no painel.`
 - [ ] No navegador da Pi, `corportv/` abre o painel (nome curto funcionando)
-- [ ] `curl -s localhost:8080/status` mostra o slug certo em `"tela"`
+- [ ] Em **Telas → Aparelhos**, a Pi aparece com o nome dela: escolher a tela na lista
+- [ ] Em até 2 minutos, `curl -s localhost:8080/status` mostra essa tela em `"tela"`
 
 O script pode ser repetido sem risco. A configuração do aparelho fica em
 `/etc/corptv/agente.env`; o limite de download (`CORPTV_LIMITE_MBPS`) segue a
@@ -189,7 +184,7 @@ Outros:
 
 | Sintoma | Causa provável | O que fazer |
 |---|---|---|
-| Tela preta, agente rodando | Slug errado em `CORPTV_TELA` | `curl -s localhost:8080/status` e comparar com a URL do player no painel |
+| TV com o aviso "Falta escolher a tela" | Nenhuma tela escolhida para este aparelho | Painel → **Telas → Aparelhos** → escolher a tela na lista |
 | Painel mostra a tela **offline**, agente rodando | O navegador não está exibindo: o agente só repassa o aviso que o player manda | `journalctl -t corptv-quiosque -n 20`; se o Chromium estiver aberto e travado, **Recarregar** no painel |
 | "sem contato com o servidor e sem cópia local" | A Pi nunca alcançou o servidor | `curl -I http://SEU-SERVIDOR:3000/health` — se falhar, é rede/VLAN, não é a Pi |
 | Nada abre depois do boot | Sessão em Wayland ou sem autologin | Refazer o passo 3 |

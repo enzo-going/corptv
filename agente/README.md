@@ -42,18 +42,22 @@ que ao agente, que responde com os arquivos locais.
 
 ## Instalação — Raspberry Pi
 
-Não precisa decorar nada nem procurar este arquivo: no painel, em **Telas**, cada
-tela tem a seção **"Instalar numa Raspberry (TI)"**, visível para o perfil TI, com o
-comando pronto. Numa Pi nova,
-com rede, abrir o terminal e colar:
+Não precisa decorar nada nem procurar este arquivo: no painel, em **Telas →
+Aparelhos**, o perfil TI vê **"Preparar uma Raspberry nova"** com o comando
+pronto. É **o mesmo comando para todas as Pis**, rodado **uma vez** em cada uma,
+com rede, no terminal dela:
 
 ```bash
-curl -fsSL http://SEU-SERVIDOR/pi/preparar.sh | sudo bash -s -- <tela>
+curl -fsSL http://SEU-SERVIDOR/pi/preparar.sh | sudo bash
 ```
+
+Depois disso a Pi aparece sozinha em **Telas → Aparelhos**, e a tela que ela
+exibe se escolhe ali, numa lista — inclusive para trocar depois, sem voltar à Pi.
+Telas novas não pedem nada: `corportv/player/<tela>` já abre em qualquer aparelho.
 
 O script (`preparar-pi.sh`) vem do próprio servidor, na mesma versão dele, e:
 
-- confere que o servidor responde e que a tela existe;
+- confere que o servidor responde;
 - põe o domínio do servidor como sufixo nas redes da Pi — o nome curto
   (`corportv/`) passa a abrir no navegador, sem mexer no roteador;
 - desliga a economia de energia do Wi-Fi;
@@ -84,7 +88,7 @@ Sem Node.js no aparelho: `winget install OpenJS.NodeJS.LTS`
 | Variável | Padrão | Para que serve |
 |---|---|---|
 | `CORPTV_SERVIDOR` | **obrigatório** | Endereço do servidor, ex.: `http://192.168.0.10:3000`. Sem ele o agente recusa subir, em vez de tentar um endereço chutado |
-| `CORPTV_TELA` | `teste` | Nome da tela cadastrada no painel |
+| `CORPTV_TELA` | vazio | Opcional. Tela inicial; o normal é escolher no painel (Telas → Aparelhos), que vale por cima |
 | `CORPTV_PORTA` | `8080` | Porta local (só 127.0.0.1) |
 | `CORPTV_CACHE` | `./cache` | Onde a mídia fica guardada |
 | `CORPTV_LIMITE_MBPS` | `2` | Ritmo do download |
