@@ -17,7 +17,9 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
+# Usuário que roda o agente. Nas Pis da instituição é "ti" (o mesmo da sessão
+# gráfica do quiosque); se a Pi tiver outro usuário, trocar aqui.
+User=ti
 WorkingDirectory=/opt/corptv-agente
 ExecStart=/usr/bin/node /opt/corptv-agente/agente.js
 
