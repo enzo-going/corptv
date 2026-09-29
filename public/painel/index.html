@@ -89,6 +89,12 @@
   .mt8{margin-top:8px}
   .flex-gap{display:flex;gap:8px;align-items:center}
   .preview-img{margin-top:8px;border-radius:8px;overflow:hidden;max-height:120px;background:#000;display:flex;align-items:center;justify-content:center}
+  .field-label{font-size:11px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px}
+  .field-hint{font-size:11px;color:var(--muted);margin-top:4px}
+  details.tecnico{margin-top:14px;border-top:1px solid var(--border);padding-top:10px}
+  details.tecnico summary{cursor:pointer;font-size:12px;color:var(--muted);user-select:none}
+  details.tecnico[open] summary{color:var(--text)}
+  body:not(.admin) .admin-only{display:none!important}
   details.sched{grid-column:span 2;margin-top:4px;border-top:1px solid var(--border);padding-top:12px}
   details.sched summary{cursor:pointer;font-size:12px;color:var(--muted);list-style:none;user-select:none}
   details.sched summary::-webkit-details-marker{display:none}
@@ -448,6 +454,7 @@ async function bootstrap(){
     try{const cfg=await api('GET','/api/config');enderecoPublicoConfig=cfg.endereco_publico||null;}catch(e){}
     document.body.classList.toggle('readonly',!permissions.edit);
     document.querySelectorAll('[data-admin-only]').forEach(el=>el.hidden=!permissions.users);
+    document.body.classList.toggle('admin',!!permissions.users);
     document.getElementById('account-name').textContent=currentUser.name;
     document.getElementById('account-role').textContent=roleLabel(currentUser.role);
     document.getElementById('profile-name').textContent=currentUser.name;
@@ -985,29 +992,38 @@ async function renderScreens(){
       <input class="editor-only volume-range" type="range" min="0" max="100" step="5" value="${vol}" style="width:100%;accent-color:var(--accent)" aria-label="Volume da tela ${esc(s.name)}" aria-valuetext="${volumeText(vol)}" onpointerdown="this.focus()" oninput="document.getElementById('vol-txt-${s.id}').textContent=volumeText(+this.value);this.setAttribute('aria-valuetext',volumeText(+this.value))" onchange="saveVolume('${s.id}',this.value)">
       <div class="editor-only" style="font-size:11px;color:var(--muted);margin-top:4px">A TV aplica em até 2 minutos. O controle remoto da TV continua valendo por cima deste ajuste.</div>
       <div class="sep" style="margin:12px 0"></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">URL do player</div>
+      <div class="field-label">Link da tela</div>
       <div class="url-box">
-        <input class="url-value" value="${esc(playerUrl)}" readonly aria-label="URL do player">
+        <input class="url-value" value="${esc(playerUrl)}" readonly aria-label="Link da tela">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}',this)">Copiar</button>
         <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Abrir</a>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px">Nome da tela no agente (Raspberry) · CORPTV_TELA</div>
-      <div class="url-box">
-        <input class="url-value" value="${esc(s.id)}" readonly aria-label="Nome da tela para o agente">
-        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${s.id}',this,'Nome da tela copiado!')">Copiar</button>
-      </div>
-      <div class="editor-only" style="font-size:11px;color:var(--muted);margin:10px 0 6px;text-transform:uppercase;letter-spacing:.5px">Preparar uma Raspberry para esta tela</div>
-      <div class="url-box editor-only">
-        <input class="url-value" value="${esc(piCommand(origin,s.id))}" readonly aria-label="Comando para preparar uma Raspberry">
-        <button class="btn btn-ghost btn-sm" onclick="copyUrl(piCommand('${origin}','${s.id}'),this,'Comando copiado!')">Copiar</button>
-      </div>
-      <div class="editor-only" style="font-size:11px;color:var(--muted);margin-top:4px">Numa Raspberry nova, com rede: abra o terminal e cole. Instala o agente, deixa o nome curto funcionando e pode ser repetido sem risco.</div>
+      <div class="field-hint">Abre no navegador o que esta TV está exibindo.</div>
+      <details class="tecnico admin-only" ${piAbertos.has(s.id)?'open':''} ontoggle="lembrarPi('${s.id}',this.open)">
+        <summary>Instalar numa Raspberry (TI)</summary>
+        <div class="field-label">Comando — colar no terminal da Raspberry</div>
+        <div class="url-box">
+          <input class="url-value" value="${esc(piCommand(origin,s.id))}" readonly aria-label="Comando para preparar uma Raspberry">
+          <button class="btn btn-ghost btn-sm" onclick="copyUrl(piCommand('${origin}','${s.id}'),this,'Comando copiado!')">Copiar</button>
+        </div>
+        <div class="field-hint">Uma vez por Raspberry, com rede: instala o agente e deixa a Pi exibindo esta tela. Pode ser repetido sem risco. Só na Raspberry — não rodar no computador.</div>
+        <div class="field-label">Nome da tela no agente · CORPTV_TELA</div>
+        <div class="url-box">
+          <input class="url-value" value="${esc(s.id)}" readonly aria-label="Nome da tela para o agente">
+          <button class="btn btn-ghost btn-sm" onclick="copyUrl('${s.id}',this,'Nome da tela copiado!')">Copiar</button>
+        </div>
+        <div class="field-hint">Só para instalação manual (mini PC, Windows). O comando acima já inclui.</div>
+      </details>
     </div>`;
   }).join('');
 }
 function volumeText(v){return v===0?'Mudo':v+'%';}
 // O comando que prepara uma Pi nova. O script vem do próprio servidor, então
 // ninguém precisa lembrar que ele existe: está aqui, na tela que a Pi vai exibir.
+// Quais telas estão com a parte de instalação aberta: o painel redesenha a cada
+// 30 s e, sem isso, a seção fecharia sozinha no meio do uso.
+const piAbertos=new Set();
+function lembrarPi(id,aberto){if(aberto)piAbertos.add(id);else piAbertos.delete(id);}
 function piCommand(origin,id){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash -s -- '+id;}
 // Quanto tempo faz que a tela deu sinal. "Offline" sozinho não diz se caiu agora
 // ou se nunca foi ligada.

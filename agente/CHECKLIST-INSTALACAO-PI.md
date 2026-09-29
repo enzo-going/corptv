@@ -94,7 +94,7 @@ pactl list short sinks
 
 ## 4. Instalar o agente
 
-No painel, **Telas** → na tela desta Pi → **Preparar uma Raspberry para esta tela** → **Copiar**.
+No painel (entrando como TI), **Telas** → na tela desta Pi → **Instalar numa Raspberry (TI)** → **Copiar** o comando.
 Na Pi, abrir o terminal, colar e digitar a senha quando pedir.
 
 - [ ] Terminou com `Pronto. Esta Pi exibe a tela "<slug>".`
