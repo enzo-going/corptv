@@ -2,7 +2,7 @@
 # CorporTV - prepara uma Raspberry Pi para exibir uma tela.
 #
 # Não precisa guardar este arquivo nem lembrar que ele existe: o painel mostra,
-# em cada tela (Telas → "Preparar uma Raspberry"), o comando pronto, e o
+# em cada tela (Telas → "Instalar numa Raspberry (TI)"), o comando pronto, e o
 # servidor entrega o script na mesma versão dele. Numa Pi nova, com rede:
 #
 #   curl -fsSL http://SEU-SERVIDOR/pi/preparar.sh | sudo bash -s -- <tela>

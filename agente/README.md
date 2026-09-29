@@ -43,7 +43,8 @@ que ao agente, que responde com os arquivos locais.
 ## Instalação — Raspberry Pi
 
 Não precisa decorar nada nem procurar este arquivo: no painel, em **Telas**, cada
-tela mostra o comando **"Preparar uma Raspberry para esta tela"**. Numa Pi nova,
+tela tem a seção **"Instalar numa Raspberry (TI)"**, visível para o perfil TI, com o
+comando pronto. Numa Pi nova,
 com rede, abrir o terminal e colar:
 
 ```bash
