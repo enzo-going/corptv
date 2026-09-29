@@ -92,6 +92,21 @@
   .field-label{font-size:11px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px}
   .field-hint{font-size:11px;color:var(--muted);margin-top:4px}
   body:not(.admin) .admin-only{display:none!important}
+  .screen-actions{flex-shrink:0}
+  .screen-actions a.btn{text-decoration:none}
+  .screen-menu{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+  .screen-menu[hidden]{display:none}
+  .screen-volume{display:flex;align-items:center;gap:12px;margin-top:12px}
+  .screen-volume-label{font-size:12px;color:var(--muted)}
+  .screen-volume .volume-range{flex:1;min-width:0;accent-color:var(--accent)}
+  .screen-volume-value{font-size:12px;min-width:40px;text-align:right}
+  .device-list{padding:0}
+  .device-row{display:flex;align-items:center;gap:12px;padding:12px 16px;border-top:1px solid var(--border)}
+  .device-row:first-child{border-top:0}
+  .device-row.device-new .card-sub{color:var(--warning)}
+  .device-info{flex:1;min-width:0}
+  .device-select{width:200px;max-width:45%}
+  .pi-steps{margin:10px 0 12px 18px;font-size:13px;line-height:1.7;color:var(--muted)}
   details.sched{grid-column:span 2;margin-top:4px;border-top:1px solid var(--border);padding-top:12px}
   details.sched summary{cursor:pointer;font-size:12px;color:var(--muted);list-style:none;user-select:none}
   details.sched summary::-webkit-details-marker{display:none}
@@ -204,8 +219,6 @@
     .mobile-fold[open]>summary::after{content:'−'}
     .mobile-fold[open]>summary{margin-bottom:16px}
     .mobile-fold>.desktop-form-title{display:none}
-    .screen-connection{margin-top:16px;border-top:1px solid var(--border);padding-top:8px}
-    .screen-connection>.sep:first-of-type{display:none}
     .field-label,.field-hint{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
     .screen-volume-label{font-size:15px!important}.screen-volume-hint{font-size:14px!important;line-height:1.5}
   }
@@ -231,6 +244,9 @@
       </button>
       <button class="nav-item" onclick="goTo('telas',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Telas
+      </button>
+      <button class="nav-item" data-admin-only hidden onclick="goTo('aparelhos',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>Aparelhos
       </button>
       <button class="nav-item" data-admin-only hidden onclick="goTo('users',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>Usuários
@@ -347,7 +363,7 @@
 
     <!-- TELAS -->
     <div class="page" id="page-telas">
-      <div class="page-header"><div><div class="page-title">Telas</div><div class="page-sub">Smart TVs e dispositivos cadastrados</div></div></div>
+      <div class="page-header"><div><div class="page-title">Telas</div><div class="page-sub">As TVs da empresa e o que cada uma está mostrando</div></div></div>
       <details class="card editor-only mobile-fold" open>
         <summary>Adicionar tela</summary>
         <div class="form-grid">
@@ -361,15 +377,26 @@
         <button class="btn btn-primary" style="margin-top:12px" onclick="addScreen()">Adicionar tela</button>
       </details>
       <div id="screen-list"></div>
-      <div class="page-title" style="font-size:15px;margin:28px 0 4px">Aparelhos</div>
-      <div class="card-sub" style="margin-bottom:12px">As Raspberry Pi atrás das TVs. Cada uma aparece aqui sozinha; escolha qual tela ela exibe.</div>
-      <div class="card admin-only">
-        <div class="card-title">Preparar uma Raspberry nova (TI)</div>
-        <div class="field-hint" style="margin:6px 0 10px">Uma vez em cada Raspberry nova, com rede: abra o terminal dela, cole e digite a senha. O comando é o mesmo para todas. Depois ela aparece na lista abaixo. Só na Raspberry — não rode no computador.</div>
+    </div>
+
+    <!-- APARELHOS (só TI) -->
+    <div class="page" id="page-aparelhos">
+      <div class="page-header">
+        <div><div class="page-title">Aparelhos</div><div class="page-sub">As Raspberry Pi atrás das TVs. Cada uma aparece aqui sozinha depois de preparada.</div></div>
+        <button class="btn btn-primary" id="pi-setup-btn" onclick="togglePiSetup()" aria-expanded="false" aria-controls="pi-setup">Adicionar Raspberry</button>
+      </div>
+      <div class="card" id="pi-setup" hidden>
+        <div class="card-title">Adicionar uma Raspberry</div>
+        <ol class="pi-steps">
+          <li>Ligue a Raspberry na TV, na energia e na rede.</li>
+          <li>Abra o terminal dela, cole o comando abaixo e digite a senha.</li>
+          <li>Em até 1 minuto ela aparece na lista abaixo. Escolha a tela que ela mostra.</li>
+        </ol>
         <div class="url-box">
           <input class="url-value" id="pi-command" readonly aria-label="Comando para preparar uma Raspberry nova">
           <button class="btn btn-ghost btn-sm" onclick="copyUrl(piCommand(officialOrigin()),this,'Comando copiado!')">Copiar</button>
         </div>
+        <div class="field-hint">O comando é o mesmo para todas e roda uma vez em cada Raspberry. Só na Raspberry — não rode no computador.</div>
       </div>
       <div id="device-list"></div>
     </div>
@@ -483,7 +510,7 @@ function syncLayout(){
 mobileLayout.addEventListener('change',syncLayout);
 syncLayout();
 function goTo(p,btn){
-  if((p==='users'||p==='audit')&&(!permissions||!permissions.users)){toast('Acesso restrito ao setor de TI');return;}
+  if((p==='users'||p==='audit'||p==='aparelhos')&&(!permissions||!permissions.users)){toast('Acesso restrito ao setor de TI');return;}
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -492,6 +519,7 @@ function goTo(p,btn){
   if(mobileLayout.matches)window.scrollTo(0,0);
   if(p==='dash')renderDash();
   if(p==='users')loadUsers();
+  if(p==='aparelhos')renderDevices();
   if(p==='audit')loadAudit(true);
 }
 async function api(method,url,body,isForm=false){
@@ -1031,47 +1059,55 @@ async function renderScreens(){
   const ativo=document.activeElement;
   if(ativo&&ativo.classList&&ativo.classList.contains('volume-range'))return;
   const el=document.getElementById('screen-list');
-  const connectionsOpen=new Set(Array.from(el.querySelectorAll('.screen-connection[open]'),e=>e.dataset.screenId));
   const sel=document.getElementById('sc-group');
   sel.innerHTML=groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
   if(!screens.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhuma tela cadastrada.</div>';return;}
   const origin=publicOrigin();
+  // Cartão curto: o que quem publica precisa ver (está no ar? qual volume?) e um
+  // botão para conferir. O resto fica no menu "⋯", fora do caminho.
   el.innerHTML=screens.map(s=>{
     const g=groups.find(g=>g.id===s.group_id);
     const online=screenOnline(s);
     const playerUrl=`${origin}/player/${s.id}`;
     const vol=Number.isInteger(s.volume)?s.volume:100;
-    return `<div class="card">
+    const situacao=online?'No ar':'Fora do ar · '+lastSeenText(s.last_seen);
+    const pis=devices.filter(d=>d.screen_id===s.id).map(d=>d.name);
+    const aberto=menusAbertos.has(s.id);
+    return `<div class="card screen-card">
       <div class="card-row">
         <div class="flex-gap">
           <span class="online-dot ${online?'on':'off'}"></span>
-           <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(g?g.name:'Sem grupo')}${online?'':' · '+esc(lastSeenText(s.last_seen))}</div></div>
+          <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(situacao)} · ${esc(g?g.name:'Sem ambiente')}<span class="admin-only"> · ${pis.length?'Raspberry '+esc(pis.join(', ')):'sem Raspberry'}</span></div></div>
         </div>
-        <div class="flex-gap">
-          <span class="badge ${online?'badge-online':'badge-offline'}">${online?'Online':'Offline'}</span>
-          <button class="btn btn-ghost btn-sm editor-only" onclick="renameScreen('${s.id}')" title="Muda só o nome; o endereço da tela continua o mesmo">Renomear</button>
-          <button class="btn btn-ghost btn-sm editor-only" onclick="reloadScreen('${s.id}')" title="A TV recarrega o player em até 2 minutos">Recarregar</button>
-           <button class="btn btn-danger btn-sm btn-icon editor-only" onclick="delScreen('${s.id}')">✕</button>
+        <div class="flex-gap screen-actions">
+          <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" title="Ver o que esta TV está exibindo">Abrir</a>
+          <button class="btn btn-ghost btn-sm btn-icon" onclick="toggleScreenMenu('${s.id}')" aria-label="Mais opções da tela ${esc(s.name)}" aria-expanded="${aberto}" aria-controls="menu-${s.id}">⋯</button>
         </div>
       </div>
-      <div class="sep" style="margin:12px 0"></div>
-      <div class="screen-volume-label" style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Volume <span id="vol-txt-${s.id}" style="color:var(--text)">${volumeText(vol)}</span></div>
-      <input class="editor-only volume-range" type="range" min="0" max="100" step="5" value="${vol}" style="width:100%;accent-color:var(--accent)" aria-label="Volume da tela ${esc(s.name)}" aria-valuetext="${volumeText(vol)}" onpointerdown="this.focus()" oninput="document.getElementById('vol-txt-${s.id}').textContent=volumeText(+this.value);this.setAttribute('aria-valuetext',volumeText(+this.value));queueVolume('${s.id}',this.value)" onchange="queueVolume('${s.id}',this.value)">
-      <div class="editor-only screen-volume-hint" style="font-size:11px;color:var(--muted);margin-top:4px">A TV aplica em até 2 minutos. O controle remoto da TV continua valendo por cima deste ajuste.</div>
-      <details class="mobile-fold screen-connection" data-screen-id="${s.id}" ${!mobileLayout.matches||connectionsOpen.has(s.id)?'open':''}>
-      <summary>Conexão desta tela</summary>
-      <div class="sep" style="margin:12px 0"></div>
-      <div class="field-label">Link da tela</div>
-      <div class="url-box">
-        <input class="url-value" value="${esc(playerUrl)}" readonly aria-label="Link da tela">
-        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}',this)">Copiar</button>
-        <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm">Abrir</a>
+      <div class="screen-menu" id="menu-${s.id}" ${aberto?'':'hidden'}>
+        <button class="btn btn-ghost btn-sm editor-only" onclick="renameScreen('${s.id}')" title="Muda só o nome; o endereço da tela continua o mesmo">Renomear</button>
+        <button class="btn btn-ghost btn-sm editor-only" onclick="reloadScreen('${s.id}')" title="A TV recarrega em até 2 minutos">Recarregar a TV</button>
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${playerUrl}',this)">Copiar link</button>
+        <button class="btn btn-danger btn-sm editor-only" onclick="delScreen('${s.id}')">Excluir</button>
       </div>
-      <div class="field-hint">Abre no navegador o que esta TV está exibindo.</div>
-      ${aparelhosDaTela(s.id)}
-      </details>
+      <div class="screen-volume editor-only" title="A TV aplica em até 2 minutos. O controle remoto da TV continua valendo por cima.">
+        <span class="screen-volume-label">Volume</span>
+        <input class="editor-only volume-range" type="range" min="0" max="100" step="5" value="${vol}" aria-label="Volume da tela ${esc(s.name)}" aria-valuetext="${volumeText(vol)}" onpointerdown="this.focus()" oninput="document.getElementById('vol-txt-${s.id}').textContent=volumeText(+this.value);this.setAttribute('aria-valuetext',volumeText(+this.value));queueVolume('${s.id}',this.value)" onchange="queueVolume('${s.id}',this.value)">
+        <span id="vol-txt-${s.id}" class="screen-volume-value">${volumeText(vol)}</span>
+      </div>
     </div>`;
   }).join('');
+}
+// Menus "⋯" abertos: o painel redesenha a cada 30 s e, sem isso, fecharia no meio do uso.
+const menusAbertos=new Set();
+function toggleScreenMenu(id){
+  const menu=document.getElementById('menu-'+id);
+  if(!menu)return;
+  const abrir=menu.hidden;
+  menu.hidden=!abrir;
+  if(abrir)menusAbertos.add(id);else menusAbertos.delete(id);
+  const botao=document.querySelector(`[aria-controls="menu-${id}"]`);
+  if(botao)botao.setAttribute('aria-expanded',String(abrir));
 }
 function volumeText(v){return v===0?'Mudo':v+'%';}
 // O comando que prepara uma Raspberry nova: o mesmo para todas, rodado uma vez em
@@ -1079,10 +1115,6 @@ function volumeText(v){return v===0?'Mudo':v+'%';}
 function piCommand(origin){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash';}
 // Aparelho manda sinal a cada minuto; com folga para uma rede lenta.
 function deviceOnline(d){return !!d.last_seen&&(Date.now()-new Date(d.last_seen).getTime())<150000;}
-function aparelhosDaTela(id){
-  const nomes=devices.filter(d=>d.screen_id===id).map(d=>d.name);
-  return nomes.length?'<div class="field-hint">Exibida em: '+esc(nomes.join(', '))+'</div>':'';
-}
 async function renderDevices(){
   // Não redesenha com a lista de telas aberta: o load() de 30 s fecharia a escolha.
   const ativo=document.activeElement;
@@ -1091,22 +1123,27 @@ async function renderDevices(){
   if(cmd)cmd.value=piCommand(officialOrigin());
   const el=document.getElementById('device-list');
   if(!el)return;
-  if(!devices.length){el.innerHTML='<div class="card" style="text-align:center;padding:24px;color:var(--muted)">Nenhum aparelho ainda. Depois de preparar uma Raspberry, ela aparece aqui em até 1 minuto.</div>';return;}
-  el.innerHTML=devices.map(d=>{
+  if(!devices.length){el.innerHTML='<div class="card" style="text-align:center;padding:24px;color:var(--muted)">Nenhuma Raspberry ainda. Use "Adicionar Raspberry" acima.</div>';return;}
+  // As que ainda não têm tela vêm primeiro: são as que pedem uma ação.
+  const lista=devices.slice().sort((a,b)=>(!!a.screen_id-!!b.screen_id)||a.name.localeCompare(b.name));
+  el.innerHTML='<div class="card device-list">'+lista.map(d=>{
     const on=deviceOnline(d);
-    const tela=screens.find(s=>s.id===d.screen_id);
-    const exibindo=tela?'exibindo '+tela.name:'aguardando escolher a tela';
-    const opcoes='<option value="">— Nenhuma (a TV mostra o aviso) —</option>'+screens.map(s=>`<option value="${esc(s.id)}" ${s.id===d.screen_id?'selected':''}>${esc(s.name)}</option>`).join('');
-    return `<div class="card">
-      <div class="card-row">
-        <div class="flex-gap"><span class="online-dot ${on?'on':'off'}"></span><div><div class="card-title">${esc(d.name)}</div><div class="card-sub">${on?'Ligado':'Desligado · '+esc(lastSeenText(d.last_seen))} · ${esc(exibindo)}</div></div></div>
-        <button class="btn btn-danger btn-sm btn-icon editor-only" onclick="delDevice('${esc(d.id)}')" aria-label="Remover ${esc(d.name)} da lista">✕</button>
-      </div>
-      <div class="field-label editor-only">Tela que este aparelho exibe</div>
-      <select class="device-select editor-only" style="width:100%" onchange="setDeviceScreen('${esc(d.id)}',this.value)" aria-label="Tela exibida por ${esc(d.name)}">${opcoes}</select>
-      <div class="field-hint editor-only">A TV muda sozinha em até 2 minutos.</div>
+    const semTela=!d.screen_id;
+    const opcoes=`<option value="" ${semTela?'selected':''}>Escolher tela…</option>`+screens.map(s=>`<option value="${esc(s.id)}" ${s.id===d.screen_id?'selected':''}>${esc(s.name)}</option>`).join('');
+    const situacao=semTela?'Nova — escolha a tela que ela mostra':(on?'Ligada':'Desligada · '+lastSeenText(d.last_seen));
+    return `<div class="device-row${semTela?' device-new':''}">
+      <span class="online-dot ${on?'on':'off'}"></span>
+      <div class="device-info"><div class="card-title">${esc(d.name)}</div><div class="card-sub">${esc(situacao)}</div></div>
+      <select class="device-select" onchange="setDeviceScreen('${esc(d.id)}',this.value)" aria-label="Tela que ${esc(d.name)} mostra">${opcoes}</select>
+      <button class="btn btn-ghost btn-sm btn-icon" onclick="delDevice('${esc(d.id)}')" aria-label="Remover ${esc(d.name)} da lista">✕</button>
     </div>`;
-  }).join('');
+  }).join('')+'</div>';
+}
+function togglePiSetup(){
+  const caixa=document.getElementById('pi-setup');
+  const botao=document.getElementById('pi-setup-btn');
+  caixa.hidden=!caixa.hidden;
+  botao.setAttribute('aria-expanded',String(!caixa.hidden));
 }
 async function setDeviceScreen(id,value){
   const r=await api('PUT','/api/aparelhos/'+id,{screen_id:value||null});
