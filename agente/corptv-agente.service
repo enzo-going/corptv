@@ -1,7 +1,7 @@
 # Serviço do agente CorporTV para Raspberry Pi / Linux.
 #
 # Numa Pi nova não instale à mão: use o comando que o painel mostra em cada
-# tela (Telas → "Preparar uma Raspberry"). Ele instala este arquivo e cria a
+# tela (Telas → "Instalar numa Raspberry (TI)"). Ele instala este arquivo e cria a
 # configuração do aparelho.
 #
 # Acompanhar:

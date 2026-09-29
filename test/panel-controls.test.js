@@ -47,7 +47,24 @@ test('o painel mostra desde quando a tela sumiu e pede recarga à TV', () => {
 
 test('cada tela mostra o comando que prepara uma Raspberry nova', () => {
   assert.ok(panel.includes("function piCommand(origin,id){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash -s -- '+id;}"));
-  assert.match(panel, /Preparar uma Raspberry para esta tela/);
+  assert.ok(panel.includes('<summary>Instalar numa Raspberry (TI)</summary>'));
+  // Parte técnica só para o perfil TI, fechada por padrão e que não fecha sozinha
+  // no redesenho de 30 s; o comando vem antes do nome da tela no agente.
+  assert.ok(panel.includes('body:not(.admin) .admin-only{display:none!important}'));
+  assert.ok(panel.includes("document.body.classList.toggle('admin',!!permissions.users)"));
+  assert.ok(panel.includes(`details class="tecnico admin-only" \${piAbertos.has(s.id)?'open':''}`));
+  assert.ok(panel.indexOf('Comando — colar no terminal da Raspberry') < panel.indexOf('Nome da tela no agente · CORPTV_TELA'));
+});
+
+test('a instalação da Raspberry continua independente da seção móvel de conexão', () => {
+  const tecnico = panel.match(/<details class="tecnico admin-only"[\s\S]*?<\/details>/)[0];
+  assert.match(tecnico, /ontoggle="lembrarPi\('\$\{s\.id\}',this\.open\)"/);
+  assert.doesNotMatch(tecnico, /mobile-fold/);
+  assert.match(tecnico, /aria-label="Comando para preparar uma Raspberry"/);
+  assert.match(tecnico, /aria-label="Nome da tela para o agente"/);
+  assert.match(panel, /function lembrarPi\(id,aberto\)\{if\(aberto\)piAbertos\.add\(id\);else piAbertos\.delete\(id\);\}/);
+  const mobile = panel.slice(panel.indexOf('@media(max-width:767px)'), panel.indexOf('</style>'));
+  assert.match(mobile, /details\.tecnico summary\{min-height:48px/);
 });
 
 test('o painel oferece "sem tempo" para imagem e texto, e deixa mudar depois', () => {
@@ -107,7 +124,7 @@ test('o painel usa o endereço oficial nos links e mostra o nome da tela para o 
   // Aberto pelo IP, o painel distribuía links com IP e porta.
   assert.match(panel, /api\('GET','\/api\/config'\);enderecoPublicoConfig=cfg\.endereco_publico\|\|null/);
   assert.match(panel, /if\(enderecoPublicoConfig\)return enderecoPublicoConfig;/);
-  assert.match(panel, /Nome da tela no agente \(Raspberry\) · CORPTV_TELA/);
+  assert.match(panel, /Nome da tela no agente · CORPTV_TELA/);
   assert.match(panel, /onclick="copyUrl\('\$\{s\.id\}',this,'Nome da tela copiado!'\)"/);
 });
 
