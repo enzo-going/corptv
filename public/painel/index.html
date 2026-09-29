@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>CorporTV — Painel</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap');
@@ -126,51 +126,92 @@
   .user-row{display:grid;grid-template-columns:minmax(150px,1fr) 130px 95px auto;align-items:center;gap:10px;background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:12px;margin-bottom:7px}.user-off{opacity:.6}.user-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap}.role-select{padding:6px 8px}
   .audit-tools{display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr auto;gap:8px;align-items:end}.audit-list{margin-top:12px;overflow:auto;border:1px solid var(--border);border-radius:10px}.audit-table{width:100%;border-collapse:collapse;min-width:820px;font-size:11px}.audit-table th{text-align:left;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.5px;background:var(--bg3);position:sticky;top:0}.audit-table th,.audit-table td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top}.audit-table tr:last-child td{border-bottom:0}.audit-action{font-family:'DM Mono',monospace;color:var(--text)}.outcome-success{color:var(--accent2)}.outcome-failure,.outcome-denied{color:var(--danger)}.integrity{font-size:11px;display:flex;align-items:center;gap:6px}.integrity.ok{color:var(--accent2)}.integrity.bad{color:var(--danger)}
   .menu-toggle,.mobile-overview{display:none}
+  .mobile-fold>summary{display:none}
   .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-  @media(max-width:767px){
-    .shell{flex-direction:column;height:auto;min-height:100vh;overflow:visible}
+  @media(max-width:767px), (max-width:1023px) and (hover:none) and (pointer:coarse){
+    html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+    body{font-size:16px;line-height:1.5}
+    .shell{flex-direction:column;height:auto;min-height:100vh;min-height:100dvh;overflow:visible;width:100%;min-width:0}
     .sidebar{position:sticky;top:0;z-index:100;width:100%;max-height:100vh;max-height:100dvh;overflow-y:auto;border-right:0;border-bottom:1px solid var(--border)}
-    .logo{padding:12px 16px;flex-shrink:0}
+    .logo{padding:12px 20px;padding-top:max(12px,env(safe-area-inset-top));padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));flex-shrink:0;font-size:18px}
+    .logo span{font-size:11px}
     .menu-toggle{display:inline-flex;margin-left:auto}
     .sidebar:not(.menu-open) .nav,.sidebar:not(.menu-open) .account{display:none}
-    .nav{flex:none}
-    .main{overflow:visible;min-width:0}
-    .page{padding:20px 16px}
-    .page-header,.card-row{flex-wrap:wrap;gap:12px}
-    .card{padding:16px;min-width:0}
+    .nav{flex:none;padding:8px max(12px,env(safe-area-inset-right)) 8px max(12px,env(safe-area-inset-left))}
+    .nav-item{font-family:inherit;font-size:16px;min-height:52px;padding:12px}
+    .nav-item svg{width:20px;height:20px}
+    .account{padding-bottom:max(12px,env(safe-area-inset-bottom))}
+    .account-name{font-size:15px}.account-role{font-size:12px}
+    .main{overflow:visible;min-width:0;width:100%}
+    .page{padding:24px 20px;padding-left:max(20px,env(safe-area-inset-left));padding-right:max(20px,env(safe-area-inset-right));padding-bottom:max(24px,env(safe-area-inset-bottom));max-width:none}
+    .page-header{margin-bottom:20px}
+    .page-title{font-size:26px;line-height:1.2}
+    .page-sub{font-size:15px;line-height:1.5;margin-top:8px}
+    .page-header,.card-row{flex-wrap:wrap;gap:14px}
+    .card{padding:18px;min-width:0;margin-bottom:16px}
     .card-row{align-items:flex-start}
     .card-row>*,.flex-gap>*{min-width:0;max-width:100%}
+    #screen-list .card-row>.flex-gap:first-child{flex:1 0 100%;flex-wrap:nowrap;align-items:flex-start}
     .flex-gap{flex-wrap:wrap}
+    .card-title{font-size:17px;line-height:1.4;font-weight:600}
+    .card-sub,.item-meta{font-size:14px;line-height:1.5;margin-top:6px}
+    .badge{font-size:13px;padding:4px 10px}
+    .online-dot{width:9px;height:9px;margin-top:7px}
     .card-title,.card-sub,.item-meta,.prog-line,.sched-hint,.slug-box{overflow-wrap:anywhere}
     .form-grid,.dash-grid,.stats-row,.security-grid,.user-row,.audit-tools{grid-template-columns:minmax(0,1fr)}
+    .form-grid{gap:16px}
     .form-grid>*{min-width:0}
     .form-full,details.sched{grid-column:span 1}
-    .item{display:grid;grid-template-columns:52px minmax(0,1fr);padding:12px;gap:10px}
-    .item-name{white-space:normal;overflow-wrap:anywhere}
-    .item-actions{grid-column:1/-1;flex-wrap:wrap}
+    .item-list{gap:12px}
+    .item{display:grid;grid-template-columns:64px minmax(0,1fr);padding:16px;gap:12px}
+    .item-thumb{width:64px;height:44px}
+    .item-name{white-space:normal;overflow-wrap:anywhere;font-size:16px;line-height:1.4}
+    .item-actions{grid-column:1/-1;flex-wrap:wrap;gap:8px}
+    .item-actions .btn:not(.btn-icon){flex:1}
     .user-actions{justify-content:flex-start}
-    .btn,.nav-item,.pill,.day,details.sched summary,.checkbox-label{min-height:44px;min-width:44px}
-    .btn,.pill{justify-content:center}
+    .btn,.pill,.day,details.sched summary,.checkbox-label{min-height:48px;min-width:48px}
+    .btn,.pill{justify-content:center;font-size:16px;padding:10px 14px}
+    .btn-sm{font-size:14px}.btn-icon{flex:0 0 48px;padding:10px}
+    .card>.btn-primary{width:100%}
     .pill{max-width:100%;overflow-wrap:anywhere}
-    input[type=text],input[type=password],input[type=number],input[type=date],input[type=datetime-local],input[type=time],select,textarea{min-height:44px;min-width:0;max-width:100%;font-size:16px}
-    input[type=color]{min-width:44px;height:44px}
-    input[type=checkbox]{width:20px;height:20px;flex-shrink:0}
-    .url-box{flex-wrap:wrap}
-    .url-box .url-value{flex:1 0 100%;width:100%;min-height:44px;font-size:16px}
-    .volume-range{height:44px;margin:0;cursor:pointer;appearance:none;-webkit-appearance:none;background:transparent;touch-action:pan-y}
+    label{font-size:13px;margin-bottom:7px}
+    .checkbox-label{font-size:14px!important}
+    input[type=text],input[type=password],input[type=number],input[type=date],input[type=datetime-local],input[type=time],select,textarea{min-height:50px;min-width:0;max-width:100%;font-size:16px;padding:12px}
+    input[type=color]{min-width:50px;height:50px}
+    input[type=checkbox]{width:22px;height:22px;flex-shrink:0}
+    .url-box{flex-wrap:wrap;padding:12px}
+    .url-box .url-value{flex:1 0 100%;width:100%;min-height:48px;font-size:16px}
+    .url-box .btn{flex:1}
+    .volume-range{height:52px;margin:4px 0;cursor:pointer;appearance:none;-webkit-appearance:none;background:transparent;touch-action:pan-y}
     .volume-range::-webkit-slider-runnable-track{height:8px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2)}
-    .volume-range::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:28px;height:28px;margin-top:-11px;border:2px solid var(--text);border-radius:50%;background:var(--accent)}
+    .volume-range::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:32px;height:32px;margin-top:-13px;border:2px solid var(--text);border-radius:50%;background:var(--accent)}
     .volume-range::-moz-range-track{height:6px;border-radius:8px;background:var(--bg3);border:1px solid var(--border2)}
-    .volume-range::-moz-range-thumb{width:24px;height:24px;border:2px solid var(--text);border-radius:50%;background:var(--accent)}
+    .volume-range::-moz-range-thumb{width:28px;height:28px;border:2px solid var(--text);border-radius:50%;background:var(--accent)}
     .volume-range:focus-visible,.menu-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-    .modal-back{padding:12px}
-    .modal{width:100%;padding:18px;max-height:90vh;max-height:90dvh}
-    #toast{left:16px;right:16px;bottom:16px;overflow-wrap:anywhere}
-    .mobile-overview{display:block;margin-bottom:20px}
-    .overview-counts{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
-    .overview-title{font-size:15px;margin-bottom:4px}
-    .overview-hint{margin-bottom:12px}
-    .overview-items{padding-left:18px;margin-top:8px;font-size:13px;line-height:1.6;overflow-wrap:anywhere}
+    .sched-hint,.prog-line{font-size:14px;line-height:1.5}
+    .state,.day{font-size:14px}.sched-badge{font-size:12px;display:inline-block;margin:4px 0}
+    .modal-back{padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left))}
+    .modal{width:100%;padding:20px;max-height:90vh;max-height:calc(100dvh - max(24px,env(safe-area-inset-top)) - max(24px,env(safe-area-inset-bottom)));overscroll-behavior:contain}
+    .modal>.flex-gap .btn{flex:1}
+    #toast{left:max(16px,env(safe-area-inset-left));right:max(16px,env(safe-area-inset-right));bottom:max(16px,env(safe-area-inset-bottom));font-size:15px;overflow-wrap:anywhere}
+    .mobile-overview{display:block;margin-bottom:24px}
+    .overview-counts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px}
+    .stat-val{font-size:32px}.stat-label{font-size:12px}
+    .overview-title{font-size:19px;margin-bottom:6px}
+    .overview-hint{margin-bottom:16px;font-size:14px}
+    .overview-items{padding-left:20px;margin-top:12px;font-size:16px;line-height:1.6;overflow-wrap:anywhere}
+    .overview-items li+li{margin-top:8px}
+    .mobile-fold>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:52px;cursor:pointer;font-size:16px;font-weight:500;list-style:none}
+    .mobile-fold>summary::-webkit-details-marker{display:none}
+    .mobile-fold>summary::after{content:'+';font-size:24px;color:var(--accent)}
+    .mobile-fold[open]>summary::after{content:'−'}
+    .mobile-fold[open]>summary{margin-bottom:16px}
+    .mobile-fold>.desktop-form-title{display:none}
+    .screen-connection{margin-top:16px;border-top:1px solid var(--border);padding-top:8px}
+    .screen-connection>.sep:first-of-type{display:none}
+    details.tecnico summary{min-height:48px;padding:12px 0;font-size:15px;line-height:1.5}
+    .field-label,.field-hint{font-size:14px;line-height:1.5;overflow-wrap:anywhere}
+    .screen-volume-label{font-size:15px!important}.screen-volume-hint{font-size:14px!important;line-height:1.5}
   }
 </style>
 </head>
@@ -222,6 +263,8 @@
         <div class="card-sub overview-hint">Conteúdos ativos na programação de cada ambiente.</div>
         <div id="overview-groups"><div class="card-sub">Carregando programação…</div></div>
       </section>
+      <details class="mobile-fold" open>
+      <summary>Detalhes por tela</summary>
       <div class="stats-row">
         <div class="stat"><div class="stat-val" id="st-slides">—</div><div class="stat-label">Conteúdos</div></div>
         <div class="stat"><div class="stat-val" id="st-grupos">—</div><div class="stat-label">Ambientes</div></div>
@@ -229,13 +272,15 @@
       </div>
       <div id="dash-screens"></div>
       <div id="dash-prog"></div>
+      </details>
     </div>
 
     <!-- SLIDES -->
     <div class="page" id="page-slides">
       <div class="page-header"><div><div class="page-title">Conteúdo</div><div class="page-sub">Biblioteca — vídeos, imagens e textos disponíveis</div></div></div>
-      <div class="card editor-only">
-        <div class="card-title" style="margin-bottom:14px">Novo conteúdo</div>
+      <details class="card editor-only mobile-fold" open>
+        <summary>Adicionar conteúdo</summary>
+        <div class="card-title desktop-form-title" style="margin-bottom:14px">Novo conteúdo</div>
         <div class="form-grid">
           <div><label>Tipo</label>
             <select id="sl-type" onchange="slTypeChange()">
@@ -286,27 +331,29 @@
           Aqui é só a biblioteca. Para definir <b style="color:var(--text)">onde</b> e <b style="color:var(--text)">quando</b> um conteúdo aparece, use a aba <b style="color:var(--text)">Ambientes</b>.
         </div>
         <button class="btn btn-primary" onclick="addSlide()">Adicionar à biblioteca</button>
-      </div>
+      </details>
       <div id="slide-list" class="item-list"></div>
     </div>
 
     <!-- AMBIENTES -->
     <div class="page" id="page-grupos">
       <div class="page-header"><div><div class="page-title">Ambientes</div><div class="page-sub">O que toca em cada lugar, e quando</div></div></div>
-      <div class="card editor-only">
+      <details class="card editor-only mobile-fold" open>
+        <summary>Criar ambiente</summary>
         <div class="form-grid">
           <div><label>Nome do ambiente</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
           <div><label>Cor</label><input type="color" id="gr-color" value="#6c63ff"></div>
         </div>
         <button class="btn btn-primary" onclick="addGroup()">Criar ambiente</button>
-      </div>
+      </details>
       <div id="group-list"></div>
     </div>
 
     <!-- TELAS -->
     <div class="page" id="page-telas">
       <div class="page-header"><div><div class="page-title">Telas</div><div class="page-sub">Smart TVs e dispositivos cadastrados</div></div></div>
-      <div class="card editor-only">
+      <details class="card editor-only mobile-fold" open>
+        <summary>Adicionar tela</summary>
         <div class="form-grid">
           <div><label>Nome da tela</label><input type="text" id="sc-name" placeholder="Ex: Recepção Principal" oninput="previewSlug(this.value)"></div>
           <div><label>Ambiente onde ela fica</label><select id="sc-group"></select></div>
@@ -316,7 +363,7 @@
           <span id="slug-preview-text"></span>
         </div>
         <button class="btn btn-primary" style="margin-top:12px" onclick="addScreen()">Adicionar tela</button>
-      </div>
+      </details>
       <div id="screen-list"></div>
     </div>
 
@@ -413,7 +460,7 @@ const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade8
 
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
 function esc(value){return String(value===undefined||value===null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
-const mobileLayout=window.matchMedia('(max-width:767px)');
+const mobileLayout=window.matchMedia('(max-width:767px), (max-width:1023px) and (hover:none) and (pointer:coarse)');
 function setMenu(open,restoreFocus=false){
   const toggle=document.getElementById('menu-toggle');
   const expanded=mobileLayout.matches&&open;
@@ -422,8 +469,12 @@ function setMenu(open,restoreFocus=false){
   toggle.textContent=expanded?'Fechar':'Menu';
   if(restoreFocus&&mobileLayout.matches)toggle.focus();
 }
-mobileLayout.addEventListener('change',()=>setMenu(false));
-setMenu(false);
+function syncLayout(){
+  setMenu(false);
+  document.querySelectorAll('.mobile-fold').forEach(el=>el.open=!mobileLayout.matches);
+}
+mobileLayout.addEventListener('change',syncLayout);
+syncLayout();
 function goTo(p,btn){
   if((p==='users'||p==='audit')&&(!permissions||!permissions.users)){toast('Acesso restrito ao setor de TI');return;}
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
@@ -487,6 +538,9 @@ const NETWORK_ORIGIN=location.origin;
 // saía com o endereço pelo qual o painel foi aberto — pelo IP, virava IP:porta.
 let enderecoPublicoConfig=null;
 function publicOrigin(){
+  // No celular, conserva o endereço que já abriu (inclusive IP e porta).
+  // O nome curto configurado no servidor pode depender do DNS do computador.
+  if(mobileLayout.matches)return location.origin;
   if(enderecoPublicoConfig)return enderecoPublicoConfig;
   return ['localhost','127.0.0.1','::1'].includes(location.hostname) ? NETWORK_ORIGIN : location.origin;
 }
@@ -966,6 +1020,7 @@ async function renderScreens(){
   const ativo=document.activeElement;
   if(ativo&&ativo.classList&&ativo.classList.contains('volume-range'))return;
   const el=document.getElementById('screen-list');
+  const connectionsOpen=new Set(Array.from(el.querySelectorAll('.screen-connection[open]'),e=>e.dataset.screenId));
   const sel=document.getElementById('sc-group');
   sel.innerHTML=groups.map(g=>`<option value="${g.id}">${esc(g.name)}</option>`).join('');
   if(!screens.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhuma tela cadastrada.</div>';return;}
@@ -988,9 +1043,11 @@ async function renderScreens(){
         </div>
       </div>
       <div class="sep" style="margin:12px 0"></div>
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Volume <span id="vol-txt-${s.id}" style="color:var(--text)">${volumeText(vol)}</span></div>
-      <input class="editor-only volume-range" type="range" min="0" max="100" step="5" value="${vol}" style="width:100%;accent-color:var(--accent)" aria-label="Volume da tela ${esc(s.name)}" aria-valuetext="${volumeText(vol)}" onpointerdown="this.focus()" oninput="document.getElementById('vol-txt-${s.id}').textContent=volumeText(+this.value);this.setAttribute('aria-valuetext',volumeText(+this.value))" onchange="saveVolume('${s.id}',this.value)">
-      <div class="editor-only" style="font-size:11px;color:var(--muted);margin-top:4px">A TV aplica em até 2 minutos. O controle remoto da TV continua valendo por cima deste ajuste.</div>
+      <div class="screen-volume-label" style="font-size:11px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Volume <span id="vol-txt-${s.id}" style="color:var(--text)">${volumeText(vol)}</span></div>
+      <input class="editor-only volume-range" type="range" min="0" max="100" step="5" value="${vol}" style="width:100%;accent-color:var(--accent)" aria-label="Volume da tela ${esc(s.name)}" aria-valuetext="${volumeText(vol)}" onpointerdown="this.focus()" oninput="document.getElementById('vol-txt-${s.id}').textContent=volumeText(+this.value);this.setAttribute('aria-valuetext',volumeText(+this.value));queueVolume('${s.id}',this.value)" onchange="queueVolume('${s.id}',this.value)">
+      <div class="editor-only screen-volume-hint" style="font-size:11px;color:var(--muted);margin-top:4px">A TV aplica em até 2 minutos. O controle remoto da TV continua valendo por cima deste ajuste.</div>
+      <details class="mobile-fold screen-connection" data-screen-id="${s.id}" ${!mobileLayout.matches||connectionsOpen.has(s.id)?'open':''}>
+      <summary>Conexão desta tela</summary>
       <div class="sep" style="margin:12px 0"></div>
       <div class="field-label">Link da tela</div>
       <div class="url-box">
@@ -1013,6 +1070,7 @@ async function renderScreens(){
           <button class="btn btn-ghost btn-sm" onclick="copyUrl('${s.id}',this,'Nome da tela copiado!')">Copiar</button>
         </div>
         <div class="field-hint">Só para instalação manual (mini PC, Windows). O comando acima já inclui.</div>
+      </details>
       </details>
     </div>`;
   }).join('');
@@ -1045,10 +1103,21 @@ async function reloadScreen(id){
   if(r.error){toast(r.error);return;}
   toast('Pedido enviado: '+(s?s.name:'a tela')+' recarrega em até 2 minutos');
 }
+const volumeTimers=new Map();
+// Toques no range podem emitir input sem change no WebKit. Agrupa ambos
+// para salvar o valor final também no iPhone, sem um pedido a cada movimento.
+function queueVolume(id,value){
+  clearTimeout(volumeTimers.get(id));
+  volumeTimers.set(id,setTimeout(()=>{
+    volumeTimers.delete(id);
+    saveVolume(id,value).catch(()=>toast('Não foi possível salvar o volume. Tente novamente.'));
+  },300));
+}
 async function saveVolume(id,value){
   const s=screens.find(x=>x.id===id);
   if(!s)return;
   const volume=parseInt(value,10);
+  if(volume===s.volume)return;
   const r=await api('PUT','/api/screens/'+id,{name:s.name,group_id:s.group_id,volume});
   if(r.error){toast(r.error);await load();return;}
   s.volume=volume;
