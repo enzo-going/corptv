@@ -19,4 +19,9 @@ if exist "C:\corptv\iniciar.local.bat" call "C:\corptv\iniciar.local.bat"
 REM Se a pasta do ">>" nao existir, o cmd aborta a linha inteira e o Node nem
 REM chega a rodar - sem erro visivel, so o servico fora do ar.
 if not exist "C:\ProgramData\CorporTVLogs" mkdir "C:\ProgramData\CorporTVLogs"
-"C:\Program Files\nodejs\node.exe" src\server.js >> "C:\ProgramData\CorporTVLogs\corptv.log" 2>&1
+REM Node proprio do CorporTV, fora do instalador do servidor. Em 29/09 o Node do
+REM sistema foi desinstalado para trocar de versao e o servico nao voltaria no
+REM proximo reinicio. Sem o proprio, cai no do sistema, como era antes.
+set "CORPTV_NODE=C:\corptv\runtime\node.exe"
+if not exist "%CORPTV_NODE%" set "CORPTV_NODE=C:\Program Files\nodejs\node.exe"
+"%CORPTV_NODE%" src\server.js >> "C:\ProgramData\CorporTVLogs\corptv.log" 2>&1
