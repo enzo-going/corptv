@@ -116,9 +116,9 @@ test('o menu recolhe só no celular e informa seu estado ao leitor de tela', () 
   assert.match(panel, /@media\(max-width:767px\)/);
   assert.match(panel, /\.sidebar:not\(\.menu-open\) \.nav,\.sidebar:not\(\.menu-open\) \.account\{display:none\}/);
   assert.match(panel, /id="menu-toggle"[^>]*aria-controls="panel-nav panel-account"[^>]*aria-expanded="false"/);
-  assert.match(panel, /const mobileLayout=window\.matchMedia\('\(max-width:767px\)'\)/);
+  assert.match(panel, /const mobileLayout=window\.matchMedia\('\(max-width:767px\), \(max-width:1023px\) and \(hover:none\) and \(pointer:coarse\)'\)/);
   assert.match(panel, /toggle\.setAttribute\('aria-expanded',String\(!mobileLayout\.matches\|\|expanded\)\)/);
-  assert.match(panel, /mobileLayout\.addEventListener\('change',\(\)=>setMenu\(false\)\)/);
+  assert.match(panel, /mobileLayout\.addEventListener\('change',syncLayout\)/);
   const navegacao = panel.slice(panel.indexOf('function goTo('), panel.indexOf('async function api('));
   assert.match(navegacao, /setMenu\(false,true\)/);
   assert.match(navegacao, /if\(mobileLayout\.matches\)window\.scrollTo\(0,0\)/);
@@ -135,17 +135,17 @@ test('cartões, formulários e ações cabem em uma coluna no celular', () => {
   assert.match(mobile, /\.shell\{flex-direction:column;height:auto;/);
   assert.match(mobile, /\.form-grid,\.dash-grid,\.stats-row,\.security-grid,\.user-row,\.audit-tools\{grid-template-columns:minmax\(0,1fr\)\}/);
   assert.match(mobile, /\.form-full,details\.sched\{grid-column:span 1\}/);
-  assert.match(mobile, /\.item-actions\{grid-column:1\/-1;flex-wrap:wrap\}/);
-  assert.match(mobile, /\.item-name\{white-space:normal;overflow-wrap:anywhere\}/);
-  assert.match(mobile, /\.url-box\{flex-wrap:wrap\}/);
-  assert.match(mobile, /\.btn,\.nav-item,\.pill,\.day,details\.sched summary,\.checkbox-label\{min-height:44px;min-width:44px\}/);
+  assert.match(mobile, /\.item-actions\{grid-column:1\/-1;flex-wrap:wrap;/);
+  assert.match(mobile, /\.item-name\{white-space:normal;overflow-wrap:anywhere;/);
+  assert.match(mobile, /\.url-box\{flex-wrap:wrap;/);
+  assert.match(mobile, /\.btn,\.pill,\.day,details\.sched summary,\.checkbox-label\{min-height:48px;min-width:48px\}/);
 });
 
 test('o volume tem área de toque e mantém o foco durante o arraste com o dedo', () => {
   const mobile = panel.slice(panel.indexOf('@media(max-width:767px)'), panel.indexOf('</style>'));
-  assert.match(mobile, /\.volume-range\{height:44px;[^}]*touch-action:pan-y/);
-  assert.match(mobile, /\.volume-range::-webkit-slider-thumb\{[^}]*width:28px;height:28px/);
-  assert.match(mobile, /\.volume-range::-moz-range-thumb\{[^}]*width:24px;height:24px/);
+  assert.match(mobile, /\.volume-range\{height:52px;[^}]*touch-action:pan-y/);
+  assert.match(mobile, /\.volume-range::-webkit-slider-thumb\{[^}]*width:32px;height:32px/);
+  assert.match(mobile, /\.volume-range::-moz-range-thumb\{[^}]*width:28px;height:28px/);
   assert.match(panel, /class="editor-only volume-range"[^>]*onpointerdown="this\.focus\(\)"/);
   assert.match(panel, /aria-valuetext="\$\{volumeText\(vol\)\}"/);
   assert.match(panel, /this\.setAttribute\('aria-valuetext',volumeText\(\+this\.value\)\)/);
@@ -183,4 +183,54 @@ test('o resumo atualiza mesmo sem telas e descarta a programação anterior quan
   assert.match(programacao, /if\(!Array\.isArray\(prog\)\)throw new Error/);
   assert.match(programacao, /catch\(e\)\{ renderOverview\(null\);/);
   assert.match(programacao, /renderOverview\(prog\)/);
+});
+
+test('o painel e o login acomodam iPhone em retrato e paisagem sem limitar o zoom', () => {
+  for (const html of [panel, login]) {
+    assert.match(html, /name="viewport" content="width=device-width,[^"]*viewport-fit=cover"/);
+    assert.match(html, /@media\(max-width:767px\), \(max-width:1023px\) and \(hover:none\) and \(pointer:coarse\)/);
+    assert.match(html, /-webkit-text-size-adjust:100%;text-size-adjust:100%/);
+    assert.match(html, /env\(safe-area-inset-left\)/);
+    assert.match(html, /env\(safe-area-inset-right\)/);
+    assert.match(html, /env\(safe-area-inset-bottom\)/);
+    assert.match(html, /min-height:100dvh/);
+    assert.doesNotMatch(html, /user-scalable=no|maximum-scale=1(?:[,"\s]|$)/);
+  }
+});
+
+test('o celular usa tipografia legível e campos de 16px inclusive no login', () => {
+  const mobile = panel.slice(panel.indexOf('@media(max-width:767px)'), panel.indexOf('</style>'));
+  assert.match(mobile, /\.card-title\{font-size:17px/);
+  assert.match(mobile, /\.card-sub,\.item-meta\{font-size:14px/);
+  assert.match(mobile, /\.item-name\{[^}]*font-size:16px/);
+  assert.match(mobile, /select,textarea\{[^}]*font-size:16px/);
+  assert.match(login, /input,button\{min-height:50px;font-size:16px;font-family:inherit\}/);
+});
+
+test('cadastros e detalhes recolhem no celular sem sumir do desktop nem perder o estado na atualização', () => {
+  assert.match(panel, /\.mobile-fold>summary\{display:none\}/);
+  assert.match(panel, /querySelectorAll\('\.mobile-fold'\)\.forEach\(el=>el\.open=!mobileLayout\.matches\)/);
+  for (const label of ['Adicionar conteúdo', 'Criar ambiente', 'Adicionar tela', 'Detalhes por tela', 'Conexão desta tela']) {
+    assert.ok(panel.includes('<summary>'+label+'</summary>'));
+  }
+  assert.match(panel, /querySelectorAll\('\.screen-connection\[open\]'\),e=>e\.dataset\.screenId/);
+  assert.match(panel, /!mobileLayout\.matches\|\|connectionsOpen\.has\(s\.id\)/);
+});
+
+test('links no celular conservam o IP ou domínio e a porta que já abriram o painel', () => {
+  const origin = panel.slice(panel.indexOf('function publicOrigin(){'), panel.indexOf('function previewSlug('));
+  assert.match(origin, /if\(mobileLayout\.matches\)return location\.origin/);
+  assert.ok(origin.indexOf('return location.origin') < origin.indexOf('if(enderecoPublicoConfig)'));
+  assert.match(origin, /if\(enderecoPublicoConfig\)return enderecoPublicoConfig/);
+});
+
+test('o volume salva o toque no WebKit mesmo sem change e agrupa eventos repetidos', () => {
+  const range = panel.match(/<input class="editor-only volume-range"[^>]*>/)[0];
+  assert.match(range, /oninput="[^"]*queueVolume\('\$\{s\.id\}',this\.value\)/);
+  assert.match(range, /onchange="queueVolume\('\$\{s\.id\}',this\.value\)"/);
+  assert.match(panel, /const volumeTimers=new Map\(\)/);
+  assert.match(panel, /clearTimeout\(volumeTimers\.get\(id\)\)/);
+  assert.match(panel, /volumeTimers\.delete\(id\)/);
+  assert.match(panel, /saveVolume\(id,value\)\.catch/);
+  assert.match(panel, /if\(volume===s\.volume\)return/);
 });

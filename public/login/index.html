@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <title>CorporTV — Acesso</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,6 +12,14 @@
     *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% -20%,#242141 0,transparent 40%),var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:grid;place-items:center;padding:24px}
     .wrap{width:min(440px,100%)}.brand{display:flex;justify-content:center;align-items:center;gap:12px;margin-bottom:26px;font-size:22px;font-weight:600}.brand svg{color:#ddd}.brand span{display:block;color:var(--muted);font:10px 'DM Mono',monospace;text-transform:uppercase;letter-spacing:1.8px;margin-top:2px}
     .card{background:rgba(24,24,28,.96);border:1px solid var(--border);border-radius:16px;padding:30px;box-shadow:0 24px 80px rgba(0,0,0,.35)}h1{font-size:22px;margin:0 0 7px}p{font-size:13px;color:var(--muted);line-height:1.55;margin:0 0 24px}label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin:15px 0 7px}input{width:100%;background:var(--field);border:1px solid var(--border);border-radius:9px;color:var(--text);font:14px 'DM Sans',sans-serif;padding:11px 12px;outline:0}input:focus{border-color:var(--accent)}button{width:100%;border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:600;padding:12px;margin-top:22px;cursor:pointer}button:disabled{opacity:.55;cursor:wait}.error{display:none;color:var(--danger);background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.25);border-radius:8px;padding:10px 12px;font-size:12px;margin-top:14px}.error.show{display:block}.local{display:none;color:#fbbf24;background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.25);border-radius:8px;padding:12px;font-size:12px;line-height:1.5}.hint{font-size:11px;color:var(--muted);margin-top:7px}.setup-only,.remote-only{display:none}body.setup .setup-only{display:block}body.setup.remote .remote-only{display:block}body.setup .login-only{display:none}.secure-note{display:flex;gap:8px;align-items:flex-start;color:var(--muted);font-size:11px;line-height:1.45;margin-top:18px}.secure-note svg{flex:none;color:var(--accent2)}
+    @media(max-width:767px), (max-width:1023px) and (hover:none) and (pointer:coarse){
+      html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+      body{min-height:100vh;min-height:100dvh;padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left))}
+      .card{padding:24px}.brand{margin-bottom:24px}
+      h1{font-size:24px}p{font-size:15px}label{font-size:13px}
+      input,button{min-height:50px;font-size:16px;font-family:inherit}
+      .hint,.secure-note,.error,.local{font-size:14px;line-height:1.5}
+    }
   </style>
 </head>
 <body>

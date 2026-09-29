@@ -77,6 +77,19 @@ Abra:
 - Player: `http://IP_DO_SERVIDOR:3000/player/ID_DA_TELA`
 - Saúde: `http://IP_DO_SERVIDOR:3000/health`
 
+No celular, conecte-se à rede interna e use o endereço completo fornecido pela
+TI, incluindo `http://` ou `https://` e a porta, quando houver. Um nome curto
+como `corportv` pode funcionar no PC porque o Windows completa o domínio da
+empresa; o celular pode não receber essa configuração. Nesse caso, use o nome
+DNS completo ou `http://IP_DO_SERVIDOR:3000/painel`. O nome completo também
+depende de o Wi-Fi fornecer o DNS interno. Para manter o nome curto em todos os
+dispositivos, a TI precisa conferir o DNS e o domínio de pesquisa entregue pelo
+DHCP da rede. Alterar o HTML não configura a resolução de nomes do celular.
+
+No layout móvel, os links do painel preservam o endereço usado para abrir a
+aplicação, evitando trocar um IP e porta funcionais por um nome curto. No
+desktop, continua valendo `CORPTV_ENDERECO_PUBLICO`, quando configurado.
+
 Para escolher outra porta:
 
 ```powershell
