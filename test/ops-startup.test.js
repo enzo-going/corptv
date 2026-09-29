@@ -43,3 +43,10 @@ test('os iniciadores de produção definem o endereço oficial dos links', () =>
     assert.match(starter, /^set CORPTV_ENDERECO_PUBLICO=http:\/\/corportv\r?$/m);
   }
 });
+
+test('o iniciador aceita ajustes locais do servidor, que o deploy nao sobrescreve', () => {
+  assert.ok(rootStarter.includes('if exist "C:\\corptv\\iniciar.local.bat" call "C:\\corptv\\iniciar.local.bat"'));
+  // O local vem depois do padrao, para poder substitui-lo.
+  assert.ok(rootStarter.indexOf('iniciar.local.bat') > rootStarter.indexOf('set CORPTV_ENDERECO_PUBLICO='));
+  assert.match(fs.readFileSync(path.join(__dirname, '../.gitignore'), 'utf8'), /^iniciar\.local\.bat$/m);
+});

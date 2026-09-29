@@ -12,6 +12,10 @@ cd /d C:\corptv
 set PORT=3000
 REM Endereco que o painel mostra nos links do player (nome oficial, via nginx).
 set CORPTV_ENDERECO_PUBLICO=http://corportv
+REM Ajustes deste servidor (ex.: o nome completo com o dominio, para aparelhos
+REM fora do dominio como a Raspberry). Fica fora do repositorio e o deploy nao
+REM sobrescreve: copiar iniciar.local.exemplo.bat para iniciar.local.bat.
+if exist "C:\corptv\iniciar.local.bat" call "C:\corptv\iniciar.local.bat"
 REM Se a pasta do ">>" nao existir, o cmd aborta a linha inteira e o Node nem
 REM chega a rodar - sem erro visivel, so o servico fora do ar.
 if not exist "C:\ProgramData\CorporTVLogs" mkdir "C:\ProgramData\CorporTVLogs"
