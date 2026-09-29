@@ -10,12 +10,23 @@ const opsStarter = fs.readFileSync(path.join(__dirname, '../ops/start-corptv.cmd
 
 test('os iniciadores deixam o watchdog como único mecanismo de reinício', () => {
   for (const starter of [rootStarter, opsStarter]) {
-    assert.match(starter, /node\.exe" src\\server\.js/);
+    assert.match(starter, /"%CORPTV_NODE%" src\\server\.js/);
     assert.doesNotMatch(starter, /^:loop\s*$/im);
     assert.doesNotMatch(starter, /goto\s+loop/i);
     assert.doesNotMatch(starter, /timeout\s+\/t/i);
   }
   assert.match(rootStarter, /CorporTV Watchdog/);
+});
+
+test('os iniciadores preferem o Node próprio e só então o do sistema', () => {
+  // Em 29/09 desinstalaram o Node do sistema para trocar de versão: com o caminho
+  // fixo em Program Files, o serviço não voltaria no reinício seguinte.
+  for (const starter of [rootStarter, opsStarter]) {
+    const proprio = starter.indexOf('set "CORPTV_NODE=C:\\corptv\\runtime\\node.exe"');
+    const reserva = starter.indexOf('if not exist "%CORPTV_NODE%" set "CORPTV_NODE=C:\\Program Files\\nodejs\\node.exe"');
+    const usa = starter.indexOf('"%CORPTV_NODE%" src\\server.js');
+    assert.ok(proprio >= 0 && reserva > proprio && usa > reserva, 'ordem esperada: próprio, reserva, uso');
+  }
 });
 
 test('o watchdog dá 10 s ao health, mas a espera de subida segue com 3 s', () => {

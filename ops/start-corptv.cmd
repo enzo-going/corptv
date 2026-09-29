@@ -4,4 +4,7 @@ set PORT=3000
 set CORPTV_ENDERECO_PUBLICO=http://corportv
 REM Sem a pasta, o cmd aborta o redirecionamento e o Node nao sobe.
 if not exist "C:\ProgramData\CorporTVLogs" mkdir "C:\ProgramData\CorporTVLogs"
-"C:\Program Files\nodejs\node.exe" src\server.js >> "C:\ProgramData\CorporTVLogs\corptv.log" 2>&1
+REM Node proprio do CorporTV; sem ele, o do sistema.
+set "CORPTV_NODE=C:\corptv\runtime\node.exe"
+if not exist "%CORPTV_NODE%" set "CORPTV_NODE=C:\Program Files\nodejs\node.exe"
+"%CORPTV_NODE%" src\server.js >> "C:\ProgramData\CorporTVLogs\corptv.log" 2>&1

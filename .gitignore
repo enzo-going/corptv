@@ -14,3 +14,4 @@ Thumbs.db
 .vscode/
 coverage/
 iniciar.local.bat
+runtime/
