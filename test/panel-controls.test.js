@@ -110,3 +110,77 @@ test('o painel usa o endereço oficial nos links e mostra o nome da tela para o 
   assert.match(panel, /Nome da tela no agente \(Raspberry\) · CORPTV_TELA/);
   assert.match(panel, /onclick="copyUrl\('\$\{s\.id\}',this,'Nome da tela copiado!'\)"/);
 });
+
+test('o menu recolhe só no celular e informa seu estado ao leitor de tela', () => {
+  assert.match(panel, /\.menu-toggle,\.mobile-overview\{display:none\}/);
+  assert.match(panel, /@media\(max-width:767px\)/);
+  assert.match(panel, /\.sidebar:not\(\.menu-open\) \.nav,\.sidebar:not\(\.menu-open\) \.account\{display:none\}/);
+  assert.match(panel, /id="menu-toggle"[^>]*aria-controls="panel-nav panel-account"[^>]*aria-expanded="false"/);
+  assert.match(panel, /const mobileLayout=window\.matchMedia\('\(max-width:767px\)'\)/);
+  assert.match(panel, /toggle\.setAttribute\('aria-expanded',String\(!mobileLayout\.matches\|\|expanded\)\)/);
+  assert.match(panel, /mobileLayout\.addEventListener\('change',\(\)=>setMenu\(false\)\)/);
+  const navegacao = panel.slice(panel.indexOf('function goTo('), panel.indexOf('async function api('));
+  assert.match(navegacao, /setMenu\(false,true\)/);
+  assert.match(navegacao, /if\(mobileLayout\.matches\)window\.scrollTo\(0,0\)/);
+  assert.match(panel, /if\(restoreFocus&&mobileLayout\.matches\)toggle\.focus\(\)/);
+  assert.match(panel, /e\.key==='Escape'&&[^\n]+setMenu\(false,true\)/);
+});
+
+test('cartões, formulários e ações cabem em uma coluna no celular', () => {
+  const desktop = panel.slice(0, panel.indexOf('@media(max-width:767px)'));
+  const mobile = panel.slice(panel.indexOf('@media(max-width:767px)'), panel.indexOf('</style>'));
+  // As duas colunas do dashboard e os 220px do menu permanecem no desktop.
+  assert.match(desktop, /\.sidebar\{width:220px/);
+  assert.match(desktop, /\.dash-grid\{display:grid;grid-template-columns:1fr 1fr;gap:10px\}/);
+  assert.match(mobile, /\.shell\{flex-direction:column;height:auto;/);
+  assert.match(mobile, /\.form-grid,\.dash-grid,\.stats-row,\.security-grid,\.user-row,\.audit-tools\{grid-template-columns:minmax\(0,1fr\)\}/);
+  assert.match(mobile, /\.form-full,details\.sched\{grid-column:span 1\}/);
+  assert.match(mobile, /\.item-actions\{grid-column:1\/-1;flex-wrap:wrap\}/);
+  assert.match(mobile, /\.item-name\{white-space:normal;overflow-wrap:anywhere\}/);
+  assert.match(mobile, /\.url-box\{flex-wrap:wrap\}/);
+  assert.match(mobile, /\.btn,\.nav-item,\.pill,\.day,details\.sched summary,\.checkbox-label\{min-height:44px;min-width:44px\}/);
+});
+
+test('o volume tem área de toque e mantém o foco durante o arraste com o dedo', () => {
+  const mobile = panel.slice(panel.indexOf('@media(max-width:767px)'), panel.indexOf('</style>'));
+  assert.match(mobile, /\.volume-range\{height:44px;[^}]*touch-action:pan-y/);
+  assert.match(mobile, /\.volume-range::-webkit-slider-thumb\{[^}]*width:28px;height:28px/);
+  assert.match(mobile, /\.volume-range::-moz-range-thumb\{[^}]*width:24px;height:24px/);
+  assert.match(panel, /class="editor-only volume-range"[^>]*onpointerdown="this\.focus\(\)"/);
+  assert.match(panel, /aria-valuetext="\$\{volumeText\(vol\)\}"/);
+  assert.match(panel, /this\.setAttribute\('aria-valuetext',volumeText\(\+this\.value\)\)/);
+});
+
+test('a visão geral móvel começa pelas telas online e offline e pela programação dos ambientes', () => {
+  const dashboard = panel.slice(panel.indexOf('id="page-dash"'), panel.indexOf('<!-- SLIDES -->'));
+  assert.ok(dashboard.indexOf('class="mobile-overview"') < dashboard.indexOf('class="stats-row"'));
+  assert.match(dashboard, /id="st-online"/);
+  assert.match(dashboard, /id="st-offline"/);
+  assert.match(dashboard, /id="overview-groups"/);
+  assert.match(panel, /function screenOnline\(s\)\{return !!s\.last_seen&&\(Date\.now\(\)-new Date\(s\.last_seen\)\.getTime\(\)\)<60000;/);
+  assert.match(panel, /getElementById\('st-online'\)\.textContent=online/);
+  assert.match(panel, /getElementById\('st-offline'\)\.textContent=screens\.length-online/);
+});
+
+test('o resumo usa IDs para agrupar ambientes, escapa nomes e distingue programação vazia de indisponível', () => {
+  const resumo = panel.slice(panel.indexOf('function renderOverview('), panel.indexOf('async function renderDash('));
+  assert.match(resumo, /screens\.filter\(s=>s\.group_id===g\.id\)/);
+  assert.match(resumo, /prog\.find\(t=>telas\.some\(s=>s\.id===t\.screen_id\)\)/);
+  assert.match(resumo, /programacao\.no_ar\.map/);
+  assert.match(resumo, /esc\(g\.name\)/);
+  assert.match(resumo, /esc\(i\.title\)/);
+  assert.match(resumo, /Nenhum ambiente cadastrado ainda/);
+  assert.match(resumo, /Nenhuma tela neste ambiente/);
+  assert.match(resumo, /Nenhum conteúdo no ar agora/);
+  assert.match(resumo, /Programação indisponível/);
+  assert.doesNotMatch(resumo, /\.ocultos/);
+});
+
+test('o resumo atualiza mesmo sem telas e descarta a programação anterior quando a consulta falha', () => {
+  const dashboard = panel.slice(panel.indexOf('async function renderDash('), panel.indexOf('async function renderProgramacao('));
+  assert.ok(dashboard.indexOf('renderProgramacao();') < dashboard.indexOf('if(!screens.length)'));
+  const programacao = panel.slice(panel.indexOf('async function renderProgramacao('), panel.indexOf("fillDays('ed-days');"));
+  assert.match(programacao, /if\(!Array\.isArray\(prog\)\)throw new Error/);
+  assert.match(programacao, /catch\(e\)\{ renderOverview\(null\);/);
+  assert.match(programacao, /renderOverview\(prog\)/);
+});
