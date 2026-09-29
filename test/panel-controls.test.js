@@ -45,11 +45,18 @@ test('o painel mostra desde quando a tela sumiu e pede recarga à TV', () => {
   assert.doesNotMatch(panel, /last_seen\s*=/);
 });
 
-test('a página Telas tem um comando único para Raspberry nova e a lista de aparelhos', () => {
+test('Aparelhos é uma página só do TI, com um comando único para Raspberry nova', () => {
   // Um comando só, igual para toda Raspberry, num lugar só — nada por tela.
   assert.ok(panel.includes("function piCommand(origin){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash';}"));
-  assert.ok(panel.includes('Preparar uma Raspberry nova (TI)'));
-  assert.ok(panel.includes('<div class="card admin-only">'));
+  assert.ok(panel.includes(`onclick="goTo('aparelhos',this)"`));
+  assert.ok(panel.includes(`<button class="nav-item" data-admin-only hidden onclick="goTo('aparelhos',this)">`));
+  assert.ok(panel.includes("if((p==='users'||p==='audit'||p==='aparelhos')&&(!permissions||!permissions.users))"));
+  const pagina = panel.slice(panel.indexOf('<div class="page" id="page-aparelhos">'), panel.indexOf('<!-- MINHA CONTA -->'));
+  assert.ok(pagina.includes('Adicionar Raspberry'));
+  assert.ok(pagina.includes('<div class="card" id="pi-setup" hidden>'), 'o passo a passo começa fechado');
+  // Quem publica conteúdo não vê nada de Raspberry na página Telas.
+  const telas = panel.slice(panel.indexOf('<div class="page" id="page-telas">'), panel.indexOf('<div class="page" id="page-aparelhos">'));
+  assert.ok(!telas.includes('Raspberry'));
   assert.ok(panel.includes('body:not(.admin) .admin-only{display:none!important}'));
   assert.ok(panel.includes("document.body.classList.toggle('admin',!!permissions.users)"));
   assert.ok(!panel.includes('Nome da tela no agente'), 'o nome da tela no agente saiu do painel');
@@ -65,12 +72,15 @@ test('a página Telas tem um comando único para Raspberry nova e a lista de apa
   assert.ok(panel.includes("cmd.value=piCommand(officialOrigin());"));
 });
 
-test('a instalação da Raspberry fica fora das telas e da seção móvel de conexão', () => {
-  // Um lugar só, na área Aparelhos: nada de comando ou nome de agente por tela.
+test('o cartão de tela é curto: Abrir à vista, o resto no menu', () => {
   assert.ok(!panel.includes('class="tecnico'), 'voltou a haver instalação dentro de cada tela');
-  const aparelhos = panel.slice(panel.indexOf('Preparar uma Raspberry nova (TI)'), panel.indexOf('<div id="device-list"></div>'));
-  assert.doesNotMatch(aparelhos, /mobile-fold/);
-  assert.match(aparelhos, /aria-label="Comando para preparar uma Raspberry nova"/);
+  const card = panel.slice(panel.indexOf('async function renderScreens(){'), panel.indexOf('function toggleScreenMenu('));
+  assert.ok(card.includes('title="Ver o que esta TV está exibindo">Abrir</a>'));
+  assert.ok(card.includes(`<div class="screen-menu" id="menu-\${s.id}" \${aberto?'':'hidden'}>`));
+  for (const acao of ['>Renomear</button>', '>Recarregar a TV</button>', '>Copiar link</button>', '>Excluir</button>']) {
+    assert.ok(card.includes(acao), 'faltou no menu: ' + acao);
+  }
+  assert.ok(!card.includes('url-box'), 'o endereço longo não aparece mais no cartão');
 });
 
 test('o painel oferece "sem tempo" para imagem e texto, e deixa mudar depois', () => {
@@ -231,11 +241,12 @@ test('o celular usa tipografia legível e campos de 16px inclusive no login', ()
 test('cadastros e detalhes recolhem no celular sem sumir do desktop nem perder o estado na atualização', () => {
   assert.match(panel, /\.mobile-fold>summary\{display:none\}/);
   assert.match(panel, /querySelectorAll\('\.mobile-fold'\)\.forEach\(el=>el\.open=!mobileLayout\.matches\)/);
-  for (const label of ['Adicionar conteúdo', 'Criar ambiente', 'Adicionar tela', 'Detalhes por tela', 'Conexão desta tela']) {
+  for (const label of ['Adicionar conteúdo', 'Criar ambiente', 'Adicionar tela', 'Detalhes por tela']) {
     assert.ok(panel.includes('<summary>'+label+'</summary>'));
   }
-  assert.match(panel, /querySelectorAll\('\.screen-connection\[open\]'\),e=>e\.dataset\.screenId/);
-  assert.match(panel, /!mobileLayout\.matches\|\|connectionsOpen\.has\(s\.id\)/);
+  // As opções de cada tela ficam no menu "⋯", que não fecha no redesenho de 30 s.
+  assert.ok(panel.includes("const aberto=menusAbertos.has(s.id);"));
+  assert.ok(panel.includes("if(abrir)menusAbertos.add(id);else menusAbertos.delete(id);"));
 });
 
 test('links no celular conservam o IP ou domínio e a porta que já abriram o painel', () => {
