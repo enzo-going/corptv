@@ -60,18 +60,11 @@ node -v
 - [ ] `node -v` respondeu **v18 ou maior**
 - [ ] Se `chromium-browser` não existir, instale `chromium` e ajuste o nome no fim do `iniciar-quiosque.sh`
 
-### Sessão gráfica em X11 e tela sem apagar
+### Sessão gráfica e tela sem apagar
 
-O `iniciar-quiosque.sh` usa `xset` e o autostart em `~/.config/autostart` — os dois são de X11. O Raspberry Pi OS Bookworm sobe em Wayland por padrão e aí **nada disso funciona**.
+Não precisa trocar Wayland por X11: o quiosque funciona nos dois (no labwc, o padrão do Raspberry Pi OS atual, inclusive). O comando do painel (`preparar.sh`) já desliga o apagamento de tela e liga o login automático na área de trabalho.
 
-```bash
-sudo raspi-config
-```
-
-- [ ] **Advanced Options → Wayland → X11** (ou W11/Openbox, conforme a versão)
-- [ ] **Display Options → Screen Blanking → Disable**
-- [ ] **System Options → Boot / Auto Login → Desktop Autologin** (sem isso a sessão gráfica não sobe sozinha depois de uma queda de energia)
-- [ ] Reiniciar e confirmar que voltou direto ao desktop, sem pedir senha
+- [ ] Depois do `preparar.sh`, reiniciar (`sudo reboot`) e confirmar que voltou direto à área de trabalho, sem pedir senha, e que o CorporTV abriu em tela cheia sozinho
 
 ### Som pela HDMI
 
@@ -187,7 +180,7 @@ Outros:
 | TV com o aviso "Falta escolher a tela" | Nenhuma tela escolhida para este aparelho | Painel → **Telas → Aparelhos** → escolher a tela na lista |
 | Painel mostra a tela **offline**, agente rodando | O navegador não está exibindo: o agente só repassa o aviso que o player manda | `journalctl -t corptv-quiosque -n 20`; se o Chromium estiver aberto e travado, **Recarregar** no painel |
 | "sem contato com o servidor e sem cópia local" | A Pi nunca alcançou o servidor | `curl -I http://SEU-SERVIDOR:3000/health` — se falhar, é rede/VLAN, não é a Pi |
-| Nada abre depois do boot | Sessão em Wayland ou sem autologin | Refazer o passo 3 |
+| Nada abre depois do boot | Sem login automático, ou o autostart não foi instalado | Rodar de novo o comando do painel (`preparar.sh`) e conferir `~/.config/autostart/corptv-quiosque.desktop` |
 | Tela apaga sozinha depois de um tempo | Screen Blanking ligado | `raspi-config` → Display Options → Screen Blanking → Disable |
 | Vídeo picotando | Subtensão, ou vídeo fora do padrão | Conferir o raio amarelo na tela e a fonte; conferir a conversão do vídeo |
 | Baixa e baixa de novo sem parar | Arquivo mudando no servidor, ou disco cheio | `df -h` e `journalctl -u corptv-agente` |

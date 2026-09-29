@@ -128,6 +128,32 @@ curl -fsS -m 2 http://127.0.0.1:8080/status >/dev/null 2>&1 \
   || falha "o agente não respondeu; veja: journalctl -u corptv-agente -n 30"
 ok "agente no ar em http://127.0.0.1:8080"
 
+# ── 5. Quiosque ──────────────────────────────────────────────────────────────
+# Sem isto o agente fica no ar, mas nada abre o navegador: a TV só mostraria o
+# conteúdo se alguém abrisse o Chromium na mão a cada vez que a Pi ligasse.
+passo "Quiosque (abre a tela sozinho)"
+usuario="${SUDO_USER:-}"
+if [ -z "$usuario" ] || [ "$usuario" = root ]; then usuario=$(getent passwd 1000 | cut -d: -f1); fi
+[ -n "$usuario" ] || falha "não achei o usuário da área de trabalho desta Pi"
+casa=$(getent passwd "$usuario" | cut -d: -f6)
+grupo=$(id -gn "$usuario")
+curl -fsS -m 60 -o "$tmp/iniciar-quiosque.sh" "$SERVIDOR/pi/agente/iniciar-quiosque.sh"
+curl -fsS -m 60 -o "$tmp/corptv-quiosque.desktop" "$SERVIDOR/pi/agente/corptv-quiosque.desktop"
+bash -n "$tmp/iniciar-quiosque.sh" || falha "iniciar-quiosque.sh baixado veio corrompido"
+install -m 755 "$tmp/iniciar-quiosque.sh" /opt/corptv-agente/iniciar-quiosque.sh
+# O autostart da área de trabalho vale no X11 e no labwc (Wayland) do Raspberry Pi OS.
+install -d -m 755 -o "$usuario" -g "$grupo" "$casa/.config" "$casa/.config/autostart"
+install -m 644 -o "$usuario" -g "$grupo" "$tmp/corptv-quiosque.desktop" "$casa/.config/autostart/corptv-quiosque.desktop"
+ok "abre sozinho na sessão de $usuario"
+if command -v raspi-config >/dev/null 2>&1; then
+  # 1 = desligar o apagamento de tela; B4 = entrar direto na área de trabalho,
+  # para a TV voltar sozinha depois de uma queda de energia.
+  if raspi-config nonint do_blanking 1 >/dev/null 2>&1; then ok "tela não apaga sozinha"; else ok "AVISO: não consegui desligar o apagamento de tela (raspi-config)"; fi
+  if raspi-config nonint do_boot_behaviour B4 >/dev/null 2>&1; then ok "liga direto na área de trabalho"; else ok "AVISO: não consegui ligar o login automático (raspi-config)"; fi
+else
+  ok "AVISO: sem raspi-config; desligar o apagamento de tela e ligar o login automático à mão"
+fi
+
 # ── Rede: aplicar o sufixo por último ────────────────────────────────────────
 # Reaplicar a conexão pode derrubar o SSH por um instante. Por isso fica no fim,
 # quando todo o resto já terminou.
@@ -143,6 +169,7 @@ else
   printf '\nPronto. Esta Pi (%s) já aparece no painel. Escolha a tela dela em Telas → Aparelhos.\n' "$(hostname)"
 fi
 printf 'Conferir: curl -s localhost:8080/status   e   journalctl -u corptv-agente -f\n'
+printf 'A tela abre sozinha no próximo boot: sudo reboot\n'
 }
 
 main "$@"

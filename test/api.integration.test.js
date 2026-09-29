@@ -201,6 +201,11 @@ test('o servidor entrega o script de preparo da Pi com o próprio endereço', as
   assert.equal(agente.status, 200);
   assert.match(await agente.text(), /CORPTV_SERVIDOR/);
   assert.equal((await request('/pi/agente/corptv-agente.service')).status, 200);
+  // O quiosque: sem ele o agente fica no ar, mas nada abre a tela na Pi.
+  const quiosque = await request('/pi/agente/iniciar-quiosque.sh');
+  assert.equal(quiosque.status, 200);
+  assert.doesNotMatch(await quiosque.text(), /\r/, 'script de shell tem de chegar à Pi sem CRLF');
+  assert.equal((await request('/pi/agente/corptv-quiosque.desktop')).status, 200);
 
   // Só os arquivos da lista; nada de caminho para fora da pasta do agente.
   assert.equal((await request('/pi/agente/preparar-pi.sh')).status, 404);
