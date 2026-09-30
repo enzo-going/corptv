@@ -77,12 +77,18 @@ test('inicialização usa código descartável na rede e cria o primeiro adminis
   });
   assert.equal(wrongOrigin.response.status, 403);
 
+  const shortPassword = await send('/api/setup', {
+    method: 'POST', body: { name: 'Administrador TI', username: 'admin-ti', password: 'abcd' }
+  });
+  assert.equal(shortPassword.response.status, 400);
+  assert.equal(shortPassword.data.error, 'A senha deve ter pelo menos 5 caracteres.');
+
   const setupAttempts = await Promise.all([
     send('/api/setup', {
-      method: 'POST', body: { name: 'Administrador TI', username: 'admin-ti', password: 'Senha corporativa forte 2026!' }
+      method: 'POST', body: { name: 'Administrador TI', username: 'admin-ti', password: 'abcde' }
     }),
     send('/api/setup', {
-      method: 'POST', body: { name: 'Administrador TI', username: 'admin-ti', password: 'Senha corporativa forte 2026!' }
+      method: 'POST', body: { name: 'Administrador TI', username: 'admin-ti', password: 'abcde' }
     })
   ]);
   const setup = setupAttempts.find(result => result.response.status === 201);
@@ -102,7 +108,7 @@ test('inicialização usa código descartável na rede e cria o primeiro adminis
 
   const spoofedHttps = await send('/api/auth/login', {
     method: 'POST', headers: { 'x-forwarded-proto': 'https' },
-    body: { username: 'admin-ti', password: 'Senha corporativa forte 2026!' }
+    body: { username: 'admin-ti', password: 'abcde' }
   });
   assert.equal(spoofedHttps.response.status, 200);
   assert.doesNotMatch(spoofedHttps.response.headers.get('set-cookie'), /;\s*Secure/i);
@@ -175,6 +181,45 @@ test('gestão preserva o último administrador e revoga sessões', async () => {
   assert.equal((await send('/api/groups', { auth: viewerSession })).response.status, 401);
 });
 
+test('criação, redefinição e troca de senha aceitam cinco caracteres e recusam quatro', async () => {
+  const account = { name: 'Teste de senha', username: 'senha-curta', role: 'viewer' };
+  const rejected = await send('/api/users', {
+    method: 'POST', auth: admin, body: { ...account, password: 'abcd' }
+  });
+  assert.equal(rejected.response.status, 400);
+  assert.equal(rejected.data.error, 'A senha deve ter pelo menos 5 caracteres.');
+  const created = await send('/api/users', {
+    method: 'POST', auth: admin, body: { ...account, password: 'abcde' }
+  });
+  assert.equal(created.response.status, 201);
+  const originalSession = await login(account.username, 'abcde');
+  const resetPath = '/api/users/' + created.data.id + '/reset-password';
+  const shortReset = await send(resetPath, { method: 'POST', auth: admin, body: { password: 'wxyz' } });
+  assert.equal(shortReset.response.status, 400);
+  assert.equal(shortReset.data.error, 'A senha deve ter pelo menos 5 caracteres.');
+  await login(account.username, 'abcde');
+
+  const reset = await send(resetPath, { method: 'POST', auth: admin, body: { password: 'vwxyz' } });
+  assert.equal(reset.response.status, 200);
+  assert.equal((await send('/api/groups', { auth: originalSession })).response.status, 401);
+  assert.equal((await send('/api/auth/login', {
+    method: 'POST', body: { username: account.username, password: 'abcde' }
+  })).response.status, 401);
+  const resetSession = await login(account.username, 'vwxyz');
+
+  const shortChange = await send('/api/auth/change-password', {
+    method: 'POST', auth: resetSession, body: { current_password: 'vwxyz', new_password: '1234' }
+  });
+  assert.equal(shortChange.response.status, 400);
+  assert.equal(shortChange.data.error, 'A senha deve ter pelo menos 5 caracteres.');
+  const changed = await send('/api/auth/change-password', {
+    method: 'POST', auth: resetSession, body: { current_password: 'vwxyz', new_password: '12345' }
+  });
+  assert.equal(changed.response.status, 200);
+  assert.equal((await send('/api/groups', { auth: resetSession })).response.status, 401);
+  await login(account.username, '12345');
+});
+
 test('falhas e mudanças aparecem na auditoria com cadeia íntegra e sem senhas', async () => {
   const failed = await send('/api/auth/login', {
     method: 'POST', body: { username: 'leitor', password: 'senha-incorreta' }
@@ -192,7 +237,7 @@ test('falhas e mudanças aparecem na auditoria com cadeia íntegra e sem senhas'
   assert.ok(actions.has('group.create'));
   assert.ok(actions.has('authorization.denied'));
   assert.ok(actions.has('session.revoke'));
-  assert.doesNotMatch(JSON.stringify(result.data.items), /Chave corporativa|Senha corporativa/);
+  assert.doesNotMatch(JSON.stringify(result.data.items), /Chave corporativa|Senha corporativa|"(?:abcde|vwxyz|12345)"/);
 
   const exported = await send('/api/audit/export.csv', { auth: admin });
   assert.equal(exported.response.status, 200);

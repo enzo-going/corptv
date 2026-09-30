@@ -20,7 +20,7 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 - Vídeos em loop com áudio e título oculto, fixo ou temporário com fade
 - Contas individuais com perfis de TI administrador, editor e somente leitura
 - Sessões protegidas, limitação de tentativas e defesa CSRF
-- Senha de no mínimo 12 caracteres, derivada com `scrypt`
+- Senha de no mínimo 5 caracteres, derivada com `scrypt`
 - Limite de requisições por IP nas rotas de mídia, páginas e autenticação
 - Auditoria pesquisável de logins e alterações, com exportação CSV e verificação de integridade
 - Playlists e agendamentos independentes por ambiente
@@ -129,7 +129,7 @@ as APIs de gestão exigem uma conta.
 | Somente leitura | Visão geral e consultas, sem qualquer alteração |
 
 Administradores podem criar e desativar contas, redefinir senhas e encerrar
-sessões. A senha precisa ter pelo menos 12 caracteres e não pode conter o nome
+sessões. A senha precisa ter pelo menos 5 caracteres e não pode conter o nome
 de usuário; trocar a senha ou mudar o perfil de alguém encerra as sessões
 abertas daquela conta. Contas não são excluídas, preservando a autoria
 histórica. A auditoria registra sucessos, falhas e acessos negados sem guardar

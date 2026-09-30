@@ -118,7 +118,7 @@ test('a configuração inicial remota pede o código de ativação descartável'
   assert.match(login, /body\.setup\.remote \.remote-only/);
 });
 
-test('o mínimo de 12 caracteres vale só para senha nova, nunca para entrar', () => {
+test('o mínimo de 5 caracteres vale só para senha nova, nunca para entrar', () => {
   // Com minlength fixo no campo, o navegador barrava no login quem tinha senha
   // antiga mais curta — o servidor aceitaria, mas o pedido nem saía da página.
   const campoSenha = login.match(/<input id="password"[^>]*>/)[0];
@@ -127,8 +127,21 @@ test('o mínimo de 12 caracteres vale só para senha nova, nunca para entrar', (
   assert.doesNotMatch(campoConfirma, /minlength/i);
 
   const blocoCadastro = login.slice(login.indexOf('if(setup){'));
-  assert.match(blocoCadastro, /getElementById\('password'\)\.minLength=12/);
-  assert.match(blocoCadastro, /getElementById\('confirm'\)\.minLength=12/);
+  assert.match(blocoCadastro, /getElementById\('password'\)\.minLength=5/);
+  assert.match(blocoCadastro, /getElementById\('confirm'\)\.minLength=5/);
+});
+
+test('criar, trocar e redefinir senhas no painel exige pelo menos cinco caracteres', () => {
+  for (const id of ['pw-new', 'us-password']) {
+    const campo = panel.match(new RegExp('<input[^>]*id="' + id + '"[^>]*>'))[0];
+    assert.match(campo, /minlength="5"/);
+    assert.match(campo, /maxlength="128"/);
+  }
+  assert.match(panel, /next\.length<5/);
+  assert.match(panel, /body\.password\.length<5/);
+  assert.match(panel, /if\(password\.length<5\)/);
+  assert.match(panel, /mínimo de 5 caracteres/);
+  assert.doesNotMatch(panel + login, /12 caracteres/);
 });
 
 test('o login não redireciona para um destino fornecido pela URL', () => {
