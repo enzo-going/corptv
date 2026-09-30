@@ -88,6 +88,10 @@ configurar_audio() {
 
 configurar_audio
 
+# --password-store=basic: a Pi entra sozinha, sem digitar senha, e o chaveiro do
+# sistema abria a janela "escolha uma senha para o chaveiro" por cima da TV — numa
+# TV sem teclado, ela ficaria ali para sempre. O quiosque não guarda senha nenhuma.
+#
 # Se o Chromium fechar — travou, ficou sem memória, alguém fechou sem querer —
 # a TV não pode ficar preta esperando alguém ir até lá reiniciar o aparelho.
 # O systemd cuida do agente (Restart=always), mas não do navegador: quem faz
@@ -108,6 +112,7 @@ while [ "$encerrando" -eq 0 ]; do
   "$NAVEGADOR" \
     --ozone-platform-hint=auto \
     --kiosk \
+    --password-store=basic \
     --noerrdialogs \
     --disable-infobars \
     --disable-session-crashed-bubble \

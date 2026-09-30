@@ -26,6 +26,11 @@ test('o quiosque sai limpo quando a sessão é encerrada', () => {
   assert.match(quiosque, /trap '.*encerrando=1.*' TERM INT HUP/);
 });
 
+test('o quiosque não deixa o chaveiro do sistema abrir janela por cima da TV', () => {
+  // Com login automático, o chaveiro pedia uma senha nova a cada boot.
+  assert.ok(quiosque.includes('    --password-store=basic \\\n'));
+});
+
 test('o quiosque aponta para o agente local, nunca para o servidor', () => {
   assert.match(quiosque, /URL="http:\/\/127\.0\.0\.1:\$\{PORTA\}\//);
   assert.doesNotMatch(quiosque, /chromium.*:3000/is);
