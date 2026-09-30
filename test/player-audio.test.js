@@ -95,6 +95,14 @@ test('conteúdo sem tempo não liga o cronômetro: não troca e não redesenha',
   assert.equal(intervalos, 2);
 });
 
+test('vídeo com defeito não prende a fila: pula para o próximo', () => {
+  const script = scriptAtivo();
+  const erro = script.slice(script.indexOf('video.onerror = function () {'), script.indexOf('layer.appendChild(video);'));
+  assert.ok(erro.includes('var sozinho = slides.length < 2;'));
+  assert.ok(erro.includes('nextSlide();'), 'com outros conteúdos, tem de seguir a fila');
+  assert.ok(erro.includes('sozinho ? 15000 : 3000'));
+});
+
 test('o player só recarrega quando o painel pede depois que ele abriu', () => {
   const script = scriptAtivo();
   const fabrica = new Function('location',

@@ -127,6 +127,17 @@ function lerTudo(res) {
 const esperar = ms => new Promise(r => setTimeout(r, ms));
 
 // ── DOWNLOAD COM RITMO, RETOMADA E TENTATIVAS ────────────────────────────────
+const DOWNLOAD_CANCELADO = 'download cancelado: a tela mudou';
+let cancelarDownload = null;
+
+function fecharArquivo(stream) {
+  return new Promise(resolve => {
+    if (stream.closed) return resolve();
+    stream.once('close', resolve);
+    stream.destroy();
+  });
+}
+
 // Baixa para um arquivo .parcial e só renomeia no fim. Se cair no meio, na
 // próxima tentativa retoma de onde parou usando Range — não recomeça do zero.
 async function baixarArquivo(urlRemota, destino, tamanhoEsperado) {
@@ -157,29 +168,44 @@ async function baixarArquivo(urlRemota, destino, tamanhoEsperado) {
   const saida = fs.createWriteStream(parcial, { flags: jaTemos > 0 ? 'a' : 'w' });
   const inicio = Date.now();
   let recebido = 0;
+  // Troca de tela no painel: quem chamar isto interrompe este download.
+  cancelarDownload = () => res.destroy(new Error(DOWNLOAD_CANCELADO));
 
   // Controle de ritmo que se autocorrige: a cada bloco, calcula quanto tempo
   // o total recebido DEVERIA ter levado no limite configurado e, se chegou
   // rápido demais, pausa a diferença. Como olha o acumulado e não uma janela
   // isolada, o excesso de um bloco é compensado no seguinte e a taxa converge
   // para o valor pedido em vez de ficar sempre um pouco acima.
-  await new Promise((resolve, reject) => {
-    res.on('data', pedaco => {
-      recebido += pedaco.length;
-      saida.write(pedaco);
-      if (LIMITE_BYTES_S <= 0) return;
-      const devidoMs = (recebido / LIMITE_BYTES_S) * 1000;
-      const decorridoMs = Date.now() - inicio;
-      const atraso = Math.round(devidoMs - decorridoMs);
-      if (atraso > 0) {
-        res.pause();
-        setTimeout(() => res.resume(), atraso);
-      }
+  try {
+    await new Promise((resolve, reject) => {
+      res.on('data', pedaco => {
+        recebido += pedaco.length;
+        saida.write(pedaco);
+        if (LIMITE_BYTES_S <= 0) return;
+        const devidoMs = (recebido / LIMITE_BYTES_S) * 1000;
+        const decorridoMs = Date.now() - inicio;
+        const atraso = Math.round(devidoMs - decorridoMs);
+        if (atraso > 0) {
+          res.pause();
+          setTimeout(() => res.resume(), atraso);
+        }
+      });
+      res.on('end', resolve);
+      res.on('error', reject);
+      // Conexão que cai sem "end": a resposta fecha incompleta.
+      res.on('close', () => { if (!res.complete) reject(new Error('conexao interrompida')); });
+      saida.on('error', reject);
     });
-    res.on('end', resolve);
-    res.on('error', reject);
-    saida.on('error', reject);
-  });
+  } catch (err) {
+    res.destroy();
+    // Fecha o arquivo em qualquer falha: antes cada queda de rede deixava um
+    // descritor aberto, e muitas quedas esgotariam o limite do sistema. O que já
+    // foi gravado fica no .parcial para retomar.
+    await fecharArquivo(saida);
+    throw err;
+  } finally {
+    cancelarDownload = null;
+  }
 
   await new Promise(r => saida.end(r));
 
@@ -217,7 +243,8 @@ async function baixarComTentativas(urlRemota, destino, tamanho) {
     try {
       return await baixarArquivo(urlRemota, destino, tamanho);
     } catch (err) {
-      if (i === esperas.length) throw err;
+      // Tela trocada ou disco cheio: tentar de novo o mesmo arquivo não resolve.
+      if (i === esperas.length || err.message === DOWNLOAD_CANCELADO || err.code === 'ENOSPC') throw err;
       log('AVISO', 'download falhou, vou tentar de novo', {
         arquivo: path.basename(destino), erro: err.message, proxima_em_s: esperas[i] / 1000
       });
@@ -257,7 +284,14 @@ async function sincronizar(opcoes = {}) {
     // sem esperar o download de uma mídia nova terminar.
     if (mesmaTela && dados.screen) playlistLocal.screen = dados.screen;
 
+    // Antes de baixar, libera o que não está na programação nova nem na TV agora
+    // (e downloads pela metade abandonados): disco cheio não pode impedir a própria
+    // limpeza, que antes só rodava depois de baixar tudo.
+    liberarEspaco(slides);
+
     for (const slide of slides) {
+      // A tela mudou no painel: o resto desta programação perdeu o sentido.
+      if (tela !== telaAtual) break;
       if (!slide.url) continue;
       const nome = nomeLocal(slide.url);
       const destino = path.join(CONFIG.pasta, nome);
@@ -289,9 +323,20 @@ async function sincronizar(opcoes = {}) {
       const jitter = opcoes.semEspera ? 0 : Math.floor(Math.random() * CONFIG.jitterMaxS * 1000);
       if (jitter) { log('INFO', 'aguardando para espalhar a carga', { seg: Math.round(jitter / 1000) }); await esperar(jitter); }
 
-      await baixarComTentativas(urlRemota, destino, tamanho);
-      estado[nome] = { etag, tamanho: tamanho || fs.statSync(destino).size, em: new Date().toISOString() };
-      salvarEstado(estado);
+      if (tela !== telaAtual) break;
+
+      // Uma mídia que falha não trava as outras nem a atualização da programação:
+      // antes, uma falha aqui pulava direto para "sem contato com o servidor".
+      try {
+        await baixarComTentativas(urlRemota, destino, tamanho);
+        estado[nome] = { etag, tamanho: tamanho || fs.statSync(destino).size, em: new Date().toISOString() };
+        salvarEstado(estado);
+      } catch (err) {
+        if (err.message === DOWNLOAD_CANCELADO) break;
+        log('AVISO', 'nao consegui baixar a midia; sigo com o resto', { arquivo: nome, erro: err.message, codigo: err.code || null });
+        // Disco cheio: tira também o que está na tela mas saiu da programação.
+        if (err.code === 'ENOSPC') limparAntigos(slides);
+      }
     }
 
     // A tela mudou de novo enquanto baixava: esta programação já não vale.
@@ -307,6 +352,8 @@ async function sincronizar(opcoes = {}) {
     }
     playlistLocal = {
       screen: dados.screen,
+      // Instante da consulta ao servidor: é dele que conta a validade de cada slide.
+      salvo_em: Date.now(),
       slides: prontos.map(s => s.url ? Object.assign({}, s, { url: '/midia/' + nomeLocal(s.url) }) : s)
     };
     try { fs.writeFileSync(arqPlaylist, JSON.stringify(playlistLocal)); } catch (e) {}
@@ -333,25 +380,39 @@ async function sincronizar(opcoes = {}) {
   }
 }
 
-// Remove mídia que saiu da programação, para o disco não encher com o tempo.
-function limparAntigos(slides) {
-  const usados = new Set(slides.filter(s => s.url).map(s => nomeLocal(s.url)));
+// Apaga a mídia (e o download pela metade dela, ".parcial") que o filtro mandar.
+// Só mídia: a pasta também guarda a identidade do aparelho, a programação e a
+// cópia do player que deixa a TV funcionar sem rede — apagar isso fazia a Pi
+// "esquecer" quem é e perder o player offline a cada troca de conteúdo.
+function removerMidias(remover) {
   let removidos = 0;
   for (const arq of fs.readdirSync(CONFIG.pasta)) {
-    // Só mídia. A pasta também guarda a identidade do aparelho, a programação e
-    // a cópia do player que deixa a TV funcionar sem rede: apagar isso fazia a
-    // Pi "esquecer" quem é e perder o player offline a cada troca de conteúdo.
-    if (!TIPOS[path.extname(arq).toLowerCase()]) continue;
-    if (!usados.has(arq)) {
-      try { fs.unlinkSync(path.join(CONFIG.pasta, arq)); removidos++; } catch (e) {}
-    }
+    const base = arq.endsWith('.parcial') ? arq.slice(0, -'.parcial'.length) : arq;
+    if (!TIPOS[path.extname(base).toLowerCase()] || !remover(base)) continue;
+    try { fs.unlinkSync(path.join(CONFIG.pasta, arq)); removidos++; } catch (e) {}
   }
   if (removidos) {
     const estado = lerEstado();
-    Object.keys(estado).forEach(k => { if (!usados.has(k)) delete estado[k]; });
+    Object.keys(estado).forEach(k => { if (remover(k)) delete estado[k]; });
     salvarEstado(estado);
-    log('INFO', 'midia antiga removida', { arquivos: removidos });
   }
+  return removidos;
+}
+
+// Remove mídia que saiu da programação, para o disco não encher com o tempo.
+function limparAntigos(slides) {
+  const usados = new Set(slides.filter(s => s.url).map(s => nomeLocal(s.url)));
+  const removidos = removerMidias(nome => !usados.has(nome));
+  if (removidos) log('INFO', 'midia antiga removida', { arquivos: removidos });
+}
+
+// Antes de baixar: guarda só o que a programação nova usa e o que está na TV agora
+// (numa troca de tela, a anterior segue no ar até a nova ficar pronta).
+function liberarEspaco(slides) {
+  const manter = new Set(slides.filter(s => s.url).map(s => nomeLocal(s.url)));
+  if (playlistLocal) playlistLocal.slides.filter(s => s.url).forEach(s => manter.add(path.basename(s.url)));
+  const removidos = removerMidias(nome => !manter.has(nome));
+  if (removidos) log('INFO', 'espaco liberado antes de baixar', { arquivos: removidos });
 }
 
 // ── HEARTBEAT ────────────────────────────────────────────────────────────────
@@ -393,14 +454,19 @@ async function registrar() {
     // até a nova estar pronta (ver sincronizar).
     if (!nova) playlistLocal = null;
     salvarAparelho();
+    // Um download da tela anterior não serve mais: interrompe e começa a nova já.
+    if (cancelarDownload) cancelarDownload();
     sincronizar({ semEspera: true });
   } catch (e) { /* sem servidor: segue com a última tela conhecida */ }
 }
 
 async function heartbeat() {
-  if (!telaAtual) return;
+  // Avisa a tela que está de fato na TV: numa troca, a anterior segue no ar até a
+  // nova ficar pronta, e o painel não pode dar a nova como exibindo antes da hora.
+  const exibida = playlistLocal && playlistLocal.screen && playlistLocal.screen.id ? playlistLocal.screen.id : telaAtual;
+  if (!exibida) return;
   try {
-    const corpo = JSON.stringify({ screen_id: telaAtual });
+    const corpo = JSON.stringify({ screen_id: exibida });
     const res = await pedir(CONFIG.servidor + '/api/heartbeat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(corpo) },
@@ -445,8 +511,24 @@ async function obterPlayer() {
     return paginaPlayer;
   } catch (e) { /* sem cópia local */ }
   // Sem servidor e sem cópia: mostra o aviso, mas não o guarda. Antes ele ficava
-  // fixo na memória e a TV seguia no erro mesmo depois de o servidor voltar.
-  return '<h1 style="color:#fff;background:#000;font-family:sans-serif">CorporTV: sem contato com o servidor e sem cópia local do player.</h1>';
+  // fixo na memória e a TV seguia no erro mesmo depois de o servidor voltar. E a
+  // própria página tenta de novo a cada 30 s: sem isso, o navegador ficava no aviso
+  // para sempre, porque ninguém recarrega a TV.
+  return '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta http-equiv="refresh" content="30"></head>' +
+    '<body style="margin:0;background:#000"><h1 style="color:#fff;font-family:sans-serif;padding:24px">' +
+    'CorporTV: sem contato com o servidor e sem cópia local do player. Tentando de novo a cada 30 segundos.</h1></body></html>';
+}
+
+// Sem rede, a Pi segue na última programação — mas só com o que ainda está dentro
+// da validade que o servidor mandou (cache_for_ms, contada da consulta). Conteúdo
+// vencido sai da TV mesmo com a rede fora. Online isso não muda nada: a programação
+// é renovada a cada minuto.
+function programacaoValida(p) {
+  if (!p || !p.salvo_em) return p;
+  const agora = Date.now();
+  const slides = p.slides.filter(s => s.cache_for_ms === null || s.cache_for_ms === undefined ||
+                                      p.salvo_em + s.cache_for_ms > agora);
+  return slides.length === p.slides.length ? p : Object.assign({}, p, { slides });
 }
 
 function paginaAguardando() {
@@ -469,7 +551,7 @@ const servidor = http.createServer(async (req, res) => {
     // Sem tela: a marca de recarga muda e o player aberto recarrega, caindo no aviso
     // de "aguardando tela" em vez de ficar numa lista vazia.
     if (!telaAtual) return res.end(JSON.stringify({ screen: { id: '', reload_at: 'aguardando-tela' }, slides: [] }));
-    return res.end(JSON.stringify(playlistLocal || { screen: { id: telaAtual }, slides: [] }));
+    return res.end(JSON.stringify(programacaoValida(playlistLocal) || { screen: { id: telaAtual }, slides: [] }));
   }
 
   // Heartbeat: o player chama a cada 20 s; repassamos ao servidor.
