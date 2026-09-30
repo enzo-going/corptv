@@ -1,6 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=CorporTV Quiosque
-Comment=Abre o player em tela cheia apontando para o agente local
+Name=CorporTV na TV
+Comment=Mostra o CorporTV em tela cheia. Alt+F4 fecha para manutenção; este atalho (ou reiniciar) volta.
 Exec=/opt/corptv-agente/iniciar-quiosque.sh
+Icon=video-display
+Categories=AudioVideo;
 X-GNOME-Autostart-enabled=true
