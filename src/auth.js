@@ -606,6 +606,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
   return {
     auditManagementMutation,
     requireManagementApi,
+    requireRole,
     requirePanelPage,
     resolveSession
   };

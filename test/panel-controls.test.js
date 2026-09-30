@@ -66,6 +66,9 @@ test('Aparelhos é uma página só do TI, com um comando único para Raspberry n
   assert.ok(panel.includes("api('PUT','/api/aparelhos/'+id,{screen_id:value||null})"));
   assert.ok(panel.includes("ativo.classList.contains('device-select'))return;"));
   assert.ok(panel.includes("api('GET','/api/aparelhos')"));
+  // Só o TI busca a lista: a API recusa os outros perfis, e o painel não pode
+  // mostrar "acesso negado" a cada 30 s para quem só publica conteúdo.
+  assert.ok(panel.includes("permissions&&permissions.users?api('GET','/api/aparelhos'):Promise.resolve([])"));
   // Mesmo no celular (que usa o endereço aberto nos links), o comando leva o endereço
   // oficial: é dele que a Pi tira o domínio do corportv/ curto.
   assert.ok(panel.includes('function officialOrigin(){return enderecoPublicoConfig||publicOrigin();}'));
