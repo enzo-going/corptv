@@ -334,13 +334,27 @@ function limparAntigos(slides) {
 // Só repassa o aviso que o player manda: "Online" no painel tem de querer dizer
 // "a TV está exibindo". Se o agente avisasse sozinho, o painel mostraria a tela
 // online com o navegador fechado e a TV preta.
+// IP deste aparelho na rede local, para o TI achar a Pi pelo painel (Aparelhos)
+// em vez de adivinhar. Cabo antes de Wi-Fi; nunca o endereço interno.
+function ipLocal() {
+  const redes = os.networkInterfaces();
+  const cabo = nome => /^(eth|en)/.test(nome) ? 0 : 1;
+  const nomes = Object.keys(redes).sort((a, b) => cabo(a) - cabo(b));
+  for (const nome of nomes) {
+    for (const r of redes[nome] || []) {
+      if ((r.family === 'IPv4' || r.family === 4) && !r.internal) return r.address;
+    }
+  }
+  return null;
+}
+
 // ── REGISTRO NO PAINEL ───────────────────────────────────────────────────────
 // A cada sincronização o aparelho diz ao servidor que existe e pergunta qual
 // tela deve exibir. Servidor antigo (sem essa rota) ou fora do ar: segue com a
 // última tela conhecida.
 async function registrar() {
   try {
-    const corpo = JSON.stringify({ id: aparelho.id, nome: os.hostname(), tela_local: CONFIG.tela });
+    const corpo = JSON.stringify({ id: aparelho.id, nome: os.hostname(), ip: ipLocal(), tela_local: CONFIG.tela });
     const res = await pedir(CONFIG.servidor + '/api/aparelhos/registro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(corpo) },
@@ -481,7 +495,7 @@ const servidor = http.createServer(async (req, res) => {
     }));
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
     return res.end(JSON.stringify({
-      aparelho: aparelho.id, nome: os.hostname(),
+      aparelho: aparelho.id, nome: os.hostname(), ip: ipLocal(),
       tela: telaAtual || null, servidor: CONFIG.servidor,
       limite_mbps: CONFIG.limiteMbps,
       baixando: sincronizando,

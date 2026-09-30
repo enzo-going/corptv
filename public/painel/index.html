@@ -1130,7 +1130,7 @@ async function renderDevices(){
     const on=deviceOnline(d);
     const semTela=!d.screen_id;
     const opcoes=`<option value="" ${semTela?'selected':''}>Escolher tela…</option>`+screens.map(s=>`<option value="${esc(s.id)}" ${s.id===d.screen_id?'selected':''}>${esc(s.name)}</option>`).join('');
-    const situacao=semTela?'Nova — escolha a tela que ela mostra':(on?'Ligada':'Desligada · '+lastSeenText(d.last_seen));
+    const situacao=(semTela?'Nova — escolha a tela que ela mostra':(on?'Ligada':'Desligada · '+lastSeenText(d.last_seen)))+(d.ip?' · IP '+d.ip:'');
     return `<div class="device-row${semTela?' device-new':''}">
       <span class="online-dot ${on?'on':'off'}"></span>
       <div class="device-info"><div class="card-title">${esc(d.name)}</div><div class="card-sub">${esc(situacao)}</div></div>

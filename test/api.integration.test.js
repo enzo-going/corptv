@@ -229,13 +229,18 @@ test('aparelho se registra sozinho e a tela se escolhe no painel', async () => {
   assert.equal((await registrar({ id: 'nao-e-uuid', nome: 'x' })).status, 400);
 
   // Pi instalada antes desta versão: entra já com a tela da configuração local.
-  const primeiro = await registrar({ id, nome: 'raspberry-recepcao', tela_local: tela.body.id });
+  const primeiro = await registrar({ id, nome: 'raspberry-recepcao', ip: '192.0.2.20', tela_local: tela.body.id });
   assert.equal(primeiro.status, 200);
   assert.equal(primeiro.body.screen_id, tela.body.id);
 
   const lista = await json('/api/aparelhos');
   const aparelho = lista.body.find(a => a.id === id);
   assert.equal(aparelho.name, 'raspberry-recepcao');
+  // O IP que a Pi informa aparece no painel; lixo no lugar do IP é descartado.
+  assert.equal(aparelho.ip, '192.0.2.20');
+  await registrar({ id, nome: 'raspberry-recepcao', ip: '<script>' });
+  assert.equal((await json('/api/aparelhos')).body.find(a => a.id === id).ip, null);
+  await registrar({ id, nome: 'raspberry-recepcao', ip: '192.0.2.20' });
   assert.equal(aparelho.screen_id, tela.body.id);
 
   // Trocar pelo painel: a Pi recebe a tela nova no próximo registro.

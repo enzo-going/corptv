@@ -70,6 +70,8 @@ test('Aparelhos é uma página só do TI, com um comando único para Raspberry n
   // oficial: é dele que a Pi tira o domínio do corportv/ curto.
   assert.ok(panel.includes('function officialOrigin(){return enderecoPublicoConfig||publicOrigin();}'));
   assert.ok(panel.includes("cmd.value=piCommand(officialOrigin());"));
+  // Cada Raspberry mostra o IP dela: o TI não precisa adivinhar para entrar por SSH.
+  assert.ok(panel.includes("+(d.ip?' · IP '+d.ip:'')"));
 });
 
 test('o cartão de tela é curto: Abrir à vista, o resto no menu', () => {
