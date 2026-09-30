@@ -184,6 +184,8 @@ Outros:
 | Tela apaga sozinha depois de um tempo | Screen Blanking ligado | `raspi-config` → Display Options → Screen Blanking → Disable |
 | Vídeo picotando | Subtensão, ou vídeo fora do padrão | Conferir o raio amarelo na tela e a fonte; conferir a conversão do vídeo |
 | Baixa e baixa de novo sem parar | Arquivo mudando no servidor, ou disco cheio | `df -h` e `journalctl -u corptv-agente` |
+| Preciso sair da tela cheia para mexer na Pi | O modo TV não tem barra nem F11, de propósito | Teclado na Pi: **Alt+F4**. O CorporTV não reabre por cima; volta pelo menu → **CorporTV na TV**, ou reiniciando |
+| Caixa "traduzir esta página" aparecendo | Pi preparada antes da correção da tradução | Rodar de novo o comando de **Aparelhos → Adicionar Raspberry** e reiniciar |
 | Barra "restaurar páginas" cobrindo o vídeo | Chromium fechou de forma anormal | O script já limpa isso no boot; se persistir, reiniciar a Pi |
 | Tela volta sozinha de tempos em tempos | Chromium sem memória (a Pi 4 aqui tem 2 GB) | `journalctl -t corptv-quiosque` mostra de quanto em quanto tempo; se for frequente, investigar |
 | Imagem sem som | TV desligada quando a Pi ligou, tela em **Mudo** no painel, ou TV mutada | `journalctl -t corptv-quiosque \| grep som`: se disser "nenhuma saida HDMI", ligar a TV e reiniciar a Pi. Conferir o volume da tela no painel e o controle da TV |

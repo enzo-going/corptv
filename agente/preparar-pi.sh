@@ -145,6 +145,16 @@ install -m 755 "$tmp/iniciar-quiosque.sh" /opt/corptv-agente/iniciar-quiosque.sh
 install -d -m 755 -o "$usuario" -g "$grupo" "$casa/.config" "$casa/.config/autostart"
 install -m 644 -o "$usuario" -g "$grupo" "$tmp/corptv-quiosque.desktop" "$casa/.config/autostart/corptv-quiosque.desktop"
 ok "abre sozinho na sessão de $usuario"
+# O mesmo atalho no menu: depois de fechar a tela cheia para manutenção (Alt+F4),
+# "CorporTV na TV" volta sem precisar reiniciar a Pi.
+install -d -m 755 -o "$usuario" -g "$grupo" "$casa/.local" "$casa/.local/share" "$casa/.local/share/applications"
+install -m 644 -o "$usuario" -g "$grupo" "$tmp/corptv-quiosque.desktop" "$casa/.local/share/applications/corptv-quiosque.desktop"
+ok "atalho \"CorporTV na TV\" no menu"
+# A página é em português e o Raspberry Pi OS vem em inglês: o Chromium oferecia
+# traduzir a cada troca de conteúdo. A política do navegador desliga a tradução.
+install -d -m 755 /etc/chromium/policies/managed
+printf '{\n  "TranslateEnabled": false\n}\n' > /etc/chromium/policies/managed/corptv.json
+ok "tradução automática do navegador desligada"
 if command -v raspi-config >/dev/null 2>&1; then
   # 1 = desligar o apagamento de tela; B4 = entrar direto na área de trabalho,
   # para a TV voltar sozinha depois de uma queda de energia.

@@ -88,6 +88,10 @@ configurar_audio() {
 
 configurar_audio
 
+# --lang=pt-BR: o Raspberry Pi OS vem em inglês e o player é em português; com
+# idiomas diferentes o Chromium oferecia "traduzir" a cada troca de conteúdo. A
+# política instalada pelo preparar.sh (TranslateEnabled=false) desliga de vez.
+#
 # --password-store=basic: a Pi entra sozinha, sem digitar senha, e o chaveiro do
 # sistema abria a janela "escolha uma senha para o chaveiro" por cima da TV — numa
 # TV sem teclado, ela ficaria ali para sempre. O quiosque não guarda senha nenhuma.
@@ -113,6 +117,7 @@ while [ "$encerrando" -eq 0 ]; do
     --ozone-platform-hint=auto \
     --kiosk \
     --password-store=basic \
+    --lang=pt-BR \
     --noerrdialogs \
     --disable-infobars \
     --disable-session-crashed-bubble \
@@ -128,6 +133,15 @@ while [ "$encerrando" -eq 0 ]; do
   saida=$?
 
   [ "$encerrando" -eq 1 ] && break
+
+  # Código 0 = alguém fechou a janela de propósito (Alt+F4, com um teclado na Pi):
+  # é manutenção, então não reabre por cima de quem está mexendo. A TV volta
+  # sozinha no próximo boot, ou pelo atalho "CorporTV na TV" do menu. Queda,
+  # travamento e falta de memória saem com outro código e continuam reabrindo.
+  if [ "$saida" -eq 0 ]; then
+    registrar "chromium fechado por alguem (codigo 0); o quiosque volta no proximo boot ou pelo atalho CorporTV na TV"
+    break
+  fi
 
   duracao=$(( $(date +%s) - inicio ))
 

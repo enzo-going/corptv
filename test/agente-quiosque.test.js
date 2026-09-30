@@ -26,6 +26,26 @@ test('o quiosque sai limpo quando a sessão é encerrada', () => {
   assert.match(quiosque, /trap '.*encerrando=1.*' TERM INT HUP/);
 });
 
+test('fechar a tela cheia de propósito (Alt+F4) não reabre por cima; queda reabre', () => {
+  // Código 0 só sai quando alguém fecha a janela: é manutenção.
+  const saida = quiosque.indexOf('if [ "$saida" -eq 0 ]; then');
+  assert.ok(saida > 0, 'faltou tratar o fechamento de propósito');
+  assert.ok(saida < quiosque.indexOf('reabrindo em ${espera}s'), 'tem de decidir antes de reabrir');
+  assert.ok(quiosque.slice(saida, saida + 250).includes('break'));
+  // E há um atalho no menu para voltar sem reiniciar.
+  const atalho = fs.readFileSync(path.join(__dirname, '../agente/corptv-quiosque.desktop'), 'utf8');
+  assert.match(atalho, /^Name=CorporTV na TV$/m);
+  const preparo = fs.readFileSync(path.join(__dirname, '../agente/preparar-pi.sh'), 'utf8');
+  assert.ok(preparo.includes('/.local/share/applications/corptv-quiosque.desktop'));
+});
+
+test('o navegador da TV não oferece tradução do conteúdo', () => {
+  assert.ok(quiosque.includes('    --lang=pt-BR \\\n'));
+  const preparo = fs.readFileSync(path.join(__dirname, '../agente/preparar-pi.sh'), 'utf8');
+  assert.ok(preparo.includes('"TranslateEnabled": false'));
+  assert.ok(preparo.includes('/etc/chromium/policies/managed/corptv.json'));
+});
+
 test('o quiosque não deixa o chaveiro do sistema abrir janela por cima da TV', () => {
   // Com login automático, o chaveiro pedia uma senha nova a cada boot.
   assert.ok(quiosque.includes('    --password-store=basic \\\n'));
