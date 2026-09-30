@@ -407,7 +407,7 @@
       <div class="card"><div class="card-title" id="profile-name">—</div><div class="card-sub" id="profile-meta">—</div></div>
       <div class="card">
         <div class="card-title">Alterar minha senha</div><div class="card-sub" style="margin-bottom:14px">Ao salvar, as outras sessões desta conta serão encerradas.</div>
-        <div class="form-grid"><div><label>Senha atual</label><input type="password" id="pw-current" autocomplete="current-password"></div><div><label>Nova senha</label><input type="password" id="pw-new" minlength="12" maxlength="128" autocomplete="new-password"></div></div>
+        <div class="form-grid"><div><label>Senha atual</label><input type="password" id="pw-current" autocomplete="current-password"></div><div><label>Nova senha</label><input type="password" id="pw-new" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
         <button class="btn btn-primary" onclick="changeOwnPassword()">Alterar senha</button>
       </div>
     </div>
@@ -418,7 +418,7 @@
       <div class="security-grid"><div class="security-stat"><b id="user-total">—</b><span>Contas</span></div><div class="security-stat"><b id="user-active">—</b><span>Ativas</span></div><div class="security-stat"><b id="user-sessions">—</b><span>Sessões abertas</span></div></div>
       <div class="card">
         <div class="card-title" style="margin-bottom:14px">Nova conta</div>
-        <div class="form-grid"><div><label>Nome completo</label><input type="text" id="us-name" maxlength="80"></div><div><label>Usuário</label><input type="text" id="us-username" maxlength="40" autocapitalize="none"></div><div><label>Perfil</label><select id="us-role"><option value="viewer">Somente leitura</option><option value="editor">Colaborador editor</option><option value="admin">TI administrador</option></select></div><div><label>Senha inicial</label><input type="password" id="us-password" minlength="12" maxlength="128" autocomplete="new-password"></div></div>
+        <div class="form-grid"><div><label>Nome completo</label><input type="text" id="us-name" maxlength="80"></div><div><label>Usuário</label><input type="text" id="us-username" maxlength="40" autocapitalize="none"></div><div><label>Perfil</label><select id="us-role"><option value="viewer">Somente leitura</option><option value="editor">Colaborador editor</option><option value="admin">TI administrador</option></select></div><div><label>Senha inicial</label><input type="password" id="us-password" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
         <button class="btn btn-primary" onclick="addUser()">Criar conta</button>
       </div>
       <div id="user-list"></div>
@@ -1256,7 +1256,7 @@ async function copyUrl(url,trigger,msg){
 async function changeOwnPassword(){
   const current=document.getElementById('pw-current').value;
   const next=document.getElementById('pw-new').value;
-  if(!current||next.length<12){toast('Informe a senha atual e uma nova senha com pelo menos 12 caracteres');return;}
+  if(!current||next.length<5){toast('Informe a senha atual e uma nova senha com pelo menos 5 caracteres');return;}
   const result=await api('POST','/api/auth/change-password',{current_password:current,new_password:next});
   if(result.error){toast(result.error);return;}
   csrfToken=result.csrf_token;
@@ -1265,7 +1265,7 @@ async function changeOwnPassword(){
 }
 async function addUser(){
   const body={name:document.getElementById('us-name').value.trim(),username:document.getElementById('us-username').value.trim(),role:document.getElementById('us-role').value,password:document.getElementById('us-password').value};
-  if(!body.name||!body.username||body.password.length<12){toast('Preencha nome, usuário e senha com pelo menos 12 caracteres');return;}
+  if(!body.name||!body.username||body.password.length<5){toast('Preencha nome, usuário e senha com pelo menos 5 caracteres');return;}
   const result=await api('POST','/api/users',body);
   if(result.error){toast(result.error);return;}
   ['us-name','us-username','us-password'].forEach(id=>document.getElementById(id).value='');
@@ -1292,9 +1292,9 @@ async function updateUser(id,changes){
   await loadUsers();toast('Conta atualizada');
 }
 async function resetUserPassword(id,username){
-  const password=prompt('Nova senha para @'+username+' (mínimo de 12 caracteres):');
+  const password=prompt('Nova senha para @'+username+' (mínimo de 5 caracteres):');
   if(password===null)return;
-  if(password.length<12){toast('A senha precisa ter pelo menos 12 caracteres');return;}
+  if(password.length<5){toast('A senha precisa ter pelo menos 5 caracteres');return;}
   if(!confirm('Redefinir a senha e encerrar todas as sessões desta conta?'))return;
   const result=await api('POST','/api/users/'+id+'/reset-password',{password});
   if(result.error){toast(result.error);return;}

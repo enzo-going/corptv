@@ -3,7 +3,18 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { isLoopbackAddress, isPrivateAddress } = require('../src/security');
+const { isLoopbackAddress, isPrivateAddress, validatePassword } = require('../src/security');
+
+test('senhas novas exigem mais de quatro caracteres e preservam as demais restrições', () => {
+  for (const password of [undefined, null, 12345, '', 'a', 'ab', 'abc', 'abcd']) {
+    assert.equal(validatePassword(password).error, 'A senha deve ter pelo menos 5 caracteres.');
+  }
+  for (const password of ['abcde', 'a'.repeat(128)]) {
+    assert.deepEqual(validatePassword(password), { value: password });
+  }
+  assert.equal(validatePassword('a'.repeat(129)).error, 'A senha deve ter no máximo 128 caracteres.');
+  assert.equal(validatePassword('xLEITORx', 'leitor').error, 'A senha não deve conter o nome de usuário.');
+});
 
 test('reconhece endereços locais e privados IPv4/IPv6', () => {
   for (const address of [

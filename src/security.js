@@ -24,7 +24,7 @@ function validateUsername(value) {
 
 function validatePassword(value, username) {
   const password = typeof value === 'string' ? value : '';
-  if (password.length < 12) return { error: 'A senha deve ter pelo menos 12 caracteres.' };
+  if (password.length < 5) return { error: 'A senha deve ter pelo menos 5 caracteres.' };
   if (password.length > 128) return { error: 'A senha deve ter no máximo 128 caracteres.' };
   if (username && password.toLowerCase().includes(normalizeUsername(username))) {
     return { error: 'A senha não deve conter o nome de usuário.' };
