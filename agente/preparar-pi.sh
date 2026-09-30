@@ -155,6 +155,12 @@ ok "atalho \"CorporTV na TV\" no menu"
 install -d -m 755 /etc/chromium/policies/managed
 printf '{\n  "TranslateEnabled": false\n}\n' > /etc/chromium/policies/managed/corptv.json
 ok "tradução automática do navegador desligada"
+# O Chromium aberto à mão na Pi (manutenção) também pedia senha do chaveiro a cada
+# abertura. O Raspberry Pi OS lê as opções extras do navegador em /etc/chromium.d.
+if [ -d /etc/chromium.d ]; then
+  printf 'export CHROMIUM_FLAGS="$CHROMIUM_FLAGS --password-store=basic"\n' > /etc/chromium.d/corptv
+  ok "navegador aberto à mão também sem chaveiro"
+fi
 if command -v raspi-config >/dev/null 2>&1; then
   # 1 = desligar o apagamento de tela; B4 = entrar direto na área de trabalho,
   # para a TV voltar sozinha depois de uma queda de energia.

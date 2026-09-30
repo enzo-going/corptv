@@ -125,3 +125,9 @@ test('o script de preparo da Pi é válido e seguro para "curl | bash"', () => {
   const bash = require('node:child_process').spawnSync('bash', ['-n', arquivo], { encoding: 'utf8' });
   if (!bash.error) assert.equal(bash.status, 0, bash.stderr);
 });
+
+test('o Chromium aberto à mão na Pi também não pede o chaveiro', () => {
+  const preparo = fs.readFileSync(path.join(__dirname, '../agente/preparar-pi.sh'), 'utf8');
+  assert.ok(preparo.includes('/etc/chromium.d/corptv'));
+  assert.ok(preparo.includes('--password-store=basic"'));
+});
