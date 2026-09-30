@@ -697,16 +697,25 @@
       video.setAttribute('webkit-playsinline', 'webkit-playsinline');
       video.onended = nextSlide;
       video.onplaying = hideStatus;
+      // Vídeo com defeito não pode prender a fila: com outros conteúdos na tela,
+      // pula para o próximo (ele volta a ser tentado na volta seguinte). Sozinho
+      // na tela, tenta de novo em 15 s.
       video.onerror = function () {
         if (retryTimer || current !== currentAtRender) return;
-        showStatus('Falha ao abrir o video - nova tentativa em 15 segundos');
+        var sozinho = slides.length < 2;
+        showStatus(sozinho ? 'Falha ao abrir o video - nova tentativa em 15 segundos'
+                           : 'Falha ao abrir o video - seguindo para o proximo');
         retryTimer = setTimeout(function () {
           retryTimer = null;
-          if (current === currentAtRender) {
+          if (current !== currentAtRender) return;
+          if (sozinho) {
             renderSlide();
             startTimer();
+          } else {
+            hideStatus();
+            nextSlide();
           }
-        }, 15000);
+        }, sozinho ? 15000 : 3000);
       };
       layer.appendChild(video);
       overlay.style.display = 'block';

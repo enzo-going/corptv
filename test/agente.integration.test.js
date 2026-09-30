@@ -30,6 +30,7 @@ const servidor = {
   registro: null,
   registros: 0,
   travarProgramacao: false,
+  foraDoAr: false,
   presas: [],
   ultimoRegistro: null,
   telasPedidas: [],
@@ -95,6 +96,7 @@ test.before(async () => {
 
     if (pathname.startsWith('/api/player/')) {
       servidor.telasPedidas.push(decodeURIComponent(pathname.slice('/api/player/'.length)));
+      if (servidor.foraDoAr) { res.writeHead(503); return res.end(); }
       // Programação "travada": simula um download longo segurando a sincronização.
       if (servidor.travarProgramacao) { servidor.presas.push(res); return; }
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -309,6 +311,8 @@ test('não fica preso no aviso de erro quando o servidor volta', async () => {
   };
   try {
     await esperar(async () => /sem contato com o servidor/.test(await pagina()), 'o agente responder sem servidor');
+    // O aviso se recarrega sozinho: ninguém aperta F5 numa TV.
+    assert.match(await pagina(), /http-equiv="refresh"/);
 
     const voltou = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/html' });
@@ -373,4 +377,30 @@ test('continua avisando o painel que está ligado mesmo com a sincronização pr
       res.end(JSON.stringify(servidor.playlist));
     }
   }
+});
+
+test('sem rede, a Pi tira da tela o conteúdo que venceu', async () => {
+  const lista = async () => (await (await fetch(`http://127.0.0.1:${portaAgente}/api/player/x`)).json()).slides;
+  // Um texto curto, sem mídia: a validade vale igual e não depende de download.
+  const original = servidor.playlist;
+  servidor.playlist = { screen: { id: TELA }, slides: [{ id: 'aviso', type: 'txt', title: 'Aviso', duration: 5, cache_for_ms: 1500 }] };
+  try {
+    await esperar(async () => (await lista()).some(s => s.cache_for_ms === 1500), 'o agente receber a validade do servidor');
+    servidor.foraDoAr = true;
+    await esperar(async () => (await lista()).length === 0, 'o conteúdo vencido sair da tela com a rede fora', 10000);
+  } finally {
+    servidor.foraDoAr = false;
+    servidor.playlist = original;
+  }
+  // Com a rede de volta, a Pi segue de novo o que o servidor mandar.
+  await esperar(async () => (await lista()).length === original.slides.length, 'a programação voltar com a rede');
+});
+
+test('download pela metade abandonado não fica ocupando o disco', async () => {
+  servidor.playlist = playlistCom(ARQUIVO);
+  await esperar(() => fs.existsSync(path.join(cache, ARQUIVO)), 'a mídia da programação estar no disco');
+  const abandonado = path.join(cache, 'abandonado-0000.mp4.parcial');
+  fs.writeFileSync(abandonado, Buffer.alloc(1024));
+  await esperar(() => !fs.existsSync(abandonado), 'a limpeza apagar o .parcial que não é da programação');
+  assert.ok(fs.existsSync(path.join(cache, ARQUIVO)), 'a mídia da programação tem de continuar');
 });
