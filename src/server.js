@@ -713,7 +713,10 @@ async function telaExiste(id) {
 }
 
 app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
-  const { id, nome, tela_local } = req.body || {};
+  const { id, nome, tela_local, ip: ipInformado } = req.body || {};
+  // O IP que a Pi informa (o servidor vê o nginx, não a Pi). Só o formato; o
+  // resto é ignorado para nada estranho chegar ao painel.
+  const ip = typeof ipInformado === 'string' && /^(\d{1,3}\.){3}\d{1,3}$/.test(ipInformado) ? ipInformado : null;
   if (typeof id !== 'string' || !ID_APARELHO.test(id)) return res.status(400).json({ error: 'Aparelho inválido' });
   const agora = new Date().toISOString();
   let aparelho = await db.devices.findOne({ id });
@@ -722,11 +725,11 @@ app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
     // Aparelho instalado antes desta versão já tinha a tela na configuração local:
     // entra no painel com ela, sem ninguém precisar escolher de novo.
     const screen_id = (await telaExiste(tela_local)) ? tela_local : null;
-    aparelho = { id, name: nomeAparelho(nome), screen_id, last_seen: agora, created_at: agora };
+    aparelho = { id, name: nomeAparelho(nome), ip, screen_id, last_seen: agora, created_at: agora };
     await db.devices.insert(aparelho);
     log('INFO', 'aparelho novo', { aparelho: id, nome: aparelho.name, tela: screen_id });
   } else {
-    await db.devices.update({ id }, { $set: { last_seen: agora, name: nomeAparelho(nome) } });
+    await db.devices.update({ id }, { $set: { last_seen: agora, name: nomeAparelho(nome), ip } });
   }
   // Tela apagada no painel: o aparelho volta a "aguardando tela".
   const screen_id = (await telaExiste(aparelho.screen_id)) ? aparelho.screen_id : null;

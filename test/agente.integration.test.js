@@ -331,6 +331,9 @@ test('segue a tela escolhida no painel e avisa quando fica sem tela', async () =
   // O aparelho se apresenta com um id próprio e a tela que tinha na configuração.
   assert.match(servidor.ultimoRegistro.id, /^[0-9a-f-]{36}$/);
   assert.equal(servidor.ultimoRegistro.tela_local, TELA);
+  // E informa o próprio IP, para o TI achar a Pi pelo painel.
+  assert.ok('ip' in servidor.ultimoRegistro);
+  if (servidor.ultimoRegistro.ip !== null) assert.match(servidor.ultimoRegistro.ip, /^(\d{1,3}\.){3}\d{1,3}$/);
   const salvo = JSON.parse(fs.readFileSync(path.join(cache, 'aparelho.json'), 'utf8'));
   assert.equal(salvo.tela, 'refeitorio', 'a escolha tem de sobreviver a um reinício sem rede');
   // A limpeza de mídia antiga não pode levar junto a cópia do player (TV sem rede).
