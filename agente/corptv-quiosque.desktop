@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=CorporTV na TV
-Comment=Mostra o CorporTV em tela cheia. Alt+F4 fecha para manutenção; este atalho (ou reiniciar) volta.
+Comment=Mostra o CorporTV em tela cheia. F11 sai e volta da tela cheia; Alt+F4 fecha para manutenção e este atalho (ou reiniciar) volta.
 Exec=/opt/corptv-agente/iniciar-quiosque.sh
 Icon=video-display
 Categories=AudioVideo;

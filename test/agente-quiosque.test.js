@@ -51,6 +51,15 @@ test('o quiosque não deixa o chaveiro do sistema abrir janela por cima da TV', 
   assert.ok(quiosque.includes('    --password-store=basic \\\n'));
 });
 
+test('a tela cheia tem saída: F11 sai e volta, sem barra de endereço', () => {
+  // O --kiosk não deixava sair da tela cheia; --app abre sem barra nem abas.
+  assert.ok(!quiosque.includes('    --kiosk \
+'), 'voltou o --kiosk, que não tem saída');
+  assert.ok(quiosque.includes('    --start-fullscreen \
+'));
+  assert.ok(quiosque.includes('    --app="$URL" &'));
+});
+
 test('o quiosque aponta para o agente local, nunca para o servidor', () => {
   assert.match(quiosque, /URL="http:\/\/127\.0\.0\.1:\$\{PORTA\}\//);
   assert.doesNotMatch(quiosque, /chromium.*:3000/is);
