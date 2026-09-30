@@ -28,6 +28,9 @@ const servidor = {
   heartbeats: 0,
   // Resposta do registro do aparelho; null = servidor antigo, sem a rota (404).
   registro: null,
+  registros: 0,
+  travarProgramacao: false,
+  presas: [],
   ultimoRegistro: null,
   telasPedidas: [],
   downloads: 0
@@ -83,6 +86,7 @@ test.before(async () => {
       req.on('data', c => { corpo += c; });
       req.on('end', () => {
         servidor.ultimoRegistro = JSON.parse(corpo);
+        servidor.registros++;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(servidor.registro));
       });
@@ -91,6 +95,8 @@ test.before(async () => {
 
     if (pathname.startsWith('/api/player/')) {
       servidor.telasPedidas.push(decodeURIComponent(pathname.slice('/api/player/'.length)));
+      // Programação "travada": simula um download longo segurando a sincronização.
+      if (servidor.travarProgramacao) { servidor.presas.push(res); return; }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify(servidor.playlist));
     }
@@ -139,6 +145,7 @@ test.before(async () => {
       CORPTV_LIMITE_MBPS: '0',   // sem limite: o teste não pode depender do relógio
       CORPTV_JITTER: '0',        // sem espera aleatória
       CORPTV_INTERVALO: '1',     // sincroniza a cada segundo
+      CORPTV_INTERVALO_REGISTRO: '1',
       CORPTV_INTERVALO_PLAYER: '1'
     },
     stdio: ['ignore', 'pipe', 'pipe']
@@ -348,4 +355,22 @@ test('segue a tela escolhida no painel e avisa quando fica sem tela', async () =
 
   servidor.registro = { screen_id: TELA };
   await esperar(async () => (await status()).tela === TELA, 'o agente voltar para a tela original');
+});
+
+test('continua avisando o painel que está ligado mesmo com a sincronização presa', async () => {
+  // Antes o aviso vinha de dentro da sincronização: durante um download longo a
+  // Pi parava de avisar e o painel a mostrava como desligada.
+  servidor.registro = { screen_id: TELA };
+  servidor.travarProgramacao = true;
+  try {
+    await esperar(() => servidor.presas.length > 0, 'a sincronização ficar presa');
+    const antes = servidor.registros;
+    await esperar(() => servidor.registros >= antes + 2, 'o aviso seguir sozinho com a sincronização presa');
+  } finally {
+    servidor.travarProgramacao = false;
+    for (const res of servidor.presas.splice(0)) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(servidor.playlist));
+    }
+  }
 });

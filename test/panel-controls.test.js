@@ -288,3 +288,8 @@ test('o painel renomeia a tela sem trocar o endereço nem o volume', () => {
   assert.match(fn, /api\('PUT','\/api\/screens\/'\+id,\{name:limpo,group_id:s\.group_id\}\)/);
   assert.doesNotMatch(fn, /volume/);
 });
+
+test('o painel dá a Raspberry como desligada depois de 1 minuto sem aviso', () => {
+  // O aviso vem a cada 15 s; 4 perdidos seguidos é aparelho desligado de verdade.
+  assert.ok(panel.includes('(Date.now()-new Date(d.last_seen).getTime())<60000;}'));
+});

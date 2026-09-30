@@ -1113,8 +1113,8 @@ function volumeText(v){return v===0?'Mudo':v+'%';}
 // O comando que prepara uma Raspberry nova: o mesmo para todas, rodado uma vez em
 // cada uma. O script vem do próprio servidor, então ninguém precisa guardá-lo.
 function piCommand(origin){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash';}
-// Aparelho manda sinal a cada minuto; com folga para uma rede lenta.
-function deviceOnline(d){return !!d.last_seen&&(Date.now()-new Date(d.last_seen).getTime())<150000;}
+// Aparelho manda sinal a cada 15 s; 1 minuto sem sinal (4 perdidos) = desligado.
+function deviceOnline(d){return !!d.last_seen&&(Date.now()-new Date(d.last_seen).getTime())<60000;}
 async function renderDevices(){
   // Não redesenha com a lista de telas aberta: o load() de 30 s fecharia a escolha.
   const ativo=document.activeElement;
