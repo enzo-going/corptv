@@ -9,6 +9,7 @@ const db = require('./db');
 const { createAudit } = require('./audit');
 const { createAuth } = require('./auth');
 const { validateGroupInput, validateScreenInput, validateSlideInput } = require('./validation');
+const scheduling = require('./scheduling');
 const {
   acceptsUpload,
   inspectStoredUpload,
@@ -390,36 +391,13 @@ function temAgenda(a) {
   return !!(a && (a.starts_at || a.expires_at || (a.days && a.days.length) || a.time_start || a.time_end));
 }
 
-// Fonte unica da regra de calendario. Devolve o motivo de o slide estar oculto
-// para o painel poder explicar ao usuario, em vez de a tela sumir sem aviso.
-// Retorna { active: bool, reason: string|null }.
-const DIAS_CURTOS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sab'];
-
+// Devolve { active, reason, detail }: o motivo de o slide estar oculto, para o
+// painel explicar ao usuário em vez de a tela sumir sem aviso.
+// A regra mora em scheduling.js, a versão testada — inclusive a madrugada: "seg
+// 22h-06h" vale de segunda à noite até terça de manhã. Antes havia aqui uma cópia
+// própria que usava o dia do relógio e errava depois da meia-noite.
 function statusAgenda(a, now) {
-  now = now || new Date();
-
-  if (a.starts_at && now < new Date(a.starts_at)) {
-    return { active: false, reason: 'aguardando', detail: 'ainda não chegou a data de início' };
-  }
-  if (a.expires_at && now > new Date(a.expires_at)) {
-    return { active: false, reason: 'expirado', detail: 'o prazo já passou' };
-  }
-  if (Array.isArray(a.days) && a.days.length && a.days.indexOf(now.getDay()) === -1) {
-    const nomes = a.days.slice().sort((x, y) => x - y).map(d => DIAS_CURTOS[d]).join('/');
-    return { active: false, reason: 'fora_do_dia', detail: 'só toca ' + nomes };
-  }
-  const start = toMinutes(a.time_start);
-  const end = toMinutes(a.time_end);
-  if (start !== null && end !== null) {
-    const mins = now.getHours() * 60 + now.getMinutes();
-    const dentro = start <= end
-      ? (mins >= start && mins <= end)
-      : (mins >= start || mins <= end); // faixa que cruza a meia-noite (22:00-06:00)
-    if (!dentro) {
-      return { active: false, reason: 'fora_do_horario', detail: 'só toca das ' + a.time_start + ' às ' + a.time_end };
-    }
-  }
-  return { active: true, reason: null, detail: null };
+  return scheduling.slideStatus(a, now || new Date());
 }
 
 // Recusa combinacoes que nunca tocariam, para o conteudo nao sumir da tela sem
@@ -664,8 +642,13 @@ app.get('/api/player/:slug', async (req, res) => {
   const vinculos = await db.gslides.find({ group_id: screen.group_id }).sort({ position: 1 });
   const now = new Date();
   const itens = await Promise.all(vinculos.map(async v => {
-    if (!statusAgenda(agendaDoVinculo(v), now).active) return null;
-    return db.slides.findOne({ id: v.slide_id });
+    const agenda = agendaDoVinculo(v);
+    if (!statusAgenda(agenda, now).active) return null;
+    const slide = await db.slides.findOne({ id: v.slide_id });
+    // Por quanto tempo uma cópia offline (player ou agente) ainda pode exibir o
+    // conteúdo sem falar com o servidor. Sem isso, um conteúdo vencido seguia na
+    // TV enquanto a rede estivesse fora. null = a agenda não tem prazo à frente.
+    return slide && { ...slide, cache_for_ms: scheduling.activeForMs(agenda, now) };
   }));
   // Telas cadastradas antes do controle de volume não têm o campo: tocam no máximo,
   // como sempre tocaram.
@@ -736,11 +719,13 @@ app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
   res.json({ screen_id });
 });
 
-app.get('/api/aparelhos', async (req, res) => {
+// Consultar e mexer nos aparelhos é do TI, como Usuários e Auditoria: o painel já
+// escondia a página, mas a API aceitava qualquer perfil de edição.
+app.get('/api/aparelhos', auth.requireRole('admin'), async (req, res) => {
   res.json(await db.devices.find({}).sort({ name: 1 }));
 });
 
-app.put('/api/aparelhos/:id', async (req, res) => {
+app.put('/api/aparelhos/:id', auth.requireRole('admin'), async (req, res) => {
   const screen_id = req.body && req.body.screen_id;
   if (screen_id !== null && !(await telaExiste(screen_id))) return res.status(400).json({ error: 'Escolha uma tela que exista' });
   const affected = await db.devices.update({ id: req.params.id }, { $set: { screen_id } });
@@ -749,7 +734,7 @@ app.put('/api/aparelhos/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/aparelhos/:id', async (req, res) => {
+app.delete('/api/aparelhos/:id', auth.requireRole('admin'), async (req, res) => {
   const removed = await db.devices.remove({ id: req.params.id }, {});
   if (!removed) return res.status(404).json({ error: 'Aparelho não encontrado' });
   res.json({ ok: true });

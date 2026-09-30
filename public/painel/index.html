@@ -556,7 +556,7 @@ async function logout(){const result=await api('POST','/api/auth/logout',{});if(
 // com os últimos dados; a próxima passagem se recupera sozinha.
 async function load(){
   try{
-    [slides,groups,screens,devices]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens'),api('GET','/api/aparelhos')]);
+    [slides,groups,screens,devices]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens'),permissions&&permissions.users?api('GET','/api/aparelhos'):Promise.resolve([])]);
     if(!Array.isArray(devices))devices=[];
   }catch(e){
     toast('Sem conexão com o servidor — tentando de novo em 30s');

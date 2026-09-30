@@ -272,6 +272,34 @@ test('aparelho se registra sozinho e a tela se escolhe no painel', async () => {
   assert.equal((await json('/api/aparelhos/' + id, { method: 'DELETE', body: {} })).response.status, 404);
 });
 
+test('o player recebe a validade de cada conteúdo, calculada pela regra de agenda testada', async () => {
+  const group = await json('/api/groups', { method: 'POST', body: { name: 'Validade', color: '#224466' } });
+  const screen = await json('/api/screens', { method: 'POST', body: { name: 'TV Validade', group_id: group.body.id } });
+  const form = new FormData();
+  addPanelFields(form, 'Aviso com prazo');
+  form.set('type', 'txt');
+  const slide = await (await request('/api/slides', { method: 'POST', body: form })).json();
+  const umaHora = 60 * 60 * 1000;
+  // Como o painel manda: data e hora locais, sem fuso ("2026-09-30T15:40").
+  const fim = new Date(Date.now() + umaHora + 60000);
+  const d2 = n => String(n).padStart(2, '0');
+  const local = `${fim.getFullYear()}-${d2(fim.getMonth() + 1)}-${d2(fim.getDate())}T${d2(fim.getHours())}:${d2(fim.getMinutes())}`;
+  const vinculo = await json('/api/groups/' + group.body.id + '/slides', {
+    method: 'POST', body: { slide_id: slide.id, expires_at: local }
+  });
+  assert.equal(vinculo.response.status, 200);
+
+  // Sem isso, uma cópia offline exibia o conteúdo para sempre, mesmo vencido.
+  const player = await (await request('/api/player/' + screen.body.id)).json();
+  const item = player.slides.find(s => s.id === slide.id);
+  assert.ok(item.cache_for_ms > umaHora - 60000 && item.cache_for_ms <= umaHora + 120000, 'validade: ' + item.cache_for_ms);
+
+  // O servidor usa a regra de scheduling.js (a da madrugada certa), não uma cópia.
+  const fonte = fs.readFileSync(path.join(__dirname, '../src/server.js'), 'utf8');
+  assert.ok(fonte.includes('return scheduling.slideStatus(a, now || new Date());'));
+  assert.ok(!fonte.includes('now.getDay()'), 'voltou a haver regra de dia própria no servidor');
+});
+
 test('API rejeita corpos JSON ausentes sem responder erro interno', async () => {
   const group = await json('/api/groups', { method: 'POST' });
   assert.equal(group.response.status, 400);

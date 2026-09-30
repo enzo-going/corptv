@@ -163,6 +163,11 @@ test('CSRF e perfis impedem alterações e acesso de TI fora da permissão', asy
   assert.equal(group.response.status, 200);
   assert.equal((await send('/api/users', { auth: editor })).response.status, 403);
   assert.equal((await send('/api/audit', { auth: editor })).response.status, 403);
+  // Aparelhos é do TI na API também, não só escondido no painel.
+  assert.equal((await send('/api/aparelhos', { auth: editor })).response.status, 403);
+  assert.equal((await send('/api/aparelhos/qualquer', {
+    method: 'PUT', auth: editor, body: { screen_id: null }
+  })).response.status, 403);
 });
 
 test('gestão preserva o último administrador e revoga sessões', async () => {
