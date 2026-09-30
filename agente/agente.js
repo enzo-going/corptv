@@ -43,6 +43,10 @@ const CONFIG = {
   limiteMbps: parseFloat(process.env.CORPTV_LIMITE_MBPS || '2'),
   // De quanto em quanto tempo confere a programação.
   intervaloProgramacaoS: parseInt(process.env.CORPTV_INTERVALO || '60', 10),
+  // De quanto em quanto tempo avisa o painel que está ligado e pergunta a tela.
+  // Separado da programação: um download longo não pode fazer a Pi parecer
+  // desligada, nem atrasar a troca de tela escolhida no painel.
+  intervaloRegistroS: parseInt(process.env.CORPTV_INTERVALO_REGISTRO || '15', 10),
   // Espalha o início dos downloads para vários aparelhos não baixarem juntos.
   jitterMaxS: parseInt(process.env.CORPTV_JITTER || '90', 10),
   // De quanto em quanto tempo baixa de novo a página do player.
@@ -225,26 +229,33 @@ async function baixarComTentativas(urlRemota, destino, tamanho) {
 // ── SINCRONIZAÇÃO ────────────────────────────────────────────────────────────
 let playlistLocal = null;   // playlist já com caminhos locais
 let sincronizando = false;
+let sincronizarDeNovo = false; // troca de tela chegou no meio de uma sincronização
 
 function nomeLocal(urlRemota) {
   return path.basename(new URL(urlRemota, CONFIG.servidor).pathname);
 }
 
-async function sincronizar() {
-  if (sincronizando) return;
+// semEspera: troca de tela feita no painel. A espera aleatória existe para várias
+// TVs não baixarem o mesmo vídeo novo ao mesmo tempo; numa troca, é um aparelho só.
+async function sincronizar(opcoes = {}) {
+  if (sincronizando) {
+    if (opcoes.semEspera) sincronizarDeNovo = true;
+    return;
+  }
   sincronizando = true;
+  const tela = telaAtual;
   try {
-    await registrar();
-    if (!telaAtual) { playlistLocal = null; return; }
-    const res = await pedir(CONFIG.servidor + '/api/player/' + encodeURIComponent(telaAtual));
+    if (!tela) { playlistLocal = null; return; }
+    const res = await pedir(CONFIG.servidor + '/api/player/' + encodeURIComponent(tela));
     if (res.statusCode !== 200) { res.destroy(); throw new Error('HTTP ' + res.statusCode); }
     const dados = JSON.parse(await lerTudo(res));
     const estado = lerEstado();
     const slides = dados.slides || [];
+    const mesmaTela = !!(playlistLocal && playlistLocal.screen && playlistLocal.screen.id === tela);
 
     // Os ajustes da tela (volume, pedido de recarregar) chegam ao player já,
     // sem esperar o download de uma mídia nova terminar.
-    if (playlistLocal && dados.screen) playlistLocal.screen = dados.screen;
+    if (mesmaTela && dados.screen) playlistLocal.screen = dados.screen;
 
     for (const slide of slides) {
       if (!slide.url) continue;
@@ -275,7 +286,7 @@ async function sincronizar() {
       else log('INFO', 'midia nova, baixando', { arquivo: nome, mb: tamanho ? +(tamanho / 1048576).toFixed(1) : '?' });
 
       // Espalha o início: com vários aparelhos, evita todos baixarem juntos.
-      const jitter = Math.floor(Math.random() * CONFIG.jitterMaxS * 1000);
+      const jitter = opcoes.semEspera ? 0 : Math.floor(Math.random() * CONFIG.jitterMaxS * 1000);
       if (jitter) { log('INFO', 'aguardando para espalhar a carga', { seg: Math.round(jitter / 1000) }); await esperar(jitter); }
 
       await baixarComTentativas(urlRemota, destino, tamanho);
@@ -283,8 +294,17 @@ async function sincronizar() {
       salvarEstado(estado);
     }
 
+    // A tela mudou de novo enquanto baixava: esta programação já não vale.
+    if (tela !== telaAtual) return;
+
     // Playlist com caminhos locais: só entra o que já está no disco.
     const prontos = slides.filter(s => !s.url || fs.existsSync(path.join(CONFIG.pasta, nomeLocal(s.url))));
+    // Troca de tela com nada da nova pronto ainda: a TV segue na tela anterior em
+    // vez de ficar preta com "sem conteúdo" enquanto baixa.
+    if (!mesmaTela && prontos.length === 0 && slides.length > 0 && playlistLocal && playlistLocal.slides.length) {
+      log('INFO', 'mantendo a tela anterior ate a nova ficar pronta', { tela });
+      return;
+    }
     playlistLocal = {
       screen: dados.screen,
       slides: prontos.map(s => s.url ? Object.assign({}, s, { url: '/midia/' + nomeLocal(s.url) }) : s)
@@ -306,6 +326,10 @@ async function sincronizar() {
     }
   } finally {
     sincronizando = false;
+    if (sincronizarDeNovo) {
+      sincronizarDeNovo = false;
+      setImmediate(() => sincronizar({ semEspera: true }));
+    }
   }
 }
 
@@ -349,9 +373,9 @@ function ipLocal() {
 }
 
 // ── REGISTRO NO PAINEL ───────────────────────────────────────────────────────
-// A cada sincronização o aparelho diz ao servidor que existe e pergunta qual
-// tela deve exibir. Servidor antigo (sem essa rota) ou fora do ar: segue com a
-// última tela conhecida.
+// A cada 15 s o aparelho diz ao servidor que está ligado e pergunta qual tela deve
+// exibir. Servidor antigo (sem essa rota) ou fora do ar: segue com a última tela
+// conhecida. Trocou a tela no painel: sincroniza na hora, sem esperar o ciclo.
 async function registrar() {
   try {
     const corpo = JSON.stringify({ id: aparelho.id, nome: os.hostname(), ip: ipLocal(), tela_local: CONFIG.tela });
@@ -365,8 +389,11 @@ async function registrar() {
     if (nova === telaAtual) return;
     log('INFO', nova ? 'tela escolhida no painel' : 'painel tirou a tela deste aparelho', { de: telaAtual || null, para: nova || null });
     telaAtual = nova;
-    playlistLocal = null;
+    // Sem tela: aviso de "escolha a tela". Com tela nova: a anterior segue no ar
+    // até a nova estar pronta (ver sincronizar).
+    if (!nova) playlistLocal = null;
     salvarAparelho();
+    sincronizar({ semEspera: true });
   } catch (e) { /* sem servidor: segue com a última tela conhecida */ }
 }
 
@@ -522,7 +549,9 @@ servidor.listen(CONFIG.porta, '127.0.0.1', () => {
     endereco: 'http://127.0.0.1:' + CONFIG.porta,
     limite_mbps: CONFIG.limiteMbps, cache: CONFIG.pasta
   });
-  sincronizar();
+  // Primeiro descobre a tela no painel, depois sincroniza.
+  registrar().finally(() => sincronizar());
+  setInterval(registrar, CONFIG.intervaloRegistroS * 1000);
   setInterval(sincronizar, CONFIG.intervaloProgramacaoS * 1000);
   atualizarPlayer();
   setInterval(atualizarPlayer, CONFIG.intervaloPlayerS * 1000);
