@@ -88,10 +88,11 @@ configurar_audio() {
 
 configurar_audio
 
-# --app + --start-fullscreen (em vez de --kiosk): abre em tela cheia numa janela
-# de aplicativo, sem barra de endereço nem abas. O --kiosk não tinha saída: F11
-# não fazia nada. Assim, com um teclado na Pi, F11 sai da tela cheia para olhar
-# outra coisa e F11 volta; Alt+F4 fecha para manutenção (ver o laço abaixo).
+# --start-fullscreen numa janela normal (em vez de --kiosk): abre em tela cheia,
+# sem barra nem abas à vista, e com um teclado na Pi F11 sai da tela cheia para
+# olhar outra coisa e F11 volta; Alt+F4 fecha para manutenção (ver o laço abaixo).
+# O --kiosk não tinha saída (F11 não fazia nada). E não usar --app: o Chromium
+# ignora o --start-fullscreen na janela de aplicativo, e a TV abria em janela.
 #
 # --lang=pt-BR: o Raspberry Pi OS vem em inglês e o player é em português; com
 # idiomas diferentes o Chromium oferecia "traduzir" a cada troca de conteúdo. A
@@ -121,6 +122,8 @@ while [ "$encerrando" -eq 0 ]; do
   "$NAVEGADOR" \
     --ozone-platform-hint=auto \
     --start-fullscreen \
+    --no-first-run \
+    --no-default-browser-check \
     --password-store=basic \
     --lang=pt-BR \
     --noerrdialogs \
@@ -131,7 +134,7 @@ while [ "$encerrando" -eq 0 ]; do
     --check-for-update-interval=31536000 \
     --disable-pinch \
     --overscroll-history-navigation=0 \
-    --app="$URL" &
+    "$URL" &
 
   navegador=$!
   wait "$navegador"
