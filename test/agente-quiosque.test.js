@@ -51,13 +51,14 @@ test('o quiosque não deixa o chaveiro do sistema abrir janela por cima da TV', 
   assert.ok(quiosque.includes('    --password-store=basic \\\n'));
 });
 
-test('a tela cheia tem saída: F11 sai e volta, sem barra de endereço', () => {
-  // O --kiosk não deixava sair da tela cheia; --app abre sem barra nem abas.
-  assert.ok(!quiosque.includes('    --kiosk \
-'), 'voltou o --kiosk, que não tem saída');
-  assert.ok(quiosque.includes('    --start-fullscreen \
-'));
-  assert.ok(quiosque.includes('    --app="$URL" &'));
+test('a TV abre em tela cheia e a tela cheia tem saída (F11)', () => {
+  const linhas = quiosque.split('\n').map(l => l.trim());
+  // O --kiosk não deixava sair da tela cheia (F11 não fazia nada).
+  assert.ok(!linhas.includes('--kiosk \\'), 'voltou o --kiosk, que não tem saída');
+  assert.ok(linhas.includes('--start-fullscreen \\'));
+  // Com --app, o Chromium ignora o --start-fullscreen e a TV abria em janela.
+  assert.ok(!linhas.some(l => l.startsWith('--app')), 'voltou o --app, que abre em janela');
+  assert.ok(linhas.includes('"$URL" &'));
 });
 
 test('o quiosque aponta para o agente local, nunca para o servidor', () => {
