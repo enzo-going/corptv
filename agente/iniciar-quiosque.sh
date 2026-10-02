@@ -62,6 +62,62 @@ limpar_flags_de_crash() {
   fi
 }
 
+# Tela cheia. No labwc (Wayland, padrão do Raspberry Pi OS atual) o
+# --start-fullscreen do Chromium não serve: medido na Pi, no boot a TV abria em
+# janela e, quando pegava, a imagem ficava do tamanho da janela, com bordas pretas.
+# Quem põe a janela em tela cheia é o próprio labwc, por uma regra que só vale para
+# a janela da TV (--class=corptv-tv): o Chromium aberto à mão continua normal. O
+# resultado é o mesmo do F11 manual, e o F11 continua saindo e voltando.
+#
+# O labwc da Raspberry roda em modo merge (-m): o rc.xml do usuário SOMA ao do
+# sistema. Sem merge, criar esse arquivo trocaria a configuração inteira da área
+# de trabalho, então aí não mexe e fica o --start-fullscreen (que no X11 funciona).
+# Roda a cada início para se consertar sozinho se alguém regravar o arquivo.
+CLASSE_JANELA=corptv-tv
+REGRAS_LABWC="$HOME/.config/labwc/rc.xml"
+tela_cheia_pelo_labwc() {
+  local labwc pid bloco tmp
+  labwc=$(pgrep -u "$(id -u)" -a -x labwc 2>/dev/null | head -1)
+  [ -n "$labwc" ] || return 1
+  case " $labwc " in
+    *" -m "*|*" --merge-config "*) ;;
+    *) registrar "tela cheia: labwc sem modo merge, ficou o --start-fullscreen"; return 1 ;;
+  esac
+  grep -q "identifier=\"$CLASSE_JANELA\"" "$REGRAS_LABWC" 2>/dev/null && return 0
+
+  # Em XML, comentário não pode ter dois hífens seguidos: o labwc recusava o arquivo.
+  bloco="  <!-- CorporTV: a janela da TV abre em tela cheia (F11 sai e volta). -->
+  <windowRules>
+    <windowRule identifier=\"$CLASSE_JANELA\">
+      <action name=\"ToggleFullscreen\" />
+    </windowRule>
+  </windowRules>"
+  mkdir -p "$(dirname "$REGRAS_LABWC")"
+  if [ ! -f "$REGRAS_LABWC" ]; then
+    printf '<?xml version="1.0" encoding="UTF-8"?>\n<openbox_config xmlns="http://openbox.org/3.4/rc">\n%s\n</openbox_config>\n' "$bloco" > "$REGRAS_LABWC"
+  elif grep -q '</openbox_config>' "$REGRAS_LABWC"; then
+    # Já existe (a Central de Controle da Pi grava ali): acrescenta sem tirar nada.
+    cp -p "$REGRAS_LABWC" "$REGRAS_LABWC.antes-corptv"
+    tmp=$(mktemp) || return 1
+    BLOCO="$bloco" awk '/<\/openbox_config>/ && !feito { print ENVIRON["BLOCO"]; feito=1 } { print }' \
+      "$REGRAS_LABWC" > "$tmp" && cat "$tmp" > "$REGRAS_LABWC"
+    rm -f "$tmp"
+  else
+    registrar "tela cheia: $REGRAS_LABWC em formato inesperado, nao mexi"
+    return 1
+  fi
+  # Um rc.xml quebrado faz o labwc ignorar o arquivo inteiro: confere antes de recarregar.
+  if python3 -c 'import xml.dom.minidom' >/dev/null 2>&1 &&
+     ! python3 -c 'import sys, xml.dom.minidom; xml.dom.minidom.parse(sys.argv[1])' "$REGRAS_LABWC" 2>/dev/null; then
+    [ -f "$REGRAS_LABWC.antes-corptv" ] && cp -p "$REGRAS_LABWC.antes-corptv" "$REGRAS_LABWC"
+    registrar "tela cheia: a regra deixou $REGRAS_LABWC invalido, voltei o anterior"
+    return 1
+  fi
+  pid=${labwc%% *}
+  kill -HUP "$pid" 2>/dev/null
+  registrar "tela cheia: regra da janela $CLASSE_JANELA gravada em $REGRAS_LABWC"
+}
+
 # Som pela HDMI e volume do sistema em 100%. Quem regula o volume é o painel
 # (por tela) e o controle remoto da TV. Se o volume do sistema ficasse nos 40%
 # que às vezes vêm de fábrica, o "100%" do painel sairia baixo sem ninguém
@@ -88,11 +144,12 @@ configurar_audio() {
 
 configurar_audio
 
-# --start-fullscreen numa janela normal (em vez de --kiosk): abre em tela cheia,
-# sem barra nem abas à vista, e com um teclado na Pi F11 sai da tela cheia para
-# olhar outra coisa e F11 volta; Alt+F4 fecha para manutenção (ver o laço abaixo).
-# O --kiosk não tinha saída (F11 não fazia nada). E não usar --app: o Chromium
-# ignora o --start-fullscreen na janela de aplicativo, e a TV abria em janela.
+# Janela normal posta em tela cheia (em vez de --kiosk): sem barra nem abas à
+# vista, e com um teclado na Pi F11 sai da tela cheia para olhar outra coisa e F11
+# volta; Alt+F4 fecha para manutenção (ver o laço abaixo). O --kiosk não tinha
+# saída (F11 não fazia nada). E não usar --app: a TV abria em janela.
+tela_cheia=()
+tela_cheia_pelo_labwc || tela_cheia=(--start-fullscreen)
 #
 # --lang=pt-BR: o Raspberry Pi OS vem em inglês e o player é em português; com
 # idiomas diferentes o Chromium oferecia "traduzir" a cada troca de conteúdo. A
@@ -121,7 +178,8 @@ while [ "$encerrando" -eq 0 ]; do
 
   "$NAVEGADOR" \
     --ozone-platform-hint=auto \
-    --start-fullscreen \
+    --class="$CLASSE_JANELA" \
+    "${tela_cheia[@]}" \
     --no-first-run \
     --no-default-browser-check \
     --password-store=basic \
