@@ -55,10 +55,75 @@ test('a TV abre em tela cheia e a tela cheia tem saída (F11)', () => {
   const linhas = quiosque.split('\n').map(l => l.trim());
   // O --kiosk não deixava sair da tela cheia (F11 não fazia nada).
   assert.ok(!linhas.includes('--kiosk \\'), 'voltou o --kiosk, que não tem saída');
-  assert.ok(linhas.includes('--start-fullscreen \\'));
-  // Com --app, o Chromium ignora o --start-fullscreen e a TV abria em janela.
   assert.ok(!linhas.some(l => l.startsWith('--app')), 'voltou o --app, que abre em janela');
+  // No labwc quem põe em tela cheia é a regra da janela da TV; o --start-fullscreen
+  // só entra sem ela (X11). Os dois juntos se anulariam: a regra INVERTE a tela cheia.
+  assert.ok(!linhas.includes('--start-fullscreen \\'), '--start-fullscreen fixo anula a regra do labwc');
+  assert.ok(linhas.includes('tela_cheia_pelo_labwc || tela_cheia=(--start-fullscreen)'));
+  assert.ok(linhas.includes('--class="$CLASSE_JANELA" \\'));
+  assert.ok(linhas.includes('"${tela_cheia[@]}" \\'));
   assert.ok(linhas.includes('"$URL" &'));
+  assert.ok(quiosque.indexOf('tela_cheia_pelo_labwc ||') < quiosque.indexOf('"$NAVEGADOR" \\'));
+});
+
+test('a regra de tela cheia do labwc soma à configuração da Pi, sem trocá-la', () => {
+  // Sem o modo merge, um rc.xml do usuário substituiria o do sistema inteiro.
+  assert.match(quiosque, /\*" -m "\*\|\*" --merge-config "\*\) ;;/);
+  assert.match(quiosque, /<windowRule identifier=\\"\$CLASSE_JANELA\\">/);
+  assert.match(quiosque, /<action name=\\"ToggleFullscreen\\" \/>/);
+  assert.match(quiosque, /^CLASSE_JANELA=corptv-tv$/m);
+  // Já gravada: não mexe de novo.
+  assert.match(quiosque, /grep -q "identifier=\\"\$CLASSE_JANELA\\"" "\$REGRAS_LABWC" 2>\/dev\/null && return 0/);
+  // Arquivo existente ganha cópia antes e volta se ficar inválido.
+  assert.match(quiosque, /cp -p "\$REGRAS_LABWC" "\$REGRAS_LABWC\.antes-corptv"/);
+  assert.match(quiosque, /xml\.dom\.minidom\.parse/);
+  // Comentário XML não pode ter "--" (o labwc recusou o arquivo inteiro na Pi).
+  const comentarios = quiosque.match(/<!--[\s\S]*?-->/g) || [];
+  assert.ok(comentarios.length > 0);
+  for (const c of comentarios) assert.ok(!c.slice(4, -3).includes('--'), `comentário XML com "--": ${c}`);
+});
+
+test('a regra de tela cheia funciona de verdade no rc.xml (novo e já existente)', (t) => {
+  const { spawnSync } = require('node:child_process');
+  const os = require('node:os');
+  if (spawnSync('bash', ['-c', 'command -v awk pgrep'], { encoding: 'utf8' }).status !== 0) {
+    t.skip('sem bash/awk/pgrep neste sistema');
+    return;
+  }
+  const inicio = quiosque.indexOf('CLASSE_JANELA=corptv-tv');
+  const fim = quiosque.indexOf('\n}\n', inicio) + 3;
+  const funcao = quiosque.slice(inicio, fim);
+  const casa = fs.mkdtempSync(path.join(os.tmpdir(), 'corptv-labwc-'));
+  // pgrep falso: finge um labwc em modo merge com um PID que não existe.
+  const bin = path.join(casa, 'bin');
+  fs.mkdirSync(bin);
+  fs.writeFileSync(path.join(bin, 'pgrep'), '#!/bin/sh\necho "999999 /usr/bin/labwc -m"\n', { mode: 0o755 });
+  const rodar = () => spawnSync('bash', ['-c', `registrar() { echo "$1"; }\n${funcao}\ntela_cheia_pelo_labwc`], {
+    encoding: 'utf8', env: { ...process.env, HOME: casa, PATH: `${bin}${path.delimiter}${process.env.PATH}` },
+  });
+  const rc = path.join(casa, '.config/labwc/rc.xml');
+
+  // Sem arquivo: cria só com a regra.
+  let r = rodar();
+  assert.equal(r.status, 0, r.stderr);
+  let xml = fs.readFileSync(rc, 'utf8');
+  assert.match(xml, /<windowRule identifier="corptv-tv">\s*<action name="ToggleFullscreen" \/>/);
+  assert.match(xml, /<\/openbox_config>\n$/);
+
+  // Rodar de novo não duplica.
+  r = rodar();
+  assert.equal(r.status, 0, r.stderr);
+  assert.equal(fs.readFileSync(rc, 'utf8'), xml);
+
+  // Arquivo da Central de Controle: mantém o que havia e acrescenta a regra.
+  fs.writeFileSync(rc, '<?xml version="1.0"?>\n<openbox_config>\n  <mouse><doubleClickTime>400</doubleClickTime></mouse>\n</openbox_config>\n');
+  r = rodar();
+  assert.equal(r.status, 0, r.stderr);
+  xml = fs.readFileSync(rc, 'utf8');
+  assert.match(xml, /<doubleClickTime>400<\/doubleClickTime>/);
+  assert.ok(xml.indexOf('identifier="corptv-tv"') < xml.indexOf('</openbox_config>'));
+  assert.ok(fs.existsSync(`${rc}.antes-corptv`));
+  fs.rmSync(casa, { recursive: true, force: true });
 });
 
 test('o quiosque aponta para o agente local, nunca para o servidor', () => {
