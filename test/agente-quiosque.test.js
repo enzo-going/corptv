@@ -26,6 +26,15 @@ test('o quiosque sai limpo quando a sessão é encerrada', () => {
   assert.match(quiosque, /trap '.*encerrando=1.*' TERM INT HUP/);
 });
 
+test('a barra "restaurar páginas" não cobre o vídeo, nem depois de queda nem de fechamento por sinal', () => {
+  // A opção --disable-session-crashed-bubble não segura a barra no Chromium atual:
+  // quem segura é limpar o estado de saída do perfil antes de cada abertura.
+  assert.ok(quiosque.includes(`sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/'`));
+  assert.ok(quiosque.includes(`sed -i 's/"exit_type":"SessionEnded"/"exit_type":"Normal"/'`));
+  const laco = quiosque.indexOf('while [ "$encerrando" -eq 0 ]; do');
+  assert.ok(quiosque.indexOf('limpar_flags_de_crash', laco) < quiosque.indexOf('"$NAVEGADOR" \\', laco));
+});
+
 test('fechar a tela cheia de propósito (Alt+F4) não reabre por cima; queda reabre', () => {
   // Código 0 só sai quando alguém fecha a janela: é manutenção.
   const saida = quiosque.indexOf('if [ "$saida" -eq 0 ]; then');

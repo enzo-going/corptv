@@ -53,11 +53,14 @@ registrar() {
 
 # Limpa flags de encerramento anormal, senão o Chromium abre com a barra
 # "restaurar páginas" cobrindo o vídeo. Precisa rodar antes de CADA abertura:
-# quando o navegador cai, é justamente essa flag que fica suja.
+# quando o navegador cai, é justamente essa flag que fica suja. "SessionEnded" é
+# o que fica quando o navegador é fechado por sinal (fim da sessão, o próprio
+# laço abaixo): medido na Pi, também abre a barra.
 limpar_flags_de_crash() {
   PERFIL="$HOME/.config/chromium/Default/Preferences"
   if [ -f "$PERFIL" ]; then
     sed -i 's/"exit_type":"Crashed"/"exit_type":"Normal"/' "$PERFIL" 2>/dev/null
+    sed -i 's/"exit_type":"SessionEnded"/"exit_type":"Normal"/' "$PERFIL" 2>/dev/null
     sed -i 's/"exited_cleanly":false/"exited_cleanly":true/' "$PERFIL" 2>/dev/null
   fi
 }
