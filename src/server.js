@@ -484,6 +484,27 @@ app.get('/api/slides', async (req, res) => {
   }));
 });
 
+app.get('/api/slides/:id/arquivo', async (req, res, next) => {
+  const slide = await db.slides.findOne({ id: req.params.id });
+  if (!slide) return res.status(404).json({ error: 'Conteúdo não encontrado.' });
+  if (slide.otimizacao && slide.otimizacao.estado === 'otimizando') {
+    return res.status(409).json({ error: 'O vídeo ainda está sendo preparado' });
+  }
+  const arquivo = ['img', 'vid'].includes(slide.type) && uploadedPathFromUrl(slide.url, uploadsDir);
+  if (!arquivo) return res.status(404).json({ error: 'Conteúdo sem arquivo disponível.' });
+  let titulo = String(slide.title || '').replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, ' ')
+    .replace(/\s+/g, ' ').trim().replace(/^[. ]+|[. ]+$/g, '').slice(0, 120).trim() || 'Conteúdo';
+  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(titulo)) titulo = '_' + titulo;
+  res.download(arquivo, titulo + path.extname(arquivo), error => {
+    if (!error) return;
+    if (!res.headersSent && (error.code === 'ENOENT' || error.status === 404)) {
+      res.removeHeader('Content-Disposition');
+      return res.status(404).json({ error: 'Arquivo não encontrado.' });
+    }
+    next(error);
+  });
+});
+
 // Sem titulo, o painel mostrava tudo como "vid" e ficava impossivel distinguir
 // dois videos. Na falta de titulo, usa o nome do arquivo enviado.
 function tituloPadrao(title, file) {
