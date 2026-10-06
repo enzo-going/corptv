@@ -599,26 +599,29 @@ app.get('/api/groups/:id/slides', async (req, res) => {
 app.post('/api/groups/:id/slides', async (req, res) => {
   const body = req.body || {};
   const { slide_id } = body;
-  const grupo = await db.groups.findOne({ id: req.params.id });
-  if (!grupo) return res.status(404).json({ error: 'Ambiente não encontrado' });
-  const slide = await db.slides.findOne({ id: slide_id });
-  if (!slide) return res.status(404).json({ error: 'Conteúdo não encontrado' });
-  const exists = await db.gslides.findOne({ group_id: req.params.id, slide_id });
-  if (exists) return res.status(400).json({ error: 'Este conteúdo já está no ambiente' });
+  return db.executarEmSerie('vinculos', async () => {
+    const grupo = await db.groups.findOne({ id: req.params.id });
+    if (!grupo) return res.status(404).json({ error: 'Ambiente não encontrado' });
+    if (typeof slide_id !== 'string' || !slide_id.trim()) return res.status(400).json({ error: 'Conteúdo obrigatório' });
+    const slide = await db.slides.findOne({ id: slide_id });
+    if (!slide) return res.status(404).json({ error: 'Conteúdo não encontrado' });
+    const exists = await db.gslides.findOne({ group_id: req.params.id, slide_id });
+    if (exists) return res.status(400).json({ error: 'Este conteúdo já está no ambiente' });
 
-  const agenda = scheduleFromBody(body);
-  const invalido = validarAgendamento(agenda);
-  if (invalido) return res.status(400).json({ error: invalido });
+    const agenda = scheduleFromBody(body);
+    const invalido = validarAgendamento(agenda);
+    if (invalido) return res.status(400).json({ error: invalido });
 
-  const all = await db.gslides.find({ group_id: req.params.id });
-  await db.gslides.insert(Object.assign(
-    { group_id: req.params.id, slide_id, position: all.length + 1 },
-    agenda
-  ));
-  log('INFO', 'conteudo adicionado ao ambiente', {
-    ambiente: grupo.name, conteudo: slide.title || slide.type, agendado: temAgenda(agenda)
+    const all = await db.gslides.find({ group_id: req.params.id });
+    await db.gslides.insert(Object.assign(
+      { group_id: req.params.id, slide_id, position: all.length + 1 },
+      agenda
+    ));
+    log('INFO', 'conteudo adicionado ao ambiente', {
+      ambiente: grupo.name, conteudo: slide.title || slide.type, agendado: temAgenda(agenda)
+    });
+    res.json({ ok: true, status: statusAgenda(agenda) });
   });
-  res.json({ ok: true, status: statusAgenda(agenda) });
 });
 
 // Define QUANDO este conteudo toca NESTE ambiente. E a rota que sustenta o
@@ -671,12 +674,14 @@ app.get('/api/screens', async (req, res) => {
 app.post('/api/screens', async (req, res) => {
   const fields = validateScreenInput(req.body || {});
   if (fields.error) return res.status(400).json({ error: fields.error });
-  const group = await db.groups.findOne({ id: fields.value.group_id });
-  if (!group) return res.status(404).json({ error: 'Ambiente não encontrado' });
-  const slug = await db.uniqueSlug(fields.value.name);
-  const doc = { id: slug, volume: 100, ...fields.value, last_seen: null, created_at: new Date() };
-  await db.screens.insert(doc);
-  res.json(doc);
+  return db.executarEmSerie('telas', async () => {
+    const group = await db.groups.findOne({ id: fields.value.group_id });
+    if (!group) return res.status(404).json({ error: 'Ambiente não encontrado' });
+    const slug = await db.uniqueSlug(fields.value.name);
+    const doc = { id: slug, volume: 100, ...fields.value, last_seen: null, created_at: new Date() };
+    await db.screens.insert(doc);
+    res.json(doc);
+  });
 });
 
 app.put('/api/screens/:id', async (req, res) => {
@@ -775,22 +780,24 @@ app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
   // resto é ignorado para nada estranho chegar ao painel.
   const ip = typeof ipInformado === 'string' && /^(\d{1,3}\.){3}\d{1,3}$/.test(ipInformado) ? ipInformado : null;
   if (typeof id !== 'string' || !ID_APARELHO.test(id)) return res.status(400).json({ error: 'Aparelho inválido' });
-  const agora = new Date().toISOString();
-  let aparelho = await db.devices.findOne({ id });
-  if (!aparelho) {
-    if (await db.devices.count({}) >= LIMITE_APARELHOS) return res.status(429).json({ error: 'Aparelhos demais cadastrados' });
-    // Aparelho instalado antes desta versão já tinha a tela na configuração local:
-    // entra no painel com ela, sem ninguém precisar escolher de novo.
-    const screen_id = (await telaExiste(tela_local)) ? tela_local : null;
-    aparelho = { id, name: nomeAparelho(nome), ip, screen_id, last_seen: agora, created_at: agora };
-    await db.devices.insert(aparelho);
-    log('INFO', 'aparelho novo', { aparelho: id, nome: aparelho.name, tela: screen_id });
-  } else {
-    await db.devices.update({ id }, { $set: { last_seen: agora, name: nomeAparelho(nome), ip } });
-  }
-  // Tela apagada no painel: o aparelho volta a "aguardando tela".
-  const screen_id = (await telaExiste(aparelho.screen_id)) ? aparelho.screen_id : null;
-  res.json({ screen_id });
+  return db.executarEmSerie('aparelhos', async () => {
+    const agora = new Date().toISOString();
+    let aparelho = await db.devices.findOne({ id });
+    if (!aparelho) {
+      if (await db.devices.count({}) >= LIMITE_APARELHOS) return res.status(429).json({ error: 'Aparelhos demais cadastrados' });
+      // Aparelho instalado antes desta versão já tinha a tela na configuração local:
+      // entra no painel com ela, sem ninguém precisar escolher de novo.
+      const screen_id = (await telaExiste(tela_local)) ? tela_local : null;
+      aparelho = { id, name: nomeAparelho(nome), ip, screen_id, last_seen: agora, created_at: agora };
+      await db.devices.insert(aparelho);
+      log('INFO', 'aparelho novo', { aparelho: id, nome: aparelho.name, tela: screen_id });
+    } else {
+      await db.devices.update({ id }, { $set: { last_seen: agora, name: nomeAparelho(nome), ip } });
+    }
+    // Tela apagada no painel: o aparelho volta a "aguardando tela".
+    const screen_id = (await telaExiste(aparelho.screen_id)) ? aparelho.screen_id : null;
+    res.json({ screen_id });
+  });
 });
 
 // Consultar e mexer nos aparelhos é do TI, como Usuários e Auditoria: o painel já
