@@ -12,6 +12,8 @@ process.env.CORPTV_UPLOADS_DIR = path.join(sandbox, 'uploads');
 process.env.CORPTV_LOG_DIR = path.join(sandbox, 'logs');
 process.env.CORPTV_DISABLE_SEED = '1';
 process.env.CORPTV_DISABLE_MAINTENANCE = '1';
+// Este arquivo usa assinaturas sintéticas; conversões reais ficam em video.integration.test.js.
+process.env.CORPTV_FFMPEG = 'desligado';
 process.env.CORPTV_MEDIA_REQUESTS_PER_MINUTE = '2';
 process.env.CORPTV_PAGE_REQUESTS_PER_MINUTE = '2';
 process.env.CORPTV_ENDERECO_PUBLICO = 'http://corportv/';
