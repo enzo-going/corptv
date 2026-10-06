@@ -78,6 +78,22 @@ test.after(async () => {
   fs.rmSync(sandbox, { recursive: true, force: true });
 });
 
+test('MP4 com assinatura válida mas análise inválida é recusado e removido', { skip: pular }, async () => {
+  const antes = new Set(fs.readdirSync(uploads));
+  const form = new FormData();
+  const bytes = Buffer.alloc(24);
+  bytes.writeUInt32BE(24, 0);
+  bytes.write('ftypisom', 4);
+  form.set('title', 'Vídeo inválido');
+  form.set('type', 'vid');
+  form.set('file', new Blob([bytes], { type: 'video/mp4' }), 'invalido.mp4');
+  const r = await pedir('/api/slides', { method: 'POST', body: form });
+  assert.equal(r.status, 415);
+  assert.match((await r.json()).error, /Não foi possível verificar/);
+  assert.deepEqual(fs.readdirSync(uploads).filter(f => !antes.has(f)), []);
+  assert.equal((await json('/api/slides', 'GET')).some(s => s.title === 'Vídeo inválido'), false);
+});
+
 test('vídeo pesado é aceito, fica fora da TV enquanto otimiza e entra no padrão', { skip: pular }, async () => {
   const config = await json('/api/config', 'GET');
   assert.equal(config.limite_upload_mb, 2048);

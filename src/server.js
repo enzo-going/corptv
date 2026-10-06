@@ -536,8 +536,10 @@ app.post('/api/slides', handleUpload, async (req, res) => {
         };
       }
     } catch (error) {
-      // Arquivo que o ffprobe não lê: entra como veio, do jeito que entrava antes.
-      log('AVISO', 'não consegui analisar o vídeo enviado; vai como veio', { arquivo: req.file.filename, msg: error.message });
+      // Sem análise não há garantia de que o arquivo toca ou cabe no padrão das TVs.
+      log('AVISO', 'não consegui analisar o vídeo enviado; upload recusado', { arquivo: req.file.filename, msg: error.message });
+      await cleanupUpload();
+      return res.status(415).json({ error: 'Não foi possível verificar este vídeo. Confira se o MP4 abre corretamente e tente novamente.' });
     }
   }
   try {
