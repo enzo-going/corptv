@@ -37,3 +37,16 @@ test('rejeita endereços públicos e intervalos fora da faixa privada', () => {
     assert.equal(isPrivateAddress(address), false, address);
   }
 });
+
+test('atrás do nginx cada TV conta no próprio limite, e o cabeçalho não é forjável', () => {
+  const { chaveDeLimite } = require('../src/security');
+  // Endereços de documentação: nenhum aparelho real.
+  const viaNginx = real => ({ ip: '127.0.0.1', socket: { remoteAddress: '::ffff:127.0.0.1' }, headers: { 'x-real-ip': real } });
+  assert.notEqual(chaveDeLimite(viaNginx('192.0.2.10')), chaveDeLimite(viaNginx('192.0.2.11')));
+  assert.equal(chaveDeLimite(viaNginx('192.0.2.10')), '192.0.2.10');
+  // Direto na porta 3000: o cabeçalho é ignorado.
+  const direto = { ip: '192.0.2.50', socket: { remoteAddress: '192.0.2.50' }, headers: { 'x-real-ip': '192.0.2.99' } };
+  assert.equal(chaveDeLimite(direto), '192.0.2.50');
+  // Cabeçalho que não é endereço: cai no endereço da conexão.
+  assert.equal(chaveDeLimite(viaNginx('qualquer coisa')), '127.0.0.1');
+});

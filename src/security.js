@@ -117,6 +117,21 @@ function isPrivateNetwork(req) {
   return isPrivateAddress(req.ip || (req.socket && req.socket.remoteAddress));
 }
 
+// Chave dos limites de requisições por cliente. Atrás do nginx local todo cliente
+// chega como 127.0.0.1, e os limites "por endereço" viravam um limite único para
+// todas as TVs e Raspberrys juntas (a partir de ~15 Pis o registro já era recusado).
+// O nginx grava o endereço real em X-Real-IP; o cabeçalho só vale quando a conexão
+// vem do próprio servidor, então quem acessa a porta 3000 direto não consegue forjar.
+function chaveDeLimite(req) {
+  const { ipKeyGenerator } = require('express-rate-limit');
+  const socket = req.socket && req.socket.remoteAddress;
+  const real = req.headers && req.headers['x-real-ip'];
+  const endereco = socket && isLoopbackAddress(socket) && typeof real === 'string' && require('net').isIP(real.trim())
+    ? real.trim()
+    : (req.ip || socket || '');
+  return ipKeyGenerator(normalizedAddress(endereco));
+}
+
 function publicUser(user) {
   if (!user) return null;
   return {
@@ -133,6 +148,7 @@ function publicUser(user) {
 }
 
 module.exports = {
+  chaveDeLimite,
   hashPassword,
   isLoopback,
   isLoopbackAddress,

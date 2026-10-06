@@ -16,7 +16,8 @@ const {
   tokenHash,
   validatePassword,
   validateUsername,
-  verifyPassword
+  verifyPassword,
+  chaveDeLimite
 } = require('./security');
 
 const COOKIE_NAME = 'corptv_session';
@@ -38,7 +39,7 @@ const authRequestLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: positiveInteger(process.env.CORPTV_AUTH_REQUESTS_PER_MINUTE, 120),
   standardHeaders: 'draft-8',
-  legacyHeaders: false
+  legacyHeaders: false, keyGenerator: chaveDeLimite
 });
 
 function positiveNumber(value, fallback) {

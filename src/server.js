@@ -5,6 +5,7 @@ const { Transform } = require('stream');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const { rateLimit } = require('express-rate-limit');
+const { chaveDeLimite } = require('./security');
 const db = require('./db');
 const { createAudit } = require('./audit');
 const { createAuth } = require('./auth');
@@ -37,23 +38,23 @@ const mediaRequestLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: positiveInteger(Number(process.env.CORPTV_MEDIA_REQUESTS_PER_MINUTE), 600),
   standardHeaders: 'draft-8',
-  legacyHeaders: false
+  legacyHeaders: false, keyGenerator: chaveDeLimite
 });
 const pageRequestLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: positiveInteger(Number(process.env.CORPTV_PAGE_REQUESTS_PER_MINUTE), 120),
   standardHeaders: 'draft-8',
-  legacyHeaders: false
+  legacyHeaders: false, keyGenerator: chaveDeLimite
 });
 const playerRequestLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: positiveInteger(Number(process.env.CORPTV_PLAYER_REQUESTS_PER_MINUTE), 120),
-  standardHeaders: 'draft-8', legacyHeaders: false
+  standardHeaders: 'draft-8', legacyHeaders: false, keyGenerator: chaveDeLimite
 });
 const heartbeatRequestLimiter = rateLimit({
   windowMs: 60 * 1000,
   limit: positiveInteger(Number(process.env.CORPTV_HEARTBEAT_REQUESTS_PER_MINUTE), 120),
-  standardHeaders: 'draft-8', legacyHeaders: false
+  standardHeaders: 'draft-8', legacyHeaders: false, keyGenerator: chaveDeLimite
 });
 
 // Log com carimbo de tempo no stdout. O gerenciador do processo pode redirecionar
@@ -776,7 +777,7 @@ app.post('/api/heartbeat', heartbeatRequestLimiter, async (req, res) => {
 // preparada com um comando igual para todas e a tela se escolhe no painel.
 const ID_APARELHO = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const LIMITE_APARELHOS = 500;
-const aparelhoLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
+const aparelhoLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false, keyGenerator: chaveDeLimite });
 
 function nomeAparelho(valor) {
   return String(valor || '').replace(/[^\w .-]/g, '').trim().slice(0, 60) || 'aparelho';
@@ -908,7 +909,7 @@ app.get('/health', async (req, res) => {
 const PASTA_AGENTE = path.join(__dirname, '../agente');
 const ARQUIVOS_PI = new Set(['agente.js', 'corptv-agente.service', 'iniciar-quiosque.sh', 'corptv-quiosque.desktop']);
 // Limite próprio: preparar várias Pis seguidas não pode esbarrar no limite das páginas.
-const piRequestLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false });
+const piRequestLimiter = rateLimit({ windowMs: 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false, keyGenerator: chaveDeLimite });
 
 app.get('/pi/preparar.sh', piRequestLimiter, (req, res) => {
   // O endereço vai para dentro de um script que roda como root na Pi: só aceita
