@@ -26,6 +26,7 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const dns = require('dns');
 const os = require('os');
 const { URL } = require('url');
 
@@ -102,11 +103,44 @@ function salvarEstado(e) {
 }
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────
+// Último endereço em que o servidor respondeu. Medido num prédio da empresa: o DNS da
+// rede de lá às vezes leva 5 s ou devolve "não encontrado" (o segundo servidor DNS é
+// público e não conhece o nome interno). Com DNS falhando, a Pi usa o último endereço
+// que funcionou; o nome continua indo no cabeçalho Host, então o nginx acerta o site.
+const arqEnderecoServidor = path.join(CONFIG.pasta, 'servidor-endereco.json');
+let enderecoConhecido = (() => {
+  try { return JSON.parse(fs.readFileSync(arqEnderecoServidor, 'utf8')); } catch (e) { return null; }
+})();
+let avisouDns = false;
+function procurarServidor(host, opcoes, cb) {
+  if (typeof opcoes === 'function') { cb = opcoes; opcoes = {}; }
+  dns.lookup(host, opcoes, (err, endereco, familia) => {
+    if (!err) {
+      const primeiro = Array.isArray(endereco) ? endereco[0] : { address: endereco, family: familia };
+      avisouDns = false;
+      if (primeiro && (!enderecoConhecido || enderecoConhecido.host !== host || enderecoConhecido.address !== primeiro.address)) {
+        enderecoConhecido = { host, address: primeiro.address, family: primeiro.family };
+        try { fs.writeFileSync(arqEnderecoServidor, JSON.stringify(enderecoConhecido)); } catch (e) { /* segue */ }
+      }
+      return cb(null, endereco, familia);
+    }
+    if (enderecoConhecido && enderecoConhecido.host === host) {
+      if (!avisouDns) {
+        log('AVISO', 'DNS falhou; usando o ultimo endereco conhecido do servidor', { host, endereco: enderecoConhecido.address, erro: err.code });
+        avisouDns = true;
+      }
+      const { address, family } = enderecoConhecido;
+      return opcoes && opcoes.all ? cb(null, [{ address, family }]) : cb(null, address, family);
+    }
+    cb(err);
+  });
+}
+
 function pedir(url, opcoes) {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const lib = u.protocol === 'https:' ? https : http;
-    const req = lib.request(u, Object.assign({ timeout: 20000 }, opcoes || {}), resolve);
+    const req = lib.request(u, Object.assign({ timeout: 20000, lookup: procurarServidor }, opcoes || {}), resolve);
     req.on('error', reject);
     req.on('timeout', () => { req.destroy(new Error('tempo esgotado')); });
     if (opcoes && opcoes.corpo) req.write(opcoes.corpo);
@@ -180,6 +214,7 @@ async function baixarArquivo(urlRemota, destino, tamanhoEsperado) {
     await new Promise((resolve, reject) => {
       res.on('data', pedaco => {
         recebido += pedaco.length;
+        andamento.atual = jaTemos + recebido;
         saida.write(pedaco);
         if (LIMITE_BYTES_S <= 0) return;
         const devidoMs = (recebido / LIMITE_BYTES_S) * 1000;
@@ -270,6 +305,41 @@ function lerPlaylistSalva() {
 }
 let playlistLocal = lerPlaylistSalva();   // playlist já com caminhos locais
 let sincronizando = false;
+// Quanto da tela atual já está no cartão. Vai no registro (o painel mostra
+// "recebendo 35%" ou "toca mesmo sem rede") e vira aviso na própria TV enquanto o
+// primeiro vídeo de uma tela ainda está chegando — antes era uma tela preta.
+const andamento = { tela: null, sincronizado: false, slides: 0, emCurso: false, falhou: false, erro: null, total: 0, feito: 0, atual: 0 };
+
+function percentualBaixado() {
+  if (!andamento.total) return 0;
+  const p = Math.floor(((andamento.feito + andamento.atual) / andamento.total) * 100);
+  return andamento.emCurso ? Math.min(99, p) : Math.min(100, p);
+}
+
+function espacoLivreMb() {
+  try {
+    const s = fs.statfsSync(CONFIG.pasta);
+    return Math.floor((s.bavail * s.bsize) / 1048576);
+  } catch (e) { return null; }
+}
+
+function situacaoAtual() {
+  if (!telaAtual) return { estado: 'sem_tela' };
+  const base = { livre_mb: espacoLivreMb(), total_mb: Math.round(andamento.total / 1048576) };
+  const daTela = andamento.tela === telaAtual;
+  if (daTela && andamento.emCurso) return Object.assign(base, { estado: 'baixando', percentual: percentualBaixado() });
+  if (daTela && andamento.falhou) return Object.assign(base, { estado: 'falha', percentual: percentualBaixado(), erro: andamento.erro });
+  if (daTela && andamento.sincronizado && andamento.slides === 0) return Object.assign(base, { estado: 'vazio' });
+  return Object.assign(base, { estado: 'pronto' });
+}
+
+// Texto que a TV mostra quando ainda não tem nada desta tela para tocar.
+function avisoDaTela() {
+  if (!telaAtual || andamento.tela !== telaAtual) return null;
+  if (andamento.emCurso) return 'Preparando esta TV: recebendo o conteúdo (' + percentualBaixado() + '%). Depois ele toca mesmo sem rede.';
+  if (andamento.falhou) return 'Esta TV ainda não recebeu o conteúdo. Confira a rede; ela tenta de novo sozinha.';
+  return null;
+}
 let sincronizarDeNovo = false; // troca de tela chegou no meio de uma sincronização
 
 function nomeLocal(urlRemota) {
@@ -304,15 +374,16 @@ async function sincronizar(opcoes = {}) {
     // limpeza, que antes só rodava depois de baixar tudo.
     liberarEspaco(slides);
 
+    // 1ª etapa: confere tudo o que a tela precisa (HEAD barato, sem baixar nada).
+    // Com o tamanho de tudo à mão, o andamento mostrado no painel e na TV é exato.
+    const itens = [];
     for (const slide of slides) {
-      // A tela mudou no painel: o resto desta programação perdeu o sentido.
       if (tela !== telaAtual) break;
       if (!slide.url) continue;
       const nome = nomeLocal(slide.url);
       const destino = path.join(CONFIG.pasta, nome);
       const urlRemota = CONFIG.servidor + slide.url;
 
-      // HEAD barato: descobre versão (ETag) e tamanho sem baixar nada.
       let etag = null, tamanho = null, headFalhou = false;
       try {
         const h = await pedir(urlRemota, { method: 'HEAD' });
@@ -332,10 +403,21 @@ async function sincronizar(opcoes = {}) {
       // Um arquivo sem registro ainda precisa ser baixado e conferido.
       const atualizado = temArquivo && registro && (headFalhou ||
                          (registro.etag === etag && (!tamanho || tamanhoLocal === tamanho)));
+      itens.push({ nome, destino, urlRemota, etag, tamanho, temArquivo, atualizado, tamanhoLocal });
+    }
+    if (tela !== telaAtual) return;
 
-      if (atualizado) continue;
+    const pendentes = itens.filter(i => !i.atualizado);
+    Object.assign(andamento, {
+      tela, sincronizado: true, slides: slides.length, emCurso: pendentes.length > 0, falhou: false, erro: null, atual: 0,
+      total: itens.reduce((t, i) => t + (i.atualizado ? i.tamanhoLocal : (i.tamanho || 0)), 0),
+      feito: itens.reduce((t, i) => t + (i.atualizado ? i.tamanhoLocal : 0), 0)
+    });
 
-      if (temArquivo) log('INFO', 'midia mudou no servidor, baixando de novo', { arquivo: nome });
+    // 2ª etapa: baixa o que falta.
+    for (const item of pendentes) {
+      const { nome, destino, urlRemota, etag, tamanho } = item;
+      if (item.temArquivo) log('INFO', 'midia mudou no servidor, baixando de novo', { arquivo: nome });
       else log('INFO', 'midia nova, baixando', { arquivo: nome, mb: tamanho ? +(tamanho / 1048576).toFixed(1) : '?' });
 
       // Espalha o início: com vários aparelhos, evita todos baixarem juntos.
@@ -348,15 +430,22 @@ async function sincronizar(opcoes = {}) {
       // antes, uma falha aqui pulava direto para "sem contato com o servidor".
       try {
         await baixarComTentativas(urlRemota, destino, tamanho);
-        estado[nome] = { etag, tamanho: tamanho || fs.statSync(destino).size, em: new Date().toISOString() };
+        const final = tamanho || fs.statSync(destino).size;
+        estado[nome] = { etag, tamanho: final, em: new Date().toISOString() };
         salvarEstado(estado);
+        andamento.feito += final;
       } catch (err) {
         if (err.message === DOWNLOAD_CANCELADO) break;
+        andamento.falhou = true;
+        andamento.erro = String(err.message || '').slice(0, 100);
         log('AVISO', 'nao consegui baixar a midia; sigo com o resto', { arquivo: nome, erro: err.message, codigo: err.code || null });
         // Disco cheio: tira também o que está na tela mas saiu da programação.
         if (err.code === 'ENOSPC') limparAntigos(slides);
+      } finally {
+        andamento.atual = 0;
       }
     }
+    andamento.emCurso = false;
 
     // A tela mudou de novo enquanto baixava: esta programação já não vale.
     if (tela !== telaAtual) return;
@@ -455,7 +544,7 @@ function ipLocal() {
 // conhecida. Trocou a tela no painel: sincroniza na hora, sem esperar o ciclo.
 async function registrar() {
   try {
-    const corpo = JSON.stringify({ id: aparelho.id, nome: os.hostname(), ip: ipLocal(), tela_local: CONFIG.tela });
+    const corpo = JSON.stringify({ id: aparelho.id, nome: os.hostname(), ip: ipLocal(), tela_local: CONFIG.tela, situacao: situacaoAtual() });
     const res = await pedir(CONFIG.servidor + '/api/aparelhos/registro', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(corpo) },
@@ -573,7 +662,9 @@ async function atender(req, res) {
     // Sem tela: a marca de recarga muda e o player aberto recarrega, caindo no aviso
     // de "aguardando tela" em vez de ficar numa lista vazia.
     if (!telaAtual) return res.end(JSON.stringify({ screen: { id: '', reload_at: 'aguardando-tela' }, slides: [] }));
-    return res.end(JSON.stringify(programacaoValida(playlistLocal) || { screen: { id: telaAtual }, slides: [] }));
+    const programa = programacaoValida(playlistLocal) || { screen: { id: telaAtual }, slides: [] };
+    const aviso = programa.slides.length ? null : avisoDaTela();
+    return res.end(JSON.stringify(aviso ? Object.assign({}, programa, { aviso }) : programa));
   }
 
   // Heartbeat: o player chama a cada 20 s; repassamos ao servidor.

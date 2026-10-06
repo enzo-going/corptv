@@ -36,6 +36,9 @@ test('seis falhas preservam o parcial e o próximo ciclo retoma por Range', asyn
   const esperas = [], logs = [];
   const contexto = vm.createContext({
     http, https: require('node:https'), fs, path, URL, LIMITE_BYTES_S: 0,
+    // Peças do agente fora do trecho recortado: a busca do servidor (aqui o DNS
+    // comum) e o andamento mostrado no painel.
+    procurarServidor: undefined, andamento: { atual: 0 },
     setTimeout: (fn, ms) => { esperas.push(ms); return setImmediate(fn); },
     log: (...args) => logs.push(args)
   });

@@ -186,7 +186,7 @@
   <div id="conn-status">⚠ Sem conexão — usando cache local</div>
   <div id="empty">
     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
-    Nenhum slide configurado para esta tela
+    <span id="empty-text">Nenhum slide configurado para esta tela</span>
   </div>
 </div>
 
@@ -423,6 +423,18 @@
     status.style.display = 'block';
   }
 
+  var EMPTY_TEXT = 'Nenhum slide configurado para esta tela';
+  function setEmptyNotice(aviso) {
+    var el = document.getElementById('empty-text');
+    var box = document.getElementById('empty');
+    if (!el || !box) return;
+    var texto = typeof aviso === 'string' && aviso ? aviso.slice(0, 160) : EMPTY_TEXT;
+    if (el.textContent !== texto) el.textContent = texto;
+    // Aviso de preparo fica legível de longe; a mensagem padrão continua discreta.
+    box.style.color = texto === EMPTY_TEXT ? '' : 'rgba(255,255,255,.75)';
+    box.style.fontSize = texto === EMPTY_TEXT ? '' : '28px';
+  }
+
   function hideStatus() {
     if (offline || audioBlocked) return;
     document.getElementById('conn-status').style.display = 'none';
@@ -599,6 +611,9 @@
           // Servidor antigo não manda volume: normalizeVolume devolve o máximo,
           // que é como sempre tocou.
           setScreenVolume(normalizeVolume(data.screen && data.screen.volume));
+          // Numa Raspberry, enquanto o primeiro vídeo da tela chega ao cartão, o
+          // agente manda um aviso legível em vez da tela preta "sem conteúdo".
+          setEmptyNotice(data.aviso);
           saveCache(nextSlides);
           applyPlaylist(nextSlides);
           hideStatus();
