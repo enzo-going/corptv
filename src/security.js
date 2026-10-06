@@ -89,7 +89,8 @@ function safeEqualText(left, right) {
 
 function isLoopback(req) {
   // req.ip respeita a configuração de proxy do Express; o socket pode ser só o proxy.
-  return isLoopbackAddress(req.ip || (req.socket && req.socket.remoteAddress));
+  const remoto = req.socket && req.socket.remoteAddress;
+  return isLoopbackAddress(req.ip || remoto) && (!remoto || isLoopbackAddress(remoto));
 }
 
 function normalizedAddress(value) {
