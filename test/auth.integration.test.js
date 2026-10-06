@@ -71,6 +71,26 @@ test('inicialização usa código descartável na rede e cria o primeiro adminis
   assert.match(status.response.headers.get('cache-control'), /no-store/);
   assert.equal(fs.existsSync(path.join(sandbox, 'logs', 'corptv-setup-code.txt')), true);
 
+  // Endereços fictícios: simula clientes chegando por um proxy confiável local.
+  app.set('trust proxy', 1);
+  try {
+    const headers = { 'x-forwarded-for': 'fd00::10' };
+    const remoteStatus = await send('/api/setup/status', { headers });
+    assert.equal(remoteStatus.data.local, false);
+    assert.equal(remoteStatus.data.activation_required, true);
+    const remoteSetup = await send('/api/setup', {
+      method: 'POST', headers,
+      body: { name: 'Administrador de teste', username: 'admin-proxy', password: 'abcde' }
+    });
+    assert.equal(remoteSetup.response.status, 403, 'o proxy não pode dispensar o código de ativação');
+    const publicSetup = await send('/api/setup', {
+      method: 'POST', headers: { 'x-forwarded-for': '2001:db8::10' }, body: {}
+    });
+    assert.equal(publicSetup.response.status, 403);
+  } finally {
+    app.set('trust proxy', false);
+  }
+
   const wrongOrigin = await send('/api/setup', {
     method: 'POST', headers: { origin: 'http://malicioso.example' },
     body: { name: 'TI', username: 'admin-ti', password: 'Senha corporativa forte 2026!' }
@@ -168,6 +188,22 @@ test('CSRF e perfis impedem alterações e acesso de TI fora da permissão', asy
   assert.equal((await send('/api/aparelhos/qualquer', {
     method: 'PUT', auth: editor, body: { screen_id: null }
   })).response.status, 403);
+});
+
+test('falha ao auditar uma negativa de perfil responde erro sem prender a requisição', async () => {
+  const editor = await login('editor', 'Chave corporativa verde 2026!');
+  const inserir = db.audit.insert;
+  db.audit.insert = async () => { throw new Error('falha de gravação simulada'); };
+  try {
+    const resposta = await fetch(baseUrl + '/api/aparelhos', {
+      headers: { cookie: editor.cookie }, signal: AbortSignal.timeout(3000)
+    });
+    assert.equal(resposta.status, 500);
+    assert.equal((await resposta.json()).error, 'Erro interno no servidor');
+    assert.equal((await send('/health')).response.status, 200);
+  } finally {
+    db.audit.insert = inserir;
+  }
 });
 
 test('gestão preserva o último administrador e revoga sessões', async () => {

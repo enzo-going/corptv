@@ -239,7 +239,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     await db.ready;
     const session = await resolveSession(req);
     if (!session) return res.status(401).json({ error: 'Autenticação necessária' });
-    next();
+    return next();
   }
 
   function requireRole(role) {
@@ -261,7 +261,7 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
       });
       return res.status(403).json({ error: 'Requisição de segurança inválida. Atualize a página e tente novamente.' });
     }
-    next();
+    return next();
   }
 
   async function requirePanelPage(req, res, next) {
