@@ -100,8 +100,9 @@ test('vídeo pesado é aceito, fica fora da TV enquanto otimiza e entra no padr�
   const final = path.join(uploads, path.basename(pronto.url));
   const info = await video.sondar(ferramentas, final);
   assert.equal(info.codec, 'h264');
-  assert.equal(info.largura, 1280);
-  assert.equal(info.altura, 720);
+  // Full HD: o 2560x1440 desce para 1920x1080, não para 720p.
+  assert.equal(info.largura, 1920);
+  assert.equal(info.altura, 1080);
   assert.ok(Math.abs(info.duracaoS - 3) < 0.5, 'duração ' + info.duracaoS);
   assert.equal(await video.inicioRapido(final), true);
 
@@ -141,16 +142,38 @@ test('só falta o início rápido: reorganiza sem recomprimir; vídeo já leve p
   assert.equal(s2.otimizacao, undefined, 'vídeo já no padrão não passa pela fila');
 });
 
-test('excluir durante a otimização não deixa arquivo para trás', { skip: pular }, async () => {
-  const bruto = gerar('excluir.mp4', ['-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=30', '-t', '8', '-c:v', 'mpeg4', '-q:v', '2']);
-  const antes = new Set(fs.readdirSync(uploads));
-  const slide = await enviar(bruto, 'Excluir');
-  const r = await pedir('/api/slides/' + slide.id, { method: 'DELETE' });
-  assert.equal(r.status, 200);
-  for (let i = 0; i < 50; i++) {
-    const novos = fs.readdirSync(uploads).filter(f => !antes.has(f));
-    if (!novos.length) break;
-    await new Promise(res => setTimeout(res, 200));
+test('vídeo menor que Full HD não é aumentado; vídeo HDR sai com a cor das TVs', { skip: pular }, async () => {
+  // 720p em outro formato: converte, mas continua 720p (aumentar só gastaria rede).
+  const pequeno = gerar('pequeno.mp4', ['-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-t', '2', '-c:v', 'mpeg4', '-q:v', '2']);
+  const s1 = await enviar(pequeno, 'Pequeno');
+  assert.equal(s1.otimizacao.modo, 'converter');
+  const p1 = await esperarEstado(s1.id, 'pronto');
+  const i1 = await video.sondar(ferramentas, path.join(uploads, path.basename(p1.url)));
+  assert.deepEqual([i1.largura, i1.altura, i1.codec], [1280, 720, 'h264']);
+
+  // Marcado como HDR (PQ), como um vídeo de iPhone.
+  const hdr = gerar('hdr.mp4', ['-f', 'lavfi', '-i', 'testsrc2=size=1280x720:rate=30', '-t', '2',
+    '-vf', 'setparams=color_primaries=bt2020:color_trc=smpte2084:colorspace=bt2020nc',
+    '-c:v', 'libx264', '-preset', 'ultrafast', '-pix_fmt', 'yuv420p', '-movflags', '+faststart']);
+  assert.equal((await video.sondar(ferramentas, hdr)).hdr, 'smpte2084');
+  const s2 = await enviar(hdr, 'HDR');
+  assert.ok(s2.otimizacao.motivos.includes('HDR'), 'motivos: ' + s2.otimizacao.motivos);
+  const p2 = await esperarEstado(s2.id, 'pronto');
+  const i2 = await video.sondar(ferramentas, path.join(uploads, path.basename(p2.url)));
+  assert.equal(i2.codec, 'h264');
+  if (ferramentas.ajustaHdr) assert.equal(i2.hdr, null, 'a cor saiu marcada como HDR');
+});
+
+test('excluir antes, durante ou logo depois da otimização não deixa arquivo para trás', { skip: pular }, async () => {
+  const bruto = gerar('excluir.mp4', ['-f', 'lavfi', '-i', 'testsrc2=size=1920x1080:rate=30', '-t', '4', '-c:v', 'mpeg4', '-q:v', '2']);
+  // Vários instantes: na fila, no meio do ffmpeg e bem na hora de trocar o arquivo
+  // (foi aí que um teste pegou o vídeo convertido sobrando no disco).
+  for (const atraso of [0, 150, 400, 800, 1200, 1800, 2600]) {
+    const antes = new Set(fs.readdirSync(uploads));
+    const slide = await enviar(bruto, 'Excluir ' + atraso);
+    await new Promise(res => setTimeout(res, atraso));
+    const r = await pedir('/api/slides/' + slide.id, { method: 'DELETE' });
+    assert.equal(r.status, 200);
+    assert.deepEqual(fs.readdirSync(uploads).filter(f => !antes.has(f)), [], `sobrou arquivo ao excluir após ${atraso} ms`);
   }
-  assert.deepEqual(fs.readdirSync(uploads).filter(f => !antes.has(f)), []);
 });

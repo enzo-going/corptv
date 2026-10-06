@@ -7,16 +7,24 @@ const os = require('node:os');
 const path = require('node:path');
 const video = require('../src/video');
 
-const base = { codec: 'h264', largura: 1280, altura: 720, pixFmt: 'yuv420p', audio: 'aac', duracaoS: 60, mbps: 2.8 };
+const base = { codec: 'h264', largura: 1280, altura: 720, pixFmt: 'yuv420p', hdr: null, audio: 'aac', duracaoS: 60, mbps: 2.8 };
 
 test('vídeo já no padrão das TVs passa como veio', () => {
   assert.deepEqual(video.plano(base, true), { modo: null, motivos: [] });
-  // 1080p leve também: não vale perder qualidade nem gastar processador.
-  assert.equal(video.plano({ ...base, largura: 1920, altura: 1080, mbps: 4.5 }, true).modo, null);
+  // Full HD leve também: não vale perder qualidade nem gastar processador.
+  assert.equal(video.plano({ ...base, largura: 1920, altura: 1080, mbps: 3.9 }, true).modo, null);
   // Celular em pé (1080x1920) é 1080p deitado.
-  assert.equal(video.plano({ ...base, largura: 1080, altura: 1920, mbps: 4 }, true).modo, null);
+  assert.equal(video.plano({ ...base, largura: 1080, altura: 1920, mbps: 3.5 }, true).modo, null);
   // Vídeo mudo é aceito.
   assert.equal(video.plano({ ...base, audio: null }, true).modo, null);
+});
+
+test('o teto de 4 Mb/s cabe na entrega do servidor para cada TV', () => {
+  // O servidor manda no máximo 4,5 Mb/s por TV (CORPTV_LIMITE_MBPS): um vídeo acima
+  // disso trava na TV que toca direto do servidor.
+  assert.ok(video.ACEITA_COMO_VEIO.mbps < 4.5);
+  assert.ok(video.PADRAO.maxK / 1000 < 4.5);
+  assert.equal(video.plano({ ...base, largura: 1920, altura: 1080, mbps: 4.6 }, true).modo, 'converter');
 });
 
 test('só falta o início rápido: reorganiza sem recomprimir', () => {
@@ -31,21 +39,38 @@ test('vídeo pesado, grande ou em outro formato é convertido', () => {
   assert.equal(video.plano({ ...base, pixFmt: 'yuv422p10le' }, true).modo, 'converter');
   assert.equal(video.plano({ ...base, audio: 'pcm_s16le' }, true).modo, 'converter');
   assert.match(video.plano({ ...base, mbps: 21.3 }, false).motivos.join(), /21\.3 Mb\/s/);
+  // HDR de celular: mesmo em H.264 leve, precisa da cor convertida.
+  assert.deepEqual(video.plano({ ...base, hdr: 'arib-std-b67' }, true).motivos, ['HDR']);
 });
 
-test('a conversão segue o padrão das TVs e não distorce vídeo em pé', () => {
-  const args = video.argumentos('entrada.mp4', 'saida.tmp', 'converter', 2);
+test('a conversão mantém Full HD com qualidade constante e não aumenta vídeo menor', () => {
+  const args = video.argumentos('entrada.mp4', 'saida.tmp', 'converter', { threads: 2, preset: 'veryfast' });
   const texto = args.join(' ');
-  assert.match(texto, /scale=w=1280:h=720:force_original_aspect_ratio=decrease:force_divisible_by=2/);
-  assert.match(texto, /-c:v libx264 .*-profile:v baseline -level 3\.1/);
-  assert.match(texto, /-b:v 2800k -maxrate 3000k/);
+  // min(): um 720p continua 720p; um 4K vira 1080p; em pé não distorce.
+  assert.match(texto, /scale=w='min\(1920,iw\)':h='min\(1080,ih\)':force_original_aspect_ratio=decrease:force_divisible_by=2/);
+  assert.match(texto, /-fpsmax 30/);
+  assert.match(texto, /-c:v libx264 -preset veryfast -profile:v high -level 4\.1 -pix_fmt yuv420p/);
+  assert.match(texto, /-crf 21 -maxrate 4000k -bufsize 8000k/);
   assert.match(texto, /-movflags \+faststart/);
   assert.match(texto, /-threads 2/);
+  assert.doesNotMatch(texto, /zscale|tonemap/, 'vídeo normal não passa pelo ajuste de HDR');
   // Saída temporária sem extensão de vídeo: o formato vai explícito.
   assert.deepEqual(args.slice(-3), ['-f', 'mp4', 'saida.tmp']);
-  const copia = video.argumentos('entrada.mp4', 'saida.tmp', 'reorganizar', 2).join(' ');
+  const copia = video.argumentos('entrada.mp4', 'saida.tmp', 'reorganizar', { threads: 2 }).join(' ');
   assert.match(copia, /-c copy/);
   assert.doesNotMatch(copia, /libx264/);
+});
+
+test('vídeo HDR tem a cor trazida para o padrão das TVs (quando o ffmpeg tem o zscale)', () => {
+  const comAjuste = video.argumentos('e.mp4', 's.tmp', 'converter', { hdr: 'smpte2084', ajustaHdr: true }).join(' ');
+  assert.match(comAjuste, /zscale=tin=smpte2084:min=bt2020nc:pin=bt2020:t=linear:npl=100,.*tonemap=tonemap=hable/);
+  // A marcação de cor vai no quadro: a opção -color_trc da linha de comando não vale no ffmpeg atual.
+  assert.match(comAjuste, /setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,scale=/);
+  // Sem o zscale no ffmpeg: converte do mesmo jeito, só sem o ajuste de cor.
+  const semAjuste = video.argumentos('e.mp4', 's.tmp', 'converter', { hdr: 'smpte2084', ajustaHdr: false }).join(' ');
+  assert.doesNotMatch(semAjuste, /zscale|tonemap|setparams/);
+  // Só os dois tipos de HDR conhecidos entram no filtro.
+  assert.doesNotMatch(video.argumentos('e.mp4', 's.tmp', 'converter', { hdr: 'x:y', ajustaHdr: true }).join(' '), /zscale/);
 });
 
 test('o andamento da conversão sai do -progress do ffmpeg', () => {
