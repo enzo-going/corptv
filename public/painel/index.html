@@ -322,7 +322,7 @@
           <div class="form-full" id="sl-file-wrap" style="display:none">
             <label>Arquivo</label>
             <label class="dropzone" id="sl-dropzone" ondragover="doDragOver(event)" ondragleave="doDragLeave()" ondrop="doDrop(event)">
-              <input type="file" id="sl-file" accept="image/*,video/*" onchange="onFile(this)">
+              <input type="file" id="sl-file" accept=".mp4,.jpg,.jpeg,.png,.webp,video/mp4,image/jpeg,image/png,image/webp" onchange="onFile(this)">
               <div style="font-size:28px;margin-bottom:8px">⬆</div>
               <div style="font-size:13px;color:var(--muted)">Clique ou arraste uma imagem ou vídeo</div>
             </label>
@@ -492,7 +492,8 @@ let auditOffset=0;
 const AUDIT_LIMIT=50;
 const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade80',msg:'#6c63ff',aviso:'#f87171'};
 
-function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500)}
+let toastTimer=null;
+function toast(msg,ms=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms)}
 function esc(value){return String(value===undefined||value===null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
 const mobileLayout=window.matchMedia('(max-width:767px), (max-width:1023px) and (hover:none) and (pointer:coarse)');
 function setMenu(open,restoreFocus=false){
@@ -529,15 +530,51 @@ async function api(method,url,body,isForm=false){
   else if(isForm){opts.body=body;}
   const r=await fetch(BASE+url,opts);
   if(r.status===401){location.href='/login?next=%2Fpainel';throw new Error('Sessão encerrada');}
-  const data=await r.json();
+  // Resposta que não é JSON (página de erro do nginx, servidor reiniciando) vira
+  // mensagem legível em vez de travar o painel num erro de leitura.
+  let data;
+  try{data=await r.json();}catch(e){data={error:mensagemHttp(r.status)};}
   if(r.status===403)toast(data.error||'Acesso negado');
   return data;
+}
+let limiteUploadMb=200;
+function mensagemHttp(status){
+  if(status===413)return 'Arquivo grande demais: o limite é '+limiteUploadMb+' MB.';
+  if(status===502||status===503||status===504)return 'O servidor não respondeu (pode estar reiniciando). Tente de novo em 1 minuto.';
+  if(!status)return 'A conexão caiu durante o envio. Confira a rede e tente de novo.';
+  return 'Erro '+status+' no servidor.';
+}
+function mb(bytes){return Math.round(bytes/1048576)}
+// Envio com andamento: com fetch o botão ficava em "Enviando arquivo..." sem dizer
+// nada, e um arquivo recusado pelo servidor parecia travado para sempre.
+function enviarComProgresso(url,fd,aoProgresso){
+  return new Promise(resolve=>{
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST',BASE+url);
+    if(csrfToken)xhr.setRequestHeader('X-CSRF-Token',csrfToken);
+    xhr.upload.onprogress=e=>{if(e.lengthComputable)aoProgresso(e.loaded,e.total);};
+    xhr.upload.onload=()=>aoProgresso(null,null);
+    xhr.onload=()=>{
+      if(xhr.status===401){location.href='/login?next=%2Fpainel';return;}
+      let data;
+      try{data=JSON.parse(xhr.responseText);}catch(e){data={};}
+      if(xhr.status>=400&&!data.error)data.error=mensagemHttp(xhr.status);
+      resolve(data);
+    };
+    xhr.onerror=()=>resolve({error:mensagemHttp(0)});
+    xhr.ontimeout=()=>resolve({error:mensagemHttp(0)});
+    xhr.send(fd);
+  });
 }
 async function bootstrap(){
   try{
     const auth=await api('GET','/api/auth/me');
     currentUser=auth.user;permissions=auth.permissions;csrfToken=auth.csrf_token;
-    try{const cfg=await api('GET','/api/config');enderecoPublicoConfig=cfg.endereco_publico||null;}catch(e){}
+    try{
+      const cfg=await api('GET','/api/config');
+      enderecoPublicoConfig=cfg.endereco_publico||null;
+      if(Number.isInteger(cfg.limite_upload_mb))limiteUploadMb=cfg.limite_upload_mb;
+    }catch(e){}
     document.body.classList.toggle('readonly',!permissions.edit);
     document.querySelectorAll('[data-admin-only]').forEach(el=>el.hidden=!permissions.users);
     document.body.classList.toggle('admin',!!permissions.users);
@@ -563,6 +600,7 @@ async function load(){
     return;
   }
   renderSlides();renderGroups();renderScreens();renderDevices();renderDash();
+  acompanharPreparo();
 }
 
 // slug preview ao digitar nome da tela
@@ -640,6 +678,16 @@ function doDragLeave(){document.getElementById('sl-dropzone').classList.remove('
 function doDrop(e){e.preventDefault();doDragLeave();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])}
 function onFile(inp){if(inp.files[0])handleFile(inp.files[0])}
 function handleFile(f){
+  // Confere antes de enviar: um arquivo acima do limite subia por minutos para só
+  // então ser recusado (o caso real: 641 MB contra 256 MB, e o painel "enviando" sem fim).
+  if(!/\.(mp4|jpe?g|png|webp)$/i.test(f.name)){
+    toast('Formato não aceito. Use vídeo MP4 ou imagem JPG, PNG ou WEBP.',6000);
+    cancelFile();return;
+  }
+  if(f.size>limiteUploadMb*1048576){
+    toast('"'+f.name+'" tem '+mb(f.size)+' MB e o limite é '+limiteUploadMb+' MB. Envie um arquivo menor ou peça ajuda ao TI.',8000);
+    cancelFile();return;
+  }
   pendingFile=f;
   const url=URL.createObjectURL(f);
   const wrap=document.getElementById('sl-preview');
@@ -670,8 +718,13 @@ async function addSlide(){
     fd.append('video_text_mode',type==='vid'?document.getElementById('sl-video-text-mode').value:'none');
     fd.append('video_text_seconds',type==='vid'?document.getElementById('sl-video-text-seconds').value:'0');
     if(pendingFile)fd.append('file',pendingFile);
-    const data=await api('POST','/api/slides',fd,true);
-    if(data.error){toast('Erro: '+data.error);return;}
+    const data=await enviarComProgresso('/api/slides',fd,(enviado,total)=>{
+      if(!pendingFile)return;
+      btn.textContent=enviado===null
+        ? 'Recebido, conferindo o arquivo...'
+        : 'Enviando '+Math.floor(enviado/total*100)+'% ('+mb(enviado)+' de '+mb(total)+' MB)';
+    });
+    if(data.error){toast('Não foi possível adicionar: '+data.error,8000);return;}
     document.getElementById('sl-title').value='';
     document.getElementById('sl-body').value='';
     document.getElementById('sl-video-text-mode').value='fixed';
@@ -679,9 +732,11 @@ async function addSlide(){
     videoTextModeChange('sl');
     cancelFile();
     await load();
-    toast('Adicionado à biblioteca. Agora coloque em um ambiente.');
+    toast(data.otimizacao
+      ? 'Vídeo recebido. O CorporTV está deixando ele leve para as TVs; ele entra no ar sozinho quando terminar. Já pode colocar em um ambiente.'
+      : 'Adicionado à biblioteca. Agora coloque em um ambiente.', data.otimizacao?9000:2500);
   }catch(e){
-    toast('Erro ao enviar. Verifique o servidor.');
+    toast('Erro ao enviar. Verifique o servidor.',6000);
   }finally{
     btn.disabled=false;
     btn.textContent='Adicionar à biblioteca';
@@ -701,6 +756,7 @@ function renderSlides(){
       <div class="item-info">
         <div class="item-name">${esc(nomeDe(s))}</div>
         <div class="item-meta">${uso} · ${esc(meta)}</div>
+        ${preparoDe(s)}
       </div>
       <div class="item-actions editor-only">
         ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:`<button class="btn btn-ghost btn-sm" onclick="editDuration('${s.id}')">Tempo</button>`}
@@ -709,6 +765,26 @@ function renderSlides(){
       </div>
     </div>`;
   }).join('');
+}
+// Vídeo pesado é otimizado no servidor antes de ir para as TVs. Enquanto isso, quem
+// publicou vê o andamento aqui, e não um conteúdo que "não aparece" na TV.
+function preparoDe(s){
+  const o=s.otimizacao;
+  if(!o||o.estado==='pronto')return '';
+  if(o.estado==='falhou')return `<div class="item-meta" style="color:var(--danger)">⚠ Não foi possível preparar este vídeo para as TVs (${esc(o.erro||'erro desconhecido')}). Exclua e envie de novo, ou fale com o TI.</div>`;
+  const andamento=Number.isInteger(o.percentual)?o.percentual+'%':o.na_fila>0?'na fila ('+o.na_fila+'º)':'começando';
+  return `<div class="item-meta" style="color:var(--warning)">⏳ Preparando para as TVs: ${andamento}. Entra no ar sozinho quando terminar.</div>`;
+}
+// Enquanto algum vídeo está sendo preparado, a biblioteca se atualiza a cada 5 s.
+let preparoTimer=null;
+function acompanharPreparo(){
+  const preparando=slides.some(s=>s.otimizacao&&s.otimizacao.estado==='otimizando');
+  if(preparando&&!preparoTimer){
+    preparoTimer=setInterval(async()=>{
+      try{const novos=await api('GET','/api/slides');if(Array.isArray(novos)){slides=novos;renderSlides();}}catch(e){}
+      if(!slides.some(s=>s.otimizacao&&s.otimizacao.estado==='otimizando')){clearInterval(preparoTimer);preparoTimer=null;}
+    },5000);
+  }
 }
 function videoTextModeOf(s){return s.video_text_mode||'fixed'}
 function videoTextLabel(s){

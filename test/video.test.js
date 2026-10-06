@@ -88,3 +88,14 @@ test('o servidor só aceita vídeo grande se puder otimizá-lo, e nunca manda o 
   // Upload lento pela porta 3000 não pode morrer nos 5 min padrão do Node.
   assert.match(fonte, /server\.requestTimeout = 60 \* 60 \* 1000;/);
 });
+
+test('o painel confere o tamanho antes de enviar e mostra o andamento', () => {
+  const painel = fs.readFileSync(path.join(__dirname, '../public/painel/index.html'), 'utf8');
+  assert.match(painel, /if\(f\.size>limiteUploadMb\*1048576\)/);
+  assert.match(painel, /xhr\.upload\.onprogress=/);
+  assert.match(painel, /'Enviando '\+Math\.floor\(enviado\/total\*100\)\+'%/);
+  // Página de erro em HTML (nginx) não pode travar o painel.
+  assert.match(painel, /try\{data=await r\.json\(\);\}catch\(e\)\{data=\{error:mensagemHttp\(r\.status\)\};\}/);
+  assert.match(painel, /if\(status===413\)return 'Arquivo grande demais/);
+  assert.match(painel, /function preparoDe\(s\)/);
+});
