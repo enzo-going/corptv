@@ -40,6 +40,20 @@ db.stopMaintenance = function stopMaintenance() {
   });
 };
 
+// Consultar e depois inserir são duas operações distintas no NeDB. A fila evita
+// que duas requisições do mesmo processo escolham a mesma identidade ou vínculo.
+const escritasPendentes = new Map();
+db.executarEmSerie = function executarEmSerie(chave, operacao) {
+  const anterior = escritasPendentes.get(chave) || Promise.resolve();
+  const atual = anterior.then(operacao);
+  const cauda = atual.catch(() => {});
+  escritasPendentes.set(chave, cauda);
+  cauda.then(() => {
+    if (escritasPendentes.get(chave) === cauda) escritasPendentes.delete(chave);
+  });
+  return atual;
+};
+
 // Gera slug a partir do nome: "Recepção Principal" → "recepcao-principal"
 function toSlug(name) {
   return name
