@@ -34,7 +34,9 @@ const servidor = {
   presas: [],
   ultimoRegistro: null,
   telasPedidas: [],
-  downloads: 0
+  downloads: 0,
+  falhaHead: null,
+  consultasHead: 0
 };
 
 function playlistCom(arquivo) {
@@ -120,6 +122,9 @@ test.before(async () => {
       res.setHeader('Content-Length', servidor.midia.length);
       res.setHeader('Accept-Ranges', 'bytes');
       if (req.method === 'HEAD') {
+        servidor.consultasHead++;
+        if (servidor.falhaHead === 'conexao') return req.socket.destroy();
+        if (servidor.falhaHead === 'http') { res.writeHead(503); return res.end(); }
         res.writeHead(200);
         return res.end();
       }
@@ -252,6 +257,42 @@ test('baixa de novo quando o ETag muda', async () => {
     'a mídia nova chegar ao disco'
   );
   assert.deepEqual(fs.readFileSync(path.join(cache, ARQUIVO)), MIDIA_V2);
+});
+
+test('HEAD sem resposta ou com erro HTTP conserva a mídia registrada sem outro GET', async () => {
+  const antes = servidor.downloads;
+  const estadoAntes = fs.readFileSync(path.join(cache, 'estado.json'), 'utf8');
+  try {
+    for (const falha of ['conexao', 'http']) {
+      servidor.falhaHead = falha;
+      const consultas = servidor.consultasHead;
+      await esperar(() => servidor.consultasHead >= consultas + 2, 'duas consultas HEAD com falha');
+      assert.equal(servidor.downloads, antes);
+      assert.deepEqual(fs.readFileSync(path.join(cache, ARQUIVO)), MIDIA_V2);
+      assert.equal(fs.readFileSync(path.join(cache, 'estado.json'), 'utf8'), estadoAntes);
+      assert.equal((await status()).conteudos_prontos, 1);
+    }
+  } finally {
+    servidor.falhaHead = null;
+  }
+});
+
+test('HEAD com falha ainda baixa mídia sem registro ou sem arquivo', async () => {
+  const destino = path.join(cache, ARQUIVO);
+  const estado = path.join(cache, 'estado.json');
+  servidor.falhaHead = 'conexao';
+  try {
+    let antes = servidor.downloads;
+    fs.writeFileSync(estado, '{}');
+    await esperar(() => servidor.downloads > antes && JSON.parse(fs.readFileSync(estado, 'utf8'))[ARQUIVO], 'baixar o arquivo sem registro');
+    assert.deepEqual(fs.readFileSync(destino), MIDIA_V2);
+    antes = servidor.downloads;
+    fs.unlinkSync(destino);
+    await esperar(() => servidor.downloads > antes && fs.existsSync(destino), 'baixar o arquivo ausente');
+    assert.deepEqual(fs.readFileSync(destino), MIDIA_V2);
+  } finally {
+    servidor.falhaHead = null;
+  }
 });
 
 test('apaga do disco a mídia que saiu da programação', async () => {

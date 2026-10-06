@@ -244,7 +244,14 @@ async function baixarComTentativas(urlRemota, destino, tamanho) {
       return await baixarArquivo(urlRemota, destino, tamanho);
     } catch (err) {
       // Tela trocada ou disco cheio: tentar de novo o mesmo arquivo não resolve.
-      if (i === esperas.length || err.message === DOWNLOAD_CANCELADO || err.code === 'ENOSPC') throw err;
+      if (err.message === DOWNLOAD_CANCELADO || err.code === 'ENOSPC') throw err;
+      if (i === esperas.length) {
+        log('AVISO', 'download falhou apos seis tentativas; retomo no proximo ciclo', {
+          arquivo: path.basename(destino), erro: err.message
+        });
+        // Mantém o .parcial para a próxima sincronização retomar por Range.
+        throw err;
+      }
       log('AVISO', 'download falhou, vou tentar de novo', {
         arquivo: path.basename(destino), erro: err.message, proxima_em_s: esperas[i] / 1000
       });
@@ -298,21 +305,25 @@ async function sincronizar(opcoes = {}) {
       const urlRemota = CONFIG.servidor + slide.url;
 
       // HEAD barato: descobre versão (ETag) e tamanho sem baixar nada.
-      let etag = null, tamanho = null;
+      let etag = null, tamanho = null, headFalhou = false;
       try {
         const h = await pedir(urlRemota, { method: 'HEAD' });
         h.resume();
+        if (h.statusCode !== 200) throw new Error('HTTP ' + h.statusCode);
         etag = h.headers.etag || null;
         tamanho = h.headers['content-length'] ? parseInt(h.headers['content-length'], 10) : null;
       } catch (e) {
+        headFalhou = true;
         log('AVISO', 'nao consegui consultar a midia', { arquivo: nome, erro: e.message });
       }
 
       const temArquivo = fs.existsSync(destino);
       const tamanhoLocal = temArquivo ? fs.statSync(destino).size : 0;
       const registro = estado[nome];
-      const atualizado = temArquivo && registro && registro.etag === etag &&
-                         (!tamanho || tamanhoLocal === tamanho);
+      // Sem confirmação do servidor, conserva a mídia completa já registrada.
+      // Um arquivo sem registro ainda precisa ser baixado e conferido.
+      const atualizado = temArquivo && registro && (headFalhou ||
+                         (registro.etag === etag && (!tamanho || tamanhoLocal === tamanho)));
 
       if (atualizado) continue;
 
