@@ -204,7 +204,7 @@ function converter(ferramentas, entrada, saida, opcoes) {
     const filho = spawn(ferramentas.ffmpeg,
       argumentos(entrada, saida, modo, { threads, preset, hdr, ajustaHdr: !!ferramentas.ajustaHdr }),
       { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
-    // A máquina é compartilhada (no CAMPS, o controlador de domínio): o CorporTV
+    // A máquina é compartilhada com outros serviços: o CorporTV
     // nunca disputa processador de igual para igual com os outros serviços.
     try { os.setPriority(filho.pid, os.constants.priority.PRIORITY_BELOW_NORMAL); } catch (e) { /* sem permissão: segue */ }
     let erro = '';
@@ -255,6 +255,7 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
     const temporario = saida + '.otimizando';
     const inicio = Date.now();
     const de = fs.statSync(entrada).size;
+    let vinculado = false;
     progresso.set(id, 0);
     try {
       let duracaoS = slide.otimizacao.duracao_s;
@@ -281,6 +282,7 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
           segundos: Math.round((Date.now() - inicio) / 1000), em: new Date()
         }
       } });
+      vinculado = !!afetados;
       // Sumiu do banco por outro caminho: não deixa os dois arquivos órfãos.
       if (!afetados) await removerArquivo(saida).catch(() => {});
       await removerArquivo(entrada).catch(err => log('AVISO', 'não consegui apagar o vídeo original', { slide: id, msg: err.message }));
@@ -290,6 +292,9 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
       });
     } catch (err) {
       try { fs.unlinkSync(temporario); } catch (e) { /* não chegou a criar */ }
+      // Se o banco falhar após o rename, o original continua sendo o arquivo válido.
+      // Apaga a saída sem vínculo para não acumular vídeos órfãos a cada tentativa.
+      if (!vinculado) await removerArquivo(saida).catch(e => log('AVISO', 'não consegui apagar a conversão sem vínculo', { slide: id, msg: e.message }));
       // Exclusão em andamento: quem apaga o original é ela, depois que isto terminar.
       if (trabalho.cancelado) return;
       if (!(await db.slides.findOne({ id }))) {
