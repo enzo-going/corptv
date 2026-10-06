@@ -597,16 +597,16 @@ function enviarComProgresso(url,fd,aoProgresso){
     xhr.upload.onprogress=e=>{if(e.lengthComputable)aoProgresso(e.loaded,e.total);};
     xhr.upload.onload=()=>aoProgresso(null,null);
     xhr.onload=()=>{
-      if(xhr.status===401){envioAtual=null;location.href='/login?next=%2Fpainel';return;}
+      if(xhr.status===401){fim({error:'Sessão encerrada. Entre novamente.'});location.href='/login?next=%2Fpainel';return;}
       let data;
-      try{data=JSON.parse(xhr.responseText);}catch(e){data={};}
+      try{data=JSON.parse(xhr.responseText);}catch(e){data={error:'O servidor enviou uma resposta inesperada. Tente novamente.'};}
       if(xhr.status>=400&&!data.error)data.error=mensagemHttp(xhr.status);
       fim(data);
     };
     xhr.onerror=()=>fim({error:mensagemHttp(0)});
     xhr.ontimeout=()=>fim({error:mensagemHttp(0)});
     xhr.onabort=()=>fim({cancelado:true});
-    xhr.send(fd);
+    try{xhr.send(fd);}catch(e){fim({error:mensagemHttp(0)});}
   });
 }
 function cancelarEnvio(){if(envioAtual)envioAtual.abort();}

@@ -89,3 +89,22 @@ test('erro na programação do ambiente mantém a lista exibida e avisa', async 
   assert.equal(contexto.playlistCache, anterior);
   assert.match(mensagens[0], /Não foi possível atualizar/);
 });
+
+test('upload com sessão encerrada, HTML ou erro ao iniciar resolve e libera o estado de envio', async () => {
+  for (const caso of ['sessao', 'html', 'iniciar']) {
+    class Xhr {
+      constructor() { this.upload = {}; this.status = caso === 'sessao' ? 401 : 200; this.responseText = '<html>erro</html>'; }
+      open() {}
+      setRequestHeader() {}
+      send() { if (caso === 'iniciar') throw new Error('falha de envio'); this.onload(); }
+    }
+    const contexto = vm.createContext({
+      XMLHttpRequest: Xhr, envioAtual: null, csrfToken: 'teste', BASE: '', location: {}, mensagemHttp: () => 'Erro na conexão'
+    });
+    vm.runInContext(trecho('function enviarComProgresso(', 'function cancelarEnvio('), contexto);
+    const result = await contexto.enviarComProgresso('/api/slides', {}, () => {});
+    assert.ok(result.error);
+    assert.equal(contexto.envioAtual, null);
+    if (caso === 'sessao') assert.equal(contexto.location.href, '/login?next=%2Fpainel');
+  }
+});
