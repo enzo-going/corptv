@@ -1424,8 +1424,14 @@ async function loadUsers(){
     <div><div class="card-title">${esc(user.name)} ${user.id===currentUser.id?'<span class="badge badge-online">você</span>':''}</div><div class="card-sub">@${esc(user.username)} · último login: ${esc(formatDateTime(user.last_login_at))}</div></div>
     <select class="role-select" onchange="updateUser('${user.id}',{role:this.value})" ${user.id===currentUser.id?'disabled':''}><option value="viewer" ${user.role==='viewer'?'selected':''}>Somente leitura</option><option value="editor" ${user.role==='editor'?'selected':''}>Editor</option><option value="admin" ${user.role==='admin'?'selected':''}>TI admin</option></select>
     <span class="badge ${user.active_sessions?'badge-online':'badge-offline'}">${user.active_sessions||0} sessão(ões)</span>
-    <div class="user-actions">${user.id===currentUser.id?'<span class="card-sub">Gerencie a senha em Minha conta</span>':`<button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${user.id}','${esc(user.username)}')">Redefinir senha</button><button class="btn btn-ghost btn-sm" onclick="revokeUserSessions('${user.id}')" ${user.active_sessions?'':'disabled'}>Encerrar sessões</button><button class="btn ${user.active?'btn-danger':'btn-ghost'} btn-sm" onclick="updateUser('${user.id}',{active:${!user.active}})">${user.active?'Desativar':'Reativar'}</button>`}</div>
+    <div class="user-actions">${user.id===currentUser.id?'<span class="card-sub">Gerencie a senha em Minha conta</span>':`<button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${user.id}','${esc(user.username)}')">Redefinir senha</button><button class="btn btn-ghost btn-sm" onclick="revokeUserSessions('${user.id}')" ${user.active_sessions?'':'disabled'}>Encerrar sessões</button><button class="btn ${user.active?'btn-danger':'btn-ghost'} btn-sm" onclick="updateUser('${user.id}',{active:${!user.active}})">${user.active?'Desativar':'Reativar'}</button><button class="btn btn-danger btn-sm" data-id="${esc(user.id)}" data-name="${esc(user.name)}" onclick="deleteUser(this.dataset.id,this.dataset.name)">Excluir</button>`}</div>
   </div>`).join('');
+}
+async function deleteUser(id,name){
+  if(!confirm('Excluir a conta "'+name+'"? Esta ação não pode ser desfeita.'))return;
+  const result=await api('DELETE','/api/users/'+encodeURIComponent(id));
+  if(result.error){toast(result.error);return;}
+  await loadUsers();toast('Conta excluída');
 }
 async function updateUser(id,changes){
   const result=await api('PUT','/api/users/'+id,changes);
