@@ -547,17 +547,28 @@ function goTo(p,btn){
 }
 async function api(method,url,body,isForm=false){
   const opts={method,headers:{}};
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),15000);
+  opts.signal=controller.signal;
   if(!['GET','HEAD','OPTIONS'].includes(method)&&csrfToken)opts.headers['X-CSRF-Token']=csrfToken;
   if(body&&!isForm){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
   else if(isForm){opts.body=body;}
-  const r=await fetch(BASE+url,opts);
-  if(r.status===401){location.href='/login?next=%2Fpainel';throw new Error('Sessão encerrada');}
-  // Resposta que não é JSON (página de erro do nginx, servidor reiniciando) vira
-  // mensagem legível em vez de travar o painel num erro de leitura.
-  let data;
-  try{data=await r.json();}catch(e){data={error:mensagemHttp(r.status)};}
-  if(r.status===403)toast(data.error||'Acesso negado');
-  return data;
+  try{
+    const r=await fetch(BASE+url,opts);
+    if(r.status===401){location.href='/login?next=%2Fpainel';return {error:'Sessão encerrada. Entre novamente.'};}
+    // Resposta que não é JSON (página de erro do nginx, servidor reiniciando) vira
+    // mensagem legível em vez de travar o painel num erro de leitura.
+    let data;
+    try{data=await r.json();}catch(e){data={error:mensagemHttp(r.status)};}
+    if(!data||typeof data!=='object')data={error:mensagemHttp(r.status)};
+    if(r.status>=400&&!data.error)data.error=mensagemHttp(r.status);
+    if(data.error)toast(data.error,6000);
+    return data;
+  }catch(e){
+    const error=e.name==='AbortError'?'O servidor demorou para responder. Tente novamente.':'Sem conexão com o servidor. Confira a rede e tente novamente.';
+    toast(error,6000);
+    return {error};
+  }finally{clearTimeout(timeout);}
 }
 let limiteUploadMb=200;
 function mensagemHttp(status){
@@ -642,8 +653,9 @@ async function logout(){const result=await api('POST','/api/auth/logout',{});if(
 // com os últimos dados; a próxima passagem se recupera sozinha.
 async function load(){
   try{
-    [slides,groups,screens,devices]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens'),permissions&&permissions.users?api('GET','/api/aparelhos'):Promise.resolve([])]);
-    if(!Array.isArray(devices))devices=[];
+    const novos=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens'),permissions&&permissions.users?api('GET','/api/aparelhos'):Promise.resolve([])]);
+    if(novos.some(lista=>!Array.isArray(lista)))throw new Error('Dados indisponíveis');
+    [slides,groups,screens,devices]=novos;
   }catch(e){
     toast('Sem conexão com o servidor — tentando de novo em 30s');
     return;
@@ -1094,7 +1106,8 @@ let playlistCache={};
 async function addGroup(){
   const name=document.getElementById('gr-name').value.trim();
   if(!name){toast('Digite o nome do ambiente');return;}
-  await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
+  const r=await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
+  if(r.error){toast(r.error);return;}
   document.getElementById('gr-name').value='';
   await load();toast('Ambiente criado');
 }
@@ -1106,7 +1119,8 @@ async function addToGroup(gid,select){
   await load();toast('Adicionado — clique em Agendar para definir quando aparece');
 }
 async function removeFromGroup(gid,sid){
-  await api('DELETE','/api/groups/'+gid+'/slides/'+sid);
+  const r=await api('DELETE','/api/groups/'+gid+'/slides/'+sid);
+  if(r.error){toast(r.error);return;}
   await load();toast('Removido do ambiente');
 }
 
@@ -1114,6 +1128,7 @@ async function renderGroups(){
   const el=document.getElementById('group-list');
   if(!groups.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum ambiente ainda.</div>';return;}
   const pls=await Promise.all(groups.map(g=>api('GET','/api/groups/'+g.id+'/slides')));
+  if(pls.some(pl=>!Array.isArray(pl))){toast('Não foi possível atualizar a programação. Tentando novamente em 30s');return;}
   playlistCache={};
   groups.forEach((g,i)=>{playlistCache[g.id]=pls[i];});
 
@@ -1189,7 +1204,8 @@ async function addScreen(){
   const name=document.getElementById('sc-name').value.trim();
   const group_id=document.getElementById('sc-group').value;
   if(!name||!group_id){toast('Nome e grupo são obrigatórios');return;}
-  await api('POST','/api/screens',{name,group_id});
+  const r=await api('POST','/api/screens',{name,group_id});
+  if(r.error){toast(r.error);return;}
   document.getElementById('sc-name').value='';
   document.getElementById('slug-preview').style.display='none';
   await load();toast('Tela adicionada!');
