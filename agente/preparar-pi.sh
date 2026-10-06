@@ -82,6 +82,61 @@ if [ -d /etc/NetworkManager/conf.d ]; then
   command -v iw >/dev/null 2>&1 && iw dev wlan0 set power_save off 2>/dev/null || true
 fi
 
+# ── 2b. Wi-Fi sem janela de senha na TV ──────────────────────────────────────
+# Caso real: levada para outro prédio, a Pi tentou sozinha redes cuja senha não
+# estava guardada no sistema e abriu a janela "digite a senha" por cima da TV.
+# Rede com senha que não está guardada deixa de ser tentada sozinha (continua
+# cadastrada; a que está em uso agora nunca é mexida). Rede aberta e corporativa
+# (com usuário) ficam como estão.
+passo "Wi-Fi sem janela de senha na TV"
+if command -v nmcli >/dev/null 2>&1; then
+  ativas=$(nmcli -t -f UUID connection show --active)
+  while IFS=: read -r uuid tipo; do
+    [ "$tipo" = 802-11-wireless ] || continue
+    nome=$(nmcli -g connection.id connection show "$uuid")
+    seguranca=$(nmcli -g 802-11-wireless-security.key-mgmt connection show "$uuid" 2>/dev/null || true)
+    case "$seguranca" in wpa-psk|sae) ;; *) continue ;; esac
+    senha=$(nmcli -s -g 802-11-wireless-security.psk connection show "$uuid" 2>/dev/null || true)
+    if [ -z "$senha" ] && ! grep -qx "$uuid" <<<"$ativas"; then
+      nmcli connection modify "$uuid" connection.autoconnect no
+      ok "$nome: sem senha guardada, não tenta mais sozinha"
+    fi
+  done < <(nmcli -t -f UUID,TYPE connection show)
+  # Comando para cadastrar o Wi-Fi do local da instalação, com a senha guardada no
+  # sistema e prioridade sobre as outras redes.
+  cat > /usr/local/bin/corptv-wifi <<WIFI
+#!/bin/bash
+# Cadastra o Wi-Fi do local onde esta TV fica, com a senha guardada no sistema
+# (a TV nunca pede senha na tela) e prioridade sobre as outras redes conhecidas.
+# Uso, na Pi com teclado ou pelo SSH:  sudo corptv-wifi "Nome da rede"
+set -euo pipefail
+[ "\$(id -u)" -eq 0 ] || { echo 'Use: sudo corptv-wifi "Nome da rede"'; exit 1; }
+ssid="\${1:-}"
+if [ -z "\$ssid" ]; then
+  echo 'Use: sudo corptv-wifi "Nome da rede"'; echo 'Redes ao alcance:'
+  nmcli -f SSID,SIGNAL device wifi list 2>/dev/null | head -15; exit 1
+fi
+read -r -s -p "Senha do Wi-Fi \"\$ssid\": " senha; echo
+[ -n "\$senha" ] || { echo 'Senha vazia; nada feito.'; exit 1; }
+nmcli -t -f NAME connection show | grep -Fxq "\$ssid" && nmcli connection delete "\$ssid" >/dev/null
+args=(connection add type wifi ifname wlan0 con-name "\$ssid" ssid "\$ssid"
+  wifi-sec.key-mgmt wpa-psk wifi-sec.psk "\$senha" wifi-sec.psk-flags 0
+  connection.autoconnect yes connection.autoconnect-priority 10)
+[ -n "$dominio" ] && args+=(ipv4.dns-search "$dominio")
+nmcli "\${args[@]}" >/dev/null
+# As outras redes ficam de reserva, abaixo desta.
+while IFS=: read -r uuid tipo; do
+  [ "\$tipo" = 802-11-wireless ] || continue
+  [ "\$(nmcli -g connection.id connection show "\$uuid")" = "\$ssid" ] && continue
+  nmcli connection modify "\$uuid" connection.autoconnect-priority 0 || true
+done < <(nmcli -t -f UUID,TYPE connection show)
+echo "Rede \"\$ssid\" cadastrada e com prioridade. Ela conecta sozinha quando estiver ao alcance."
+echo "Para conectar agora (se você está pelo SSH em outra rede, a conexão cai): sudo nmcli connection up \"\$ssid\""
+WIFI
+  chmod 755 /usr/local/bin/corptv-wifi
+  ok "comando corptv-wifi instalado (cadastra o Wi-Fi do local)"
+fi
+
 # ── 3. Node.js ───────────────────────────────────────────────────────────────
 passo "Node.js"
 if ! command -v node >/dev/null 2>&1; then
@@ -153,7 +208,10 @@ ok "atalho \"CorporTV na TV\" no menu"
 # A página é em português e o Raspberry Pi OS vem em inglês: o Chromium oferecia
 # traduzir a cada troca de conteúdo. A política do navegador desliga a tradução.
 install -d -m 755 /etc/chromium/policies/managed
-printf '{\n  "TranslateEnabled": false\n}\n' > /etc/chromium/policies/managed/corptv.json
+# O navegador da Pi só abre o CorporTV local. Caso real: com a TV sem tela, alguém
+# abriu o painel e o player do servidor no próprio navegador da TV; ela passou a
+# depender da rede e travou quando o Wi-Fi caiu. A manutenção do TI é pelo SSH.
+printf '{\n  "TranslateEnabled": false,\n  "URLBlocklist": ["*"],\n  "URLAllowlist": ["127.0.0.1:8080", "localhost:8080"]\n}\n' > /etc/chromium/policies/managed/corptv.json
 ok "tradução automática do navegador desligada"
 # O Chromium aberto à mão na Pi (manutenção) também pedia senha do chaveiro a cada
 # abertura. O Raspberry Pi OS lê as opções extras do navegador em /etc/chromium.d.
