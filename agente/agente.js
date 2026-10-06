@@ -261,7 +261,14 @@ async function baixarComTentativas(urlRemota, destino, tamanho) {
 }
 
 // ── SINCRONIZAÇÃO ────────────────────────────────────────────────────────────
-let playlistLocal = null;   // playlist já com caminhos locais
+function lerPlaylistSalva() {
+  try {
+    const salva = JSON.parse(fs.readFileSync(arqPlaylist, 'utf8'));
+    if (telaAtual && salva.screen && salva.screen.id === telaAtual && Array.isArray(salva.slides)) return salva;
+  } catch (e) { /* sem programação local */ }
+  return null;
+}
+let playlistLocal = lerPlaylistSalva();   // playlist já com caminhos locais
 let sincronizando = false;
 let sincronizarDeNovo = false; // troca de tela chegou no meio de uma sincronização
 
@@ -378,10 +385,7 @@ async function sincronizar(opcoes = {}) {
     log('AVISO', 'sem contato com o servidor, seguindo com o que esta no disco', { erro: err.message });
     if (!playlistLocal && telaAtual) {
       // Só a cópia da tela atual: se a tela foi trocada, a lista antiga não vale.
-      try {
-        const salva = JSON.parse(fs.readFileSync(arqPlaylist, 'utf8'));
-        if (salva.screen && salva.screen.id === telaAtual) playlistLocal = salva;
-      } catch (e) {}
+      playlistLocal = lerPlaylistSalva();
     }
   } finally {
     sincronizando = false;
@@ -517,11 +521,11 @@ async function atualizarPlayer() {
 
 async function obterPlayer() {
   if (paginaPlayer) return paginaPlayer;
-  if (await atualizarPlayer()) return paginaPlayer;
   try {
     paginaPlayer = fs.readFileSync(arqPlayer, 'utf8');
     return paginaPlayer;
   } catch (e) { /* sem cópia local */ }
+  if (await atualizarPlayer()) return paginaPlayer;
   // Sem servidor e sem cópia: mostra o aviso, mas não o guarda. Antes ele ficava
   // fixo na memória e a TV seguia no erro mesmo depois de o servidor voltar. E a
   // própria página tenta de novo a cada 30 s: sem isso, o navegador ficava no aviso
