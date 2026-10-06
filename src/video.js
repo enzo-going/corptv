@@ -7,13 +7,16 @@
 // tocando direto do servidor, cada tela puxaria ~20 Mb/s (o teto de toda a rede do
 // CorporTV é 12 Mb/s); numa Raspberry, a 2 Mb/s, levaria ~45 min para chegar.
 //
-// Então o servidor converte sozinho para o padrão das TVs — o mesmo do conversor
-// manual (ferramentas/Otimizar-Video.bat): até 1280x720, H.264, ~2,8 Mb/s, AAC e
-// "início rápido" (faststart). Um vídeo por vez, com prioridade baixa e poucos
+// Então o servidor converte sozinho para o padrão das TVs, mantendo Full HD: até
+// 1920x1080 (nunca aumenta um vídeo menor), H.264 High, AAC e "início rápido"
+// (faststart). A qualidade é constante (CRF): cena simples fica pequena, cena
+// complexa usa até 4 Mb/s — o teto é o que cabe na entrega do servidor, que manda
+// no máximo 4,5 Mb/s para cada TV (CORPTV_LIMITE_MBPS). Acima disso, a TV que toca
+// direto do servidor travaria. Um vídeo por vez, com prioridade baixa e poucos
 // núcleos, porque a máquina é compartilhada. Enquanto converte, o conteúdo fica na
-// biblioteca com "otimizando" e não vai para nenhuma TV.
+// biblioteca com "preparando" e não vai para nenhuma TV.
 //
-// Vídeo que já está no padrão (H.264, até 1080p, até 5 Mb/s, com início rápido)
+// Vídeo que já está no padrão (H.264, até 1080p, até 4 Mb/s, com início rápido)
 // passa como veio: sem perder qualidade nem gastar processador.
 
 const { spawn, spawnSync } = require('child_process');
@@ -21,8 +24,11 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 
-const PADRAO = { largura: 1280, altura: 720, fps: 30, videoK: 2800, maxK: 3000, bufK: 6000, audioK: 128 };
-const ACEITA_COMO_VEIO = { maiorLado: 1920, menorLado: 1080, mbps: 5 };
+const PADRAO = { maxLargura: 1920, maxAltura: 1080, fpsMax: 30, crf: 21, maxK: 4000, bufK: 8000, audioK: 128 };
+const ACEITA_COMO_VEIO = { maiorLado: 1920, menorLado: 1080, mbps: 4 };
+// Vídeo de celular em HDR (iPhone grava assim por padrão): convertido sem ajuste de
+// cor, sairia lavado na TV. Com o filtro zscale, as cores são trazidas para o padrão.
+const TRANSFERENCIAS_HDR = new Set(['smpte2084', 'arib-std-b67']);
 
 // ── FERRAMENTAS ──────────────────────────────────────────
 // Procura o ffmpeg/ffprobe na ordem: variável de ambiente, pasta runtime\ do
@@ -46,7 +52,12 @@ function localizarFerramentas(env, raizApp) {
   };
   const ffmpeg = achar('ffmpeg', 'CORPTV_FFMPEG');
   const ffprobe = ffmpeg && achar('ffprobe', 'CORPTV_FFPROBE');
-  return ffmpeg && ffprobe ? { ffmpeg, ffprobe } : null;
+  if (!ffmpeg || !ffprobe) return null;
+  let filtros = '';
+  try {
+    filtros = String(spawnSync(ffmpeg, ['-hide_banner', '-filters'], { timeout: 15000, windowsHide: true, encoding: 'utf8' }).stdout || '');
+  } catch (e) { /* segue sem o ajuste de HDR */ }
+  return { ffmpeg, ffprobe, ajustaHdr: /\szscale\s/.test(filtros) && /\stonemap\s/.test(filtros) };
 }
 
 // ── ANÁLISE ──────────────────────────────────────────────
@@ -84,6 +95,8 @@ async function sondar(ferramentas, arquivo) {
     largura: video.width || 0,
     altura: video.height || 0,
     pixFmt: video.pix_fmt || '',
+    // Tipo de HDR (PQ ou HLG), ou null quando o vídeo é normal (SDR).
+    hdr: TRANSFERENCIAS_HDR.has(video.color_transfer) ? video.color_transfer : null,
     audio: audio ? audio.codec_name : null,
     duracaoS: duracao,
     mbps: +(bps / 1e6).toFixed(2)
@@ -127,6 +140,7 @@ function plano(info, comInicioRapido) {
   const maior = Math.max(info.largura, info.altura);
   const menor = Math.min(info.largura, info.altura);
   if (info.codec !== 'h264') motivos.push('formato ' + (info.codec || 'desconhecido'));
+  if (info.hdr) motivos.push('HDR');
   if (maior > ACEITA_COMO_VEIO.maiorLado || menor > ACEITA_COMO_VEIO.menorLado) motivos.push(`resolução ${info.largura}x${info.altura}`);
   if (info.mbps > ACEITA_COMO_VEIO.mbps) motivos.push(`${info.mbps} Mb/s`);
   if (info.pixFmt && info.pixFmt !== 'yuv420p') motivos.push('cor ' + info.pixFmt);
@@ -142,17 +156,35 @@ async function analisar(ferramentas, arquivo) {
 }
 
 // ── CONVERSÃO ────────────────────────────────────────────
-function argumentos(entrada, saida, modo, threads) {
+// Filtro de imagem: cabe em 1920x1080 sem distorcer e sem aumentar vídeo menor (um
+// 720p continua 720p; um celular em pé, 1080x1920, vira 608x1080). Vídeo HDR tem a
+// cor convertida para o padrão das TVs antes, quando o ffmpeg tem o zscale.
+function filtroDeImagem(hdr, ajustaHdr) {
+  const escala = `scale=w='min(${PADRAO.maxLargura},iw)':h='min(${PADRAO.maxAltura},ih)'` +
+    ':force_original_aspect_ratio=decrease:force_divisible_by=2';
+  if (!TRANSFERENCIAS_HDR.has(hdr) || !ajustaHdr) return escala;
+  // HDR de celular é sempre BT.2020; informar a entrada evita o zscale recusar
+  // vídeo sem a marcação completa de cor.
+  // A marcação de cor vai no próprio quadro (setparams): no ffmpeg atual as opções
+  // -color_trc/-color_primaries da linha de comando não chegam ao arquivo (medido).
+  return `zscale=tin=${hdr}:min=bt2020nc:pin=bt2020:t=linear:npl=100,format=gbrpf32le,zscale=p=bt709,` +
+    'tonemap=tonemap=hable:desat=0,zscale=t=bt709:m=bt709:r=tv,format=yuv420p,' +
+    'setparams=color_primaries=bt709:color_trc=bt709:colorspace=bt709,' + escala;
+}
+
+function argumentos(entrada, saida, modo, opcoes) {
+  const { threads = 2, preset = 'veryfast', hdr = null, ajustaHdr = false } = opcoes || {};
   const inicio = ['-hide_banner', '-nostdin', '-y', '-loglevel', 'error', '-threads', String(threads), '-i', entrada,
     '-map', '0:v:0', '-map', '0:a:0?'];
   const fim = ['-movflags', '+faststart', '-progress', 'pipe:1', '-nostats', '-f', 'mp4', saida];
   if (modo === 'reorganizar') return [...inicio, '-c', 'copy', ...fim];
   return [...inicio,
-    // Cabe em 1280x720 sem distorcer: vídeo de celular em pé vira 405x720, não 1280x2276.
-    '-vf', `scale=w=${PADRAO.largura}:h=${PADRAO.altura}:force_original_aspect_ratio=decrease:force_divisible_by=2`,
-    '-r', String(PADRAO.fps),
-    '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'baseline', '-level', '3.1', '-pix_fmt', 'yuv420p',
-    '-b:v', PADRAO.videoK + 'k', '-maxrate', PADRAO.maxK + 'k', '-bufsize', PADRAO.bufK + 'k',
+    '-vf', filtroDeImagem(hdr, ajustaHdr),
+    // Até 30 quadros por segundo: 60 dobraria o tamanho sem diferença numa TV de aviso.
+    // Vídeo de 25 ou 24 continua como veio.
+    '-fpsmax', String(PADRAO.fpsMax),
+    '-c:v', 'libx264', '-preset', preset, '-profile:v', 'high', '-level', '4.1', '-pix_fmt', 'yuv420p',
+    '-crf', String(PADRAO.crf), '-maxrate', PADRAO.maxK + 'k', '-bufsize', PADRAO.bufK + 'k',
     '-threads', String(threads),
     '-c:a', 'aac', '-b:a', PADRAO.audioK + 'k', '-ar', '44100', '-ac', '2',
     ...fim];
@@ -167,9 +199,10 @@ function lerProgresso(texto, duracaoS) {
 }
 
 function converter(ferramentas, entrada, saida, opcoes) {
-  const { modo, duracaoS, threads, aoProgresso, limiteMs } = opcoes;
+  const { modo, duracaoS, threads, preset, hdr, aoProgresso, limiteMs } = opcoes;
   return new Promise((resolve, reject) => {
-    const filho = spawn(ferramentas.ffmpeg, argumentos(entrada, saida, modo, threads),
+    const filho = spawn(ferramentas.ffmpeg,
+      argumentos(entrada, saida, modo, { threads, preset, hdr, ajustaHdr: !!ferramentas.ajustaHdr }),
       { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     // A máquina é compartilhada (no CAMPS, o controlador de domínio): o CorporTV
     // nunca disputa processador de igual para igual com os outros serviços.
@@ -197,7 +230,7 @@ function converter(ferramentas, entrada, saida, opcoes) {
 // ── FILA ─────────────────────────────────────────────────
 // Um vídeo por vez. O estado mora no próprio conteúdo (slide.otimizacao), então
 // sobrevive a reinício do servidor: o que estava "otimizando" volta para a fila.
-function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, removerArquivo, threads, limiteMs }) {
+function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, removerArquivo, threads, preset, limiteMs }) {
   const fila = [];
   const progresso = new Map();
   let atual = null;
@@ -206,7 +239,12 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
     await db.slides.update({ id }, { $set: { 'otimizacao.estado': 'falhou', 'otimizacao.erro': motivo } });
   }
 
-  async function processar(id) {
+  // `trabalho` é o item em andamento: a exclusão marca `cancelado` nele e espera esta
+  // função terminar por completo antes de ler qual arquivo apagar. Sem essa espera,
+  // excluir bem no fim da conversão apagava o original e deixava o vídeo convertido
+  // perdido no disco (pego no teste).
+  async function processar(trabalho) {
+    const id = trabalho.id;
     const slide = await db.slides.findOne({ id });
     if (!slide || !slide.otimizacao || slide.otimizacao.estado !== 'otimizando') return;
     const entrada = caminhoDaUrl(slide.url);
@@ -221,27 +259,21 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
     try {
       let duracaoS = slide.otimizacao.duracao_s;
       if (!duracaoS) duracaoS = (await sondar(ferramentas, entrada)).duracaoS;
+      if (trabalho.cancelado) return;
       await converter(ferramentas, entrada, temporario, {
-        modo: slide.otimizacao.modo, duracaoS, threads, limiteMs,
+        modo: slide.otimizacao.modo, duracaoS, threads, preset, hdr: slide.otimizacao.hdr || null, limiteMs,
         aoProgresso: p => progresso.set(id, p),
-        aoIniciar: filho => {
-          atual.filho = filho;
-          atual.fim = new Promise(resolve => filho.once('close', resolve));
-        }
+        aoIniciar: filho => { trabalho.filho = filho; }
       });
+      if (trabalho.cancelado) throw new Error('conversão interrompida');
       const resultado = await sondar(ferramentas, temporario);
       if (duracaoS && Math.abs(resultado.duracaoS - duracaoS) > Math.max(2, duracaoS * 0.02)) {
         throw new Error(`a duração mudou na conversão (${Math.round(duracaoS)} s → ${Math.round(resultado.duracaoS)} s)`);
       }
+      if (trabalho.cancelado) throw new Error('conversão interrompida');
       fs.renameSync(temporario, saida);
       const para = fs.statSync(saida).size;
-      // Excluído durante a conversão: não sobra arquivo para trás.
-      if (!(await db.slides.findOne({ id }))) {
-        await removerArquivo(saida).catch(() => {});
-        await removerArquivo(entrada).catch(() => {});
-        return;
-      }
-      await db.slides.update({ id }, { $set: {
+      const afetados = await db.slides.update({ id }, { $set: {
         url: '/uploads/' + nome,
         otimizacao: {
           estado: 'pronto', modo: slide.otimizacao.modo,
@@ -249,6 +281,8 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
           segundos: Math.round((Date.now() - inicio) / 1000), em: new Date()
         }
       } });
+      // Sumiu do banco por outro caminho: não deixa os dois arquivos órfãos.
+      if (!afetados) await removerArquivo(saida).catch(() => {});
       await removerArquivo(entrada).catch(err => log('AVISO', 'não consegui apagar o vídeo original', { slide: id, msg: err.message }));
       log('INFO', 'vídeo otimizado', {
         slide: id, modo: slide.otimizacao.modo, de_mb: +(de / 1048576).toFixed(1),
@@ -256,13 +290,12 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
       });
     } catch (err) {
       try { fs.unlinkSync(temporario); } catch (e) { /* não chegou a criar */ }
-      // Excluído durante a conversão: no Windows o original ainda estava aberto pelo
-      // ffmpeg quando a exclusão tentou apagá-lo, então apaga agora.
+      // Exclusão em andamento: quem apaga o original é ela, depois que isto terminar.
+      if (trabalho.cancelado) return;
       if (!(await db.slides.findOne({ id }))) {
         await removerArquivo(entrada).catch(() => {});
         return;
       }
-      if (atual && atual.cancelado) return;
       log('AVISO', 'não consegui otimizar o vídeo', { slide: id, msg: err.message });
       await falhou(id, String(err.message || 'erro desconhecido').slice(0, 300));
     } finally {
@@ -272,15 +305,14 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
 
   async function proxima() {
     if (atual || !fila.length) return;
-    atual = { id: fila.shift(), filho: null, cancelado: false };
-    try {
-      await processar(atual.id);
-    } catch (err) {
-      log('ERRO', 'falha na fila de otimização', { slide: atual.id, msg: err.message });
-    } finally {
-      atual = null;
-      setImmediate(proxima);
-    }
+    const trabalho = { id: fila.shift(), filho: null, cancelado: false, promessa: null };
+    atual = trabalho;
+    trabalho.promessa = processar(trabalho).catch(err => {
+      log('ERRO', 'falha na fila de otimização', { slide: trabalho.id, msg: err.message });
+    });
+    await trabalho.promessa;
+    atual = null;
+    setImmediate(proxima);
   }
 
   return {
@@ -288,18 +320,17 @@ function criarFila({ ferramentas, uploadsDir, db, log, novoNome, caminhoDaUrl, r
       if (!fila.includes(id) && !(atual && atual.id === id)) fila.push(id);
       setImmediate(proxima);
     },
-    // Conteúdo excluído: tira da fila ou interrompe a conversão em andamento. Resolve
-    // quando o ffmpeg já fechou o arquivo (no Windows, antes disso ele não sai do disco).
+    // Conteúdo excluído: tira da fila ou interrompe a conversão em andamento. Só
+    // resolve quando o trabalho terminou de vez (ffmpeg fechado, banco atualizado ou
+    // não): aí a exclusão lê o conteúdo e apaga o arquivo que vale.
     async cancelar(id) {
       const i = fila.indexOf(id);
       if (i >= 0) fila.splice(i, 1);
-      if (atual && atual.id === id) {
-        atual.cancelado = true;
-        if (atual.filho) {
-          const fim = atual.fim;
-          atual.filho.kill();
-          await Promise.race([fim, new Promise(r => setTimeout(r, 10000))]);
-        }
+      const trabalho = atual;
+      if (trabalho && trabalho.id === id) {
+        trabalho.cancelado = true;
+        if (trabalho.filho && trabalho.filho.exitCode === null) trabalho.filho.kill();
+        await Promise.race([trabalho.promessa, new Promise(r => setTimeout(r, 15000))]);
       }
     },
     percentual(id) { return progresso.has(id) ? progresso.get(id) : null; },

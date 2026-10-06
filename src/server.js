@@ -256,6 +256,8 @@ const filaVideo = videoTools && video.criarFila({
   caminhoDaUrl: url => uploadedPathFromUrl(url, uploadsDir),
   removerArquivo: arquivo => removeFile(arquivo, uploadsDir),
   threads: positiveInteger(Number(process.env.CORPTV_FFMPEG_THREADS), 2),
+  preset: /^(ultrafast|superfast|veryfast|faster|fast|medium)$/.test(process.env.CORPTV_FFMPEG_PRESET || '')
+    ? process.env.CORPTV_FFMPEG_PRESET : 'veryfast',
   limiteMs: 2 * 60 * 60 * 1000
 });
 log('INFO', videoTools ? 'otimização de vídeo ligada' : 'otimização de vídeo desligada (ffmpeg não encontrado)', {
@@ -516,7 +518,7 @@ app.post('/api/slides', handleUpload, async (req, res) => {
       const analise = await video.analisar(videoTools, req.file.path);
       if (analise.modo) {
         doc.otimizacao = {
-          estado: 'otimizando', modo: analise.modo, motivos: analise.motivos,
+          estado: 'otimizando', modo: analise.modo, motivos: analise.motivos, hdr: analise.info.hdr,
           duracao_s: Math.round(analise.info.duracaoS), original_mb: +(req.file.size / 1048576).toFixed(1)
         };
       }
@@ -556,9 +558,11 @@ app.put('/api/slides/:id', async (req, res) => {
 });
 
 app.delete('/api/slides/:id', async (req, res) => {
+  // Vídeo em otimização: a conversão termina (ou é interrompida) ANTES de ler o
+  // conteúdo, para apagar o arquivo que vale agora — o original ou o já convertido.
+  if (filaVideo) await filaVideo.cancelar(req.params.id);
   const slide = await db.slides.findOne({ id: req.params.id });
   if (!slide) return res.status(404).json({ error: 'Conteúdo não encontrado' });
-  if (filaVideo) await filaVideo.cancelar(req.params.id);
   await db.gslides.remove({ slide_id: req.params.id }, { multi: true });
   await db.slides.remove({ id: req.params.id }, {});
   const mediaPath = uploadedPathFromUrl(slide.url, uploadsDir);
