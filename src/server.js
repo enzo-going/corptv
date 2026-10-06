@@ -10,6 +10,7 @@ const { createAudit } = require('./audit');
 const { createAuth } = require('./auth');
 const { validateGroupInput, validateScreenInput, validateSlideInput } = require('./validation');
 const scheduling = require('./scheduling');
+const video = require('./video');
 const {
   acceptsUpload,
   inspectStoredUpload,
@@ -240,10 +241,43 @@ const storage = multer.diskStorage({
   filename: (req, file, cb) => cb(null, uuidv4() + path.extname(file.originalname).toLowerCase())
 });
 const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp', '.mp4']);
+
+// Vídeo pesado (o real: 641 MB, 4 min) é aceito e otimizado aqui mesmo para o padrão
+// das TVs. Sem o ffmpeg no servidor não há como otimizar: o limite volta aos 200 MB
+// de antes, para nenhum vídeo bruto chegar às telas.
+const videoTools = video.localizarFerramentas(process.env, path.join(__dirname, '..'));
+const LIMITE_UPLOAD_MB = videoTools ? positiveInteger(Number(process.env.CORPTV_LIMITE_UPLOAD_MB), 2048) : 200;
+const filaVideo = videoTools && video.criarFila({
+  ferramentas: videoTools,
+  uploadsDir,
+  db,
+  log,
+  novoNome: () => uuidv4() + '.mp4',
+  caminhoDaUrl: url => uploadedPathFromUrl(url, uploadsDir),
+  removerArquivo: arquivo => removeFile(arquivo, uploadsDir),
+  threads: positiveInteger(Number(process.env.CORPTV_FFMPEG_THREADS), 2),
+  limiteMs: 2 * 60 * 60 * 1000
+});
+log('INFO', videoTools ? 'otimização de vídeo ligada' : 'otimização de vídeo desligada (ffmpeg não encontrado)', {
+  ffmpeg: videoTools ? videoTools.ffmpeg : null, limite_upload_mb: LIMITE_UPLOAD_MB
+});
+
+// Conteúdo que ainda não pode ir para as TVs: vídeo sendo otimizado ou que falhou.
+function emPreparo(slide) {
+  return !!(slide && slide.otimizacao && slide.otimizacao.estado !== 'pronto');
+}
+const STATUS_PREPARO = {
+  otimizando: { active: false, reason: 'otimizando', detail: 'o vídeo está sendo otimizado para as TVs' },
+  falhou: { active: false, reason: 'falhou', detail: 'não foi possível otimizar o vídeo' }
+};
+function statusDoConteudo(slide, agenda, now) {
+  return emPreparo(slide) ? (STATUS_PREPARO[slide.otimizacao.estado] || STATUS_PREPARO.falhou) : statusAgenda(agenda, now);
+}
+
 const upload = multer({
   storage,
   limits: {
-    fileSize: 200 * 1024 * 1024,
+    fileSize: LIMITE_UPLOAD_MB * 1024 * 1024,
     files: 1,
     fields: 12,
     parts: 14,
@@ -267,7 +301,7 @@ function handleUpload(req, res, next) {
     if (err) {
       const respond = () => {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(413).json({ error: 'Arquivo muito grande. Limite: 200MB. Otimize o video antes do envio.' });
+          return res.status(413).json({ error: `Arquivo muito grande. O limite é ${LIMITE_UPLOAD_MB} MB.` });
         }
         if (err.code === 'INVALID_FILE_TYPE') {
           return res.status(415).json({ error: err.message });
@@ -425,7 +459,16 @@ app.get('/api/slides', async (req, res) => {
   const vinculos = await db.gslides.find({});
   const usos = new Map();
   vinculos.forEach(v => usos.set(v.slide_id, (usos.get(v.slide_id) || 0) + 1));
-  res.json(slides.map(s => Object.assign({}, s, { em_uso: usos.get(s.id) || 0 })));
+  res.json(slides.map(s => {
+    const item = Object.assign({}, s, { em_uso: usos.get(s.id) || 0 });
+    // Andamento da otimização: só existe na memória da fila, não vale gravar no banco.
+    if (filaVideo && s.otimizacao && s.otimizacao.estado === 'otimizando') {
+      item.otimizacao = Object.assign({}, s.otimizacao, {
+        percentual: filaVideo.percentual(s.id), na_fila: filaVideo.posicao(s.id)
+      });
+    }
+    return item;
+  }));
 });
 
 // Sem titulo, o painel mostrava tudo como "vid" e ficava impossivel distinguir
@@ -468,11 +511,29 @@ app.post('/api/slides', handleUpload, async (req, res) => {
     video_text_mode: v.video_text_mode,
     video_text_seconds: v.video_text_seconds
   };
+  if (uploadedType === 'vid' && filaVideo) {
+    try {
+      const analise = await video.analisar(videoTools, req.file.path);
+      if (analise.modo) {
+        doc.otimizacao = {
+          estado: 'otimizando', modo: analise.modo, motivos: analise.motivos,
+          duracao_s: Math.round(analise.info.duracaoS), original_mb: +(req.file.size / 1048576).toFixed(1)
+        };
+      }
+    } catch (error) {
+      // Arquivo que o ffprobe não lê: entra como veio, do jeito que entrava antes.
+      log('AVISO', 'não consegui analisar o vídeo enviado; vai como veio', { arquivo: req.file.filename, msg: error.message });
+    }
+  }
   try {
     await db.slides.insert(doc);
   } catch (error) {
     await cleanupUpload();
     throw error;
+  }
+  if (doc.otimizacao) {
+    log('INFO', 'vídeo na fila de otimização', { slide: doc.id, mb: doc.otimizacao.original_mb, motivos: doc.otimizacao.motivos });
+    filaVideo.enfileirar(doc.id);
   }
   res.json(doc);
 });
@@ -497,6 +558,7 @@ app.put('/api/slides/:id', async (req, res) => {
 app.delete('/api/slides/:id', async (req, res) => {
   const slide = await db.slides.findOne({ id: req.params.id });
   if (!slide) return res.status(404).json({ error: 'Conteúdo não encontrado' });
+  if (filaVideo) await filaVideo.cancelar(req.params.id);
   await db.gslides.remove({ slide_id: req.params.id }, { multi: true });
   await db.slides.remove({ id: req.params.id }, {});
   const mediaPath = uploadedPathFromUrl(slide.url, uploadsDir);
@@ -521,7 +583,7 @@ app.get('/api/groups/:id/slides', async (req, res) => {
     const agenda = agendaDoVinculo(v);
     return Object.assign({}, s, agenda, {
       agendado: temAgenda(agenda),
-      status: statusAgenda(agenda, now)
+      status: statusDoConteudo(s, agenda, now)
     });
   }));
   res.json(itens.filter(Boolean));
@@ -589,7 +651,9 @@ function enderecoPublico(valor) {
 const ENDERECO_PUBLICO = enderecoPublico(process.env.CORPTV_ENDERECO_PUBLICO);
 
 app.get('/api/config', (req, res) => {
-  res.json({ endereco_publico: ENDERECO_PUBLICO });
+  // O painel confere o tamanho antes de enviar: um arquivo acima do limite avisa na
+  // hora, em vez de subir por minutos e ser recusado.
+  res.json({ endereco_publico: ENDERECO_PUBLICO, limite_upload_mb: LIMITE_UPLOAD_MB, otimiza_videos: !!filaVideo });
 });
 
 app.get('/api/screens', async (req, res) => {
@@ -645,6 +709,9 @@ app.get('/api/player/:slug', async (req, res) => {
     const agenda = agendaDoVinculo(v);
     if (!statusAgenda(agenda, now).active) return null;
     const slide = await db.slides.findOne({ id: v.slide_id });
+    // Vídeo ainda sendo otimizado (ou que falhou) não vai para a TV: o arquivo bruto
+    // é justamente o que derrubaria a rede.
+    if (emPreparo(slide)) return null;
     // Por quanto tempo uma cópia offline (player ou agente) ainda pode exibir o
     // conteúdo sem falar com o servidor. Sem isso, um conteúdo vencido seguia na
     // TV enquanto a rede estivesse fora. null = a agenda não tem prazo à frente.
@@ -770,7 +837,7 @@ app.get('/api/programacao', async (req, res) => {
         title: slide.title || (slide.type === 'vid' ? 'Vídeo' : slide.type === 'img' ? 'Imagem' : 'Sem título'),
         type: slide.type,
         agendado: temAgenda(agenda),
-        status: statusAgenda(agenda, now)
+        status: statusDoConteudo(slide, agenda, now)
       });
     });
 
@@ -911,11 +978,19 @@ function iniciar() {
     } catch (err) {
       log('ERRO', 'falha na migracao da agenda', { msg: err.message });
     }
+    if (filaVideo) {
+      filaVideo.retomar().catch(err => log('ERRO', 'falha ao retomar a otimização de vídeos', { msg: err.message }));
+    }
     log('INFO', 'CorporTV iniciado', { porta: PORT, pid: process.pid });
     console.log(`\n🖥️  CorporTV rodando em http://localhost:${PORT}`);
     console.log(`   Painel : http://localhost:${PORT}/painel`);
     console.log(`   Player : http://localhost:${PORT}/player/<slug-da-tela>\n`);
   });
+
+  // Envio de vídeo grande por Wi-Fi passa fácil dos 5 min que o Node dá por padrão
+  // para receber uma requisição inteira (quem acessa direto na porta 3000, sem o
+  // nginx). O cabeçalho continua com prazo curto (headersTimeout).
+  server.requestTimeout = 60 * 60 * 1000;
 
   // Encerramento gracioso: para de aceitar conexoes e deixa as respostas em
   // andamento terminarem antes de sair (evita cortar o download de um video).
