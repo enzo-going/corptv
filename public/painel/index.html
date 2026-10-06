@@ -62,6 +62,21 @@
   .item-info{flex:1;min-width:0}
   .item-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .item-meta{font-size:11px;color:var(--muted);margin-top:2px}
+  /* Barra de envio: arquivo grande leva minutos e quem publica precisa ver que anda. */
+  .envio{margin-top:14px;max-width:560px}
+  .envio[hidden]{display:none}
+  .envio-barra{height:12px;background:var(--bg3);border:1px solid var(--border);border-radius:999px;overflow:hidden}
+  .envio-barra>div{height:100%;width:0;background:var(--accent);border-radius:999px;transition:width .3s ease}
+  .envio-barra.conferindo>div{width:100%;background:repeating-linear-gradient(45deg,var(--accent) 0 10px,#8a83ff 10px 20px);background-size:28px 28px;animation:envio-listras 1s linear infinite}
+  .envio-barra.erro>div{width:100%;background:var(--danger)}
+  .envio-barra.ok>div{width:100%;background:var(--accent2)}
+  @keyframes envio-listras{to{background-position:28px 0}}
+  .envio-texto{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:var(--text);margin-top:8px;flex-wrap:wrap}
+  .envio-texto .envio-detalhe{color:var(--muted);font-size:12px}
+  .envio.erro .envio-texto{color:var(--danger)}
+  .preparo-barra{height:5px;background:var(--bg3);border-radius:999px;overflow:hidden;margin-top:6px;max-width:280px}
+  .preparo-barra>div{height:100%;background:var(--warning);border-radius:999px;transition:width .5s ease}
+  @media (prefers-reduced-motion:reduce){.envio-barra>div,.preparo-barra>div{transition:none}.envio-barra.conferindo>div{animation:none}}
   .item-actions{display:flex;gap:6px;flex-shrink:0}
   .pill-area{display:flex;flex-wrap:wrap;gap:6px;min-height:40px;padding:8px;background:var(--bg);border:1px dashed var(--border2);border-radius:8px;margin-top:8px}
   .pill{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:12px;border:1px solid var(--border);background:var(--bg3);color:var(--muted);cursor:pointer;transition:all .15s}
@@ -343,6 +358,13 @@
           Aqui é só a biblioteca. Para definir <b style="color:var(--text)">onde</b> e <b style="color:var(--text)">quando</b> um conteúdo aparece, use a aba <b style="color:var(--text)">Ambientes</b>.
         </div>
         <button class="btn btn-primary" onclick="addSlide()">Adicionar à biblioteca</button>
+        <div class="envio" id="sl-envio" hidden>
+          <div class="envio-barra" id="sl-envio-barra" role="progressbar" aria-label="Envio do arquivo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div></div></div>
+          <div class="envio-texto" role="status" aria-live="polite">
+            <span><span id="sl-envio-texto"></span> <span class="envio-detalhe" id="sl-envio-detalhe"></span></span>
+            <button class="btn btn-ghost btn-sm" id="sl-envio-cancelar" type="button" onclick="cancelarEnvio()">Cancelar envio</button>
+          </div>
+        </div>
       </details>
       <div id="slide-list" class="item-list"></div>
     </div>
@@ -545,26 +567,53 @@ function mensagemHttp(status){
   return 'Erro '+status+' no servidor.';
 }
 function mb(bytes){return Math.round(bytes/1048576)}
+function tempoRestante(s){
+  if(!isFinite(s)||s<0)return '';
+  if(s<60)return 'falta menos de 1 min';
+  const m=Math.round(s/60);
+  return 'faltam ~'+m+' min';
+}
 // Envio com andamento: com fetch o botão ficava em "Enviando arquivo..." sem dizer
 // nada, e um arquivo recusado pelo servidor parecia travado para sempre.
+let envioAtual=null;
 function enviarComProgresso(url,fd,aoProgresso){
   return new Promise(resolve=>{
     const xhr=new XMLHttpRequest();
+    envioAtual=xhr;
+    const fim=data=>{envioAtual=null;resolve(data);};
     xhr.open('POST',BASE+url);
     if(csrfToken)xhr.setRequestHeader('X-CSRF-Token',csrfToken);
     xhr.upload.onprogress=e=>{if(e.lengthComputable)aoProgresso(e.loaded,e.total);};
     xhr.upload.onload=()=>aoProgresso(null,null);
     xhr.onload=()=>{
-      if(xhr.status===401){location.href='/login?next=%2Fpainel';return;}
+      if(xhr.status===401){envioAtual=null;location.href='/login?next=%2Fpainel';return;}
       let data;
       try{data=JSON.parse(xhr.responseText);}catch(e){data={};}
       if(xhr.status>=400&&!data.error)data.error=mensagemHttp(xhr.status);
-      resolve(data);
+      fim(data);
     };
-    xhr.onerror=()=>resolve({error:mensagemHttp(0)});
-    xhr.ontimeout=()=>resolve({error:mensagemHttp(0)});
+    xhr.onerror=()=>fim({error:mensagemHttp(0)});
+    xhr.ontimeout=()=>fim({error:mensagemHttp(0)});
+    xhr.onabort=()=>fim({cancelado:true});
     xhr.send(fd);
   });
+}
+function cancelarEnvio(){if(envioAtual)envioAtual.abort();}
+// Fechar a aba no meio do envio perde o arquivo: o navegador pergunta antes.
+window.addEventListener('beforeunload',e=>{if(envioAtual){e.preventDefault();e.returnValue='';}});
+// Barra de envio do formulário de conteúdo.
+function mostrarEnvio(estado,texto,detalhe,percentual){
+  const caixa=document.getElementById('sl-envio');
+  const barra=document.getElementById('sl-envio-barra');
+  if(estado==='oculto'){caixa.hidden=true;return;}
+  caixa.hidden=false;
+  caixa.classList.toggle('erro',estado==='erro');
+  barra.className='envio-barra'+(estado==='enviando'?'':' '+estado);
+  barra.firstElementChild.style.width=estado==='enviando'?(percentual||0)+'%':'';
+  barra.setAttribute('aria-valuenow',String(estado==='enviando'?(percentual||0):100));
+  document.getElementById('sl-envio-texto').textContent=texto;
+  document.getElementById('sl-envio-detalhe').textContent=detalhe||'';
+  document.getElementById('sl-envio-cancelar').hidden=estado!=='enviando';
 }
 async function bootstrap(){
   try{
@@ -689,6 +738,7 @@ function handleFile(f){
     cancelFile();return;
   }
   pendingFile=f;
+  mostrarEnvio('oculto');
   const url=URL.createObjectURL(f);
   const wrap=document.getElementById('sl-preview');
   wrap.style.display='flex';
@@ -710,7 +760,10 @@ async function addSlide(){
 
   const btn=document.querySelector('[onclick="addSlide()"]');
   btn.disabled=true;
-  btn.textContent=pendingFile?'Enviando arquivo...':'Adicionando...';
+  btn.textContent=pendingFile?'Enviando...':'Adicionando...';
+  const comArquivo=!!pendingFile;
+  const inicioEnvio=Date.now();
+  if(comArquivo)mostrarEnvio('enviando','Enviando 0%',mb(pendingFile.size)+' MB',0);
 
   try{
     const fd=new FormData();
@@ -719,12 +772,21 @@ async function addSlide(){
     fd.append('video_text_seconds',type==='vid'?document.getElementById('sl-video-text-seconds').value:'0');
     if(pendingFile)fd.append('file',pendingFile);
     const data=await enviarComProgresso('/api/slides',fd,(enviado,total)=>{
-      if(!pendingFile)return;
-      btn.textContent=enviado===null
-        ? 'Recebido, conferindo o arquivo...'
-        : 'Enviando '+Math.floor(enviado/total*100)+'% ('+mb(enviado)+' de '+mb(total)+' MB)';
+      if(!comArquivo)return;
+      if(enviado===null){mostrarEnvio('conferindo','Recebido. Conferindo o arquivo...','');return;}
+      const pct=Math.floor(enviado/total*100);
+      const seg=(Date.now()-inicioEnvio)/1000;
+      // Tempo restante só depois de alguns segundos: no começo a estimativa pula muito.
+      const resta=seg>3&&enviado>0?tempoRestante((total-enviado)/(enviado/seg)):'';
+      mostrarEnvio('enviando','Enviando '+pct+'%',mb(enviado)+' de '+mb(total)+' MB'+(resta?' · '+resta:''),pct);
     });
-    if(data.error){toast('Não foi possível adicionar: '+data.error,8000);return;}
+    if(data.cancelado){mostrarEnvio('erro','Envio cancelado.','Nada foi adicionado.');return;}
+    if(data.error){
+      if(comArquivo)mostrarEnvio('erro','Não foi possível enviar: '+data.error,'');
+      toast('Não foi possível adicionar: '+data.error,8000);
+      return;
+    }
+    if(comArquivo)mostrarEnvio('ok',data.otimizacao?'Enviado. Preparando o vídeo para as TVs (acompanhe na lista abaixo).':'Enviado.','');
     document.getElementById('sl-title').value='';
     document.getElementById('sl-body').value='';
     document.getElementById('sl-video-text-mode').value='fixed';
@@ -736,6 +798,7 @@ async function addSlide(){
       ? 'Vídeo recebido. O CorporTV está deixando ele leve para as TVs; ele entra no ar sozinho quando terminar. Já pode colocar em um ambiente.'
       : 'Adicionado à biblioteca. Agora coloque em um ambiente.', data.otimizacao?9000:2500);
   }catch(e){
+    if(comArquivo)mostrarEnvio('erro','Erro ao enviar. Verifique a conexão e tente de novo.','');
     toast('Erro ao enviar. Verifique o servidor.',6000);
   }finally{
     btn.disabled=false;
@@ -772,8 +835,10 @@ function preparoDe(s){
   const o=s.otimizacao;
   if(!o||o.estado==='pronto')return '';
   if(o.estado==='falhou')return `<div class="item-meta" style="color:var(--danger)">⚠ Não foi possível preparar este vídeo para as TVs (${esc(o.erro||'erro desconhecido')}). Exclua e envie de novo, ou fale com o TI.</div>`;
+  const pct=Number.isInteger(o.percentual)?o.percentual:0;
   const andamento=Number.isInteger(o.percentual)?o.percentual+'%':o.na_fila>0?'na fila ('+o.na_fila+'º)':'começando';
-  return `<div class="item-meta" style="color:var(--warning)">⏳ Preparando para as TVs: ${andamento}. Entra no ar sozinho quando terminar.</div>`;
+  return `<div class="item-meta" style="color:var(--warning)">⏳ Preparando para as TVs: ${andamento}. Entra no ar sozinho quando terminar.</div>
+    <div class="preparo-barra" role="progressbar" aria-label="Preparo do vídeo" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}"><div style="width:${pct}%"></div></div>`;
 }
 // Enquanto algum vídeo está sendo preparado, a biblioteca se atualiza a cada 5 s.
 let preparoTimer=null;

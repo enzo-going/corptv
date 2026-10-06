@@ -114,13 +114,22 @@ test('o servidor só aceita vídeo grande se puder otimizá-lo, e nunca manda o 
   assert.match(fonte, /server\.requestTimeout = 60 \* 60 \* 1000;/);
 });
 
-test('o painel confere o tamanho antes de enviar e mostra o andamento', () => {
+test('o painel confere o tamanho antes de enviar e mostra uma barra de progresso', () => {
   const painel = fs.readFileSync(path.join(__dirname, '../public/painel/index.html'), 'utf8');
   assert.match(painel, /if\(f\.size>limiteUploadMb\*1048576\)/);
   assert.match(painel, /xhr\.upload\.onprogress=/);
-  assert.match(painel, /'Enviando '\+Math\.floor\(enviado\/total\*100\)\+'%/);
+  // Barra de verdade, acessível, com porcentagem, MB e tempo restante.
+  assert.match(painel, /<div class="envio-barra" id="sl-envio-barra" role="progressbar"[^>]*aria-valuemin="0" aria-valuemax="100"/);
+  assert.match(painel, /mostrarEnvio\('enviando','Enviando '\+pct\+'%',mb\(enviado\)\+' de '\+mb\(total\)\+' MB'/);
+  assert.match(painel, /function tempoRestante\(s\)/);
+  // Dá para cancelar e o navegador avisa antes de fechar a aba no meio do envio.
+  assert.match(painel, /onclick="cancelarEnvio\(\)"/);
+  assert.match(painel, /xhr\.onabort=\(\)=>fim\(\{cancelado:true\}\)/);
+  assert.match(painel, /window\.addEventListener\('beforeunload',e=>\{if\(envioAtual\)/);
   // Página de erro em HTML (nginx) não pode travar o painel.
   assert.match(painel, /try\{data=await r\.json\(\);\}catch\(e\)\{data=\{error:mensagemHttp\(r\.status\)\};\}/);
   assert.match(painel, /if\(status===413\)return 'Arquivo grande demais/);
+  // O preparo no servidor também tem barra, na biblioteca.
   assert.match(painel, /function preparoDe\(s\)/);
+  assert.match(painel, /class="preparo-barra" role="progressbar"/);
 });
