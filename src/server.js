@@ -45,6 +45,16 @@ const pageRequestLimiter = rateLimit({
   standardHeaders: 'draft-8',
   legacyHeaders: false
 });
+const playerRequestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: positiveInteger(Number(process.env.CORPTV_PLAYER_REQUESTS_PER_MINUTE), 120),
+  standardHeaders: 'draft-8', legacyHeaders: false
+});
+const heartbeatRequestLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: positiveInteger(Number(process.env.CORPTV_HEARTBEAT_REQUESTS_PER_MINUTE), 120),
+  standardHeaders: 'draft-8', legacyHeaders: false
+});
 
 // Log com carimbo de tempo no stdout. O gerenciador do processo pode redirecionar
 // a saída; o log de mídia fica no diretório configurado por CORPTV_LOG_DIR.
@@ -707,7 +717,7 @@ app.delete('/api/screens/:id', async (req, res) => {
 });
 
 // ── PLAYER API ────────────────────────────────────────────
-app.get('/api/player/:slug', async (req, res) => {
+app.get('/api/player/:slug', playerRequestLimiter, async (req, res) => {
   const screen = await db.screens.findOne({ id: req.params.slug });
   if (!screen) return res.status(404).json({ error: 'Tela não encontrada' });
   const vinculos = await db.gslides.find({ group_id: screen.group_id }).sort({ position: 1 });
@@ -735,7 +745,7 @@ app.get('/api/player/:slug', async (req, res) => {
 const OFFLINE_MS = 60000;
 const lastBeat = new Map();
 
-app.post('/api/heartbeat', async (req, res) => {
+app.post('/api/heartbeat', heartbeatRequestLimiter, async (req, res) => {
   const { screen_id } = req.body || {};
   if (!screen_id || typeof screen_id !== 'string') {
     return res.status(400).json({ error: 'Tela obrigatória' });
