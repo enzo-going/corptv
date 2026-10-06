@@ -515,7 +515,10 @@ app.post('/api/slides', handleUpload, async (req, res) => {
   };
   if (uploadedType === 'vid' && filaVideo) {
     try {
-      const analise = await video.analisar(videoTools, req.file.path);
+      // Caminho conferido (nome UUID dentro da pasta de uploads), como em toda leitura de mídia.
+      const arquivoEnviado = uploadedPathFromUrl('/uploads/' + req.file.filename, uploadsDir);
+      if (!arquivoEnviado) throw new Error('nome de arquivo inesperado');
+      const analise = await video.analisar(videoTools, arquivoEnviado);
       if (analise.modo) {
         doc.otimizacao = {
           estado: 'otimizando', modo: analise.modo, motivos: analise.motivos, hdr: analise.info.hdr,
