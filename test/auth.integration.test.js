@@ -183,11 +183,15 @@ test('CSRF e perfis impedem alterações e acesso de TI fora da permissão', asy
   assert.equal(group.response.status, 200);
   assert.equal((await send('/api/users', { auth: editor })).response.status, 403);
   assert.equal((await send('/api/audit', { auth: editor })).response.status, 403);
-  // Aparelhos é do TI na API também, não só escondido no painel.
-  assert.equal((await send('/api/aparelhos', { auth: editor })).response.status, 403);
+  // Quem publica escolhe o que a TV mostra (caso real: a sala da comunicação, em
+  // outro prédio, precisou trocar e não tinha como). Remover o aparelho é do TI, e o
+  // IP da Pi só o TI vê.
+  const listaEditor = await send('/api/aparelhos', { auth: editor });
+  assert.equal(listaEditor.response.status, 200);
   assert.equal((await send('/api/aparelhos/qualquer', {
     method: 'PUT', auth: editor, body: { screen_id: null }
-  })).response.status, 403);
+  })).response.status, 404);
+  assert.equal((await send('/api/aparelhos/qualquer', { method: 'DELETE', auth: editor, body: {} })).response.status, 403);
 });
 
 test('falha ao auditar uma negativa de perfil responde erro sem prender a requisição', async () => {
@@ -195,7 +199,7 @@ test('falha ao auditar uma negativa de perfil responde erro sem prender a requis
   const inserir = db.audit.insert;
   db.audit.insert = async () => { throw new Error('falha de gravação simulada'); };
   try {
-    const resposta = await fetch(baseUrl + '/api/aparelhos', {
+    const resposta = await fetch(baseUrl + '/api/users', {
       headers: { cookie: editor.cookie }, signal: AbortSignal.timeout(3000)
     });
     assert.equal(resposta.status, 500);

@@ -54,9 +54,16 @@ test('Aparelhos é uma página só do TI, com um comando único para Raspberry n
   const pagina = panel.slice(panel.indexOf('<div class="page" id="page-aparelhos">'), panel.indexOf('<!-- MINHA CONTA -->'));
   assert.ok(pagina.includes('Adicionar Raspberry'));
   assert.ok(pagina.includes('<div class="card" id="pi-setup" hidden>'), 'o passo a passo começa fechado');
-  // Quem publica conteúdo não vê nada de Raspberry na página Telas.
+  // Em Telas, quem publica vê as TVs com Raspberry e escolhe o que cada uma mostra
+  // (caso real: sem isso, abriram o player no navegador da própria TV). O comando de
+  // instalação e remover o aparelho continuam só em Aparelhos, do TI.
   const telas = panel.slice(panel.indexOf('<div class="page" id="page-telas">'), panel.indexOf('<div class="page" id="page-aparelhos">'));
-  assert.ok(!telas.includes('Raspberry'));
+  assert.ok(telas.includes('<div id="tv-device-list"></div>'));
+  assert.ok(!telas.includes('pi-command'));
+  assert.ok(panel.includes(`<select class="device-select editor-only" onchange="setDeviceScreen(`));
+  const linha = panel.slice(panel.indexOf('function linhaDeTv('), panel.indexOf('async function renderDevices('));
+  assert.ok(linha.indexOf('${ti?') >= 0 && linha.indexOf('${ti?') < linha.indexOf('delDevice('), 'remover a Pi só aparece para o TI');
+  assert.ok(panel.includes("api('GET','/api/aparelhos')]);"), 'editores também carregam a lista de TVs');
   assert.ok(panel.includes('body:not(.admin) .admin-only{display:none!important}'));
   assert.ok(panel.includes("document.body.classList.toggle('admin',!!permissions.users)"));
   assert.ok(!panel.includes('Nome da tela no agente'), 'o nome da tela no agente saiu do painel');
@@ -66,15 +73,14 @@ test('Aparelhos é uma página só do TI, com um comando único para Raspberry n
   assert.ok(panel.includes("api('PUT','/api/aparelhos/'+id,{screen_id:value||null})"));
   assert.ok(panel.includes("ativo.classList.contains('device-select'))return;"));
   assert.ok(panel.includes("api('GET','/api/aparelhos')"));
-  // Só o TI busca a lista: a API recusa os outros perfis, e o painel não pode
-  // mostrar "acesso negado" a cada 30 s para quem só publica conteúdo.
-  assert.ok(panel.includes("permissions&&permissions.users?api('GET','/api/aparelhos'):Promise.resolve([])"));
+  // Todo perfil logado busca a lista (a API agora permite): quem publica escolhe a tela da TV.
+  assert.ok(!panel.includes("permissions&&permissions.users?api('GET','/api/aparelhos'):Promise.resolve([])"));
   // Mesmo no celular (que usa o endereço aberto nos links), o comando leva o endereço
   // oficial: é dele que a Pi tira o domínio do corportv/ curto.
   assert.ok(panel.includes('function officialOrigin(){return enderecoPublicoConfig||publicOrigin();}'));
   assert.ok(panel.includes("cmd.value=piCommand(officialOrigin());"));
-  // Cada Raspberry mostra o IP dela: o TI não precisa adivinhar para entrar por SSH.
-  assert.ok(panel.includes("+(d.ip?' · IP '+d.ip:'')"));
+  // Cada Raspberry mostra o IP dela para o TI: ninguém precisa adivinhar para entrar por SSH.
+  assert.ok(panel.includes("if(d.ip)partes.push('IP '+d.ip);"));
 });
 
 test('o cartão de tela é curto: Abrir à vista, o resto no menu', () => {
