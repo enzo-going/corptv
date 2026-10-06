@@ -280,6 +280,7 @@ async function sincronizar(opcoes = {}) {
   const tela = telaAtual;
   try {
     if (!tela) { playlistLocal = null; return; }
+    const consultadoEm = Date.now();
     const res = await pedir(CONFIG.servidor + '/api/player/' + encodeURIComponent(tela));
     if (res.statusCode !== 200) { res.destroy(); throw new Error('HTTP ' + res.statusCode); }
     const dados = JSON.parse(await lerTudo(res));
@@ -364,7 +365,7 @@ async function sincronizar(opcoes = {}) {
     playlistLocal = {
       screen: dados.screen,
       // Instante da consulta ao servidor: é dele que conta a validade de cada slide.
-      salvo_em: Date.now(),
+      salvo_em: consultadoEm,
       slides: prontos.map(s => s.url ? Object.assign({}, s, { url: '/midia/' + nomeLocal(s.url) }) : s)
     };
     try { fs.writeFileSync(arqPlaylist, JSON.stringify(playlistLocal)); } catch (e) {}
@@ -538,8 +539,11 @@ function programacaoValida(p) {
   if (!p || !p.salvo_em) return p;
   const agora = Date.now();
   const slides = p.slides.filter(s => s.cache_for_ms === null || s.cache_for_ms === undefined ||
-                                      p.salvo_em + s.cache_for_ms > agora);
-  return slides.length === p.slides.length ? p : Object.assign({}, p, { slides });
+                                      p.salvo_em + s.cache_for_ms > agora)
+    .map(s => s.cache_for_ms === null || s.cache_for_ms === undefined ? s :
+      Object.assign({}, s, { cache_for_ms: Math.max(0, p.salvo_em + s.cache_for_ms - agora) }));
+  // O navegador guarda uma cópia com o relógio dele: manda só a validade restante.
+  return Object.assign({}, p, { slides });
 }
 
 function paginaAguardando() {
@@ -552,9 +556,12 @@ function paginaAguardando() {
     '<p style="font-size:24px;color:#aaa">Falta escolher a tela: no painel, Telas → Aparelhos.</p></div></body></html>';
 }
 
-const servidor = http.createServer(async (req, res) => {
+async function atender(req, res) {
   const u = new URL(req.url, 'http://127.0.0.1');
-  const caminho = decodeURIComponent(u.pathname);
+  let caminho;
+  try { caminho = decodeURIComponent(u.pathname); } catch (e) {
+    res.writeHead(400); return res.end('Endereco invalido');
+  }
 
   // A programação: sempre a versão local, com os arquivos que já estão no disco.
   if (caminho.startsWith('/api/player/')) {
@@ -580,10 +587,15 @@ const servidor = http.createServer(async (req, res) => {
     const ext = path.extname(nome).toLowerCase();
     if (!TIPOS[ext] || !fs.existsSync(arquivo)) { res.writeHead(404); return res.end(); }
     const info = fs.statSync(arquivo);
+    if (!info.isFile() || info.size === 0) { res.writeHead(404); return res.end(); }
     let inicio = 0, fim = info.size - 1;
     const range = req.headers.range;
     if (range) {
       const m = /^bytes=(\d*)-(\d*)$/.exec(String(range).trim());
+      if (!m || (!m[1] && !m[2]) || (!m[1] && Number(m[2]) === 0)) {
+        res.writeHead(416, { 'Content-Range': 'bytes */' + info.size });
+        return res.end();
+      }
       if (m) {
         if (m[1] === '') inicio = Math.max(0, info.size - parseInt(m[2], 10));
         else { inicio = parseInt(m[1], 10); if (m[2] !== '') fim = Math.min(parseInt(m[2], 10), info.size - 1); }
@@ -603,6 +615,10 @@ const servidor = http.createServer(async (req, res) => {
     if (req.method === 'HEAD') return res.end();
     const leitura = fs.createReadStream(arquivo, { start: inicio, end: fim });
     res.on('close', () => leitura.destroy());
+    leitura.on('error', err => {
+      log('AVISO', 'falha ao ler midia local', { arquivo: nome, erro: err.message });
+      res.destroy();
+    });
     return leitura.pipe(res);
   }
 
@@ -634,6 +650,14 @@ const servidor = http.createServer(async (req, res) => {
   const html = await obterPlayer();
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(html);
+}
+
+const servidor = http.createServer((req, res) => {
+  atender(req, res).catch(err => {
+    log('ERRO', 'falha ao atender pedido local', { erro: err.message });
+    if (res.headersSent) return res.destroy();
+    res.writeHead(500); res.end('Erro ao atender pedido local');
+  });
 });
 
 servidor.listen(CONFIG.porta, '127.0.0.1', () => {
