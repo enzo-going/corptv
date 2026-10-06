@@ -127,6 +127,13 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
   let setupCode = null;
   let setupCodePromise = null;
   let setupCreationInProgress = false;
+  let alteracoesDePerfil = Promise.resolve();
+
+  function alterarPerfil(operacao) {
+    const atual = alteracoesDePerfil.then(operacao);
+    alteracoesDePerfil = atual.catch(() => {});
+    return atual;
+  }
 
   function normalizeSetupCode(value) {
     return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -489,28 +496,30 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
   });
 
   app.put('/api/users/:id', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {
-    const target = await db.users.findOne({ id: req.params.id });
-    if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
-    const name = req.body && req.body.name !== undefined ? cleanName(req.body.name) : { value: target.name };
-    const role = req.body && req.body.role !== undefined ? String(req.body.role) : target.role;
-    const active = req.body && req.body.active !== undefined ? req.body.active === true : target.active !== false;
-    if (name.error) return res.status(400).json({ error: name.error });
-    if (!ROLES.has(role)) return res.status(400).json({ error: 'Perfil inválido.' });
-    if (target.id === req.user.id && (role !== 'admin' || !active)) {
-      return res.status(400).json({ error: 'Você não pode remover o próprio acesso administrativo.' });
-    }
-    if (target.role === 'admin' && target.active !== false && (role !== 'admin' || !active)) {
-      const admins = await db.users.count({ role: 'admin', active: { $ne: false } });
-      if (admins <= 1) return res.status(400).json({ error: 'O sistema precisa manter ao menos um administrador ativo.' });
-    }
-    const updatedAt = new Date().toISOString();
-    await db.users.update({ id: target.id }, { $set: { name: name.value, role, active, updated_at: updatedAt } });
-    if (!active || role !== target.role) await db.sessions.remove({ user_id: target.id }, { multi: true });
-    await audit.fromRequest(req, {
-      action: 'user.update', entity_type: 'user', entity_id: target.id,
-      details: { username: target.username, old_role: target.role, role, active }
+    return alterarPerfil(async () => {
+      const target = await db.users.findOne({ id: req.params.id });
+      if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
+      const name = req.body && req.body.name !== undefined ? cleanName(req.body.name) : { value: target.name };
+      const role = req.body && req.body.role !== undefined ? String(req.body.role) : target.role;
+      const active = req.body && req.body.active !== undefined ? req.body.active === true : target.active !== false;
+      if (name.error) return res.status(400).json({ error: name.error });
+      if (!ROLES.has(role)) return res.status(400).json({ error: 'Perfil inválido.' });
+      if (target.id === req.user.id && (role !== 'admin' || !active)) {
+        return res.status(400).json({ error: 'Você não pode remover o próprio acesso administrativo.' });
+      }
+      if (target.role === 'admin' && target.active !== false && (role !== 'admin' || !active)) {
+        const admins = await db.users.count({ role: 'admin', active: { $ne: false } });
+        if (admins <= 1) return res.status(400).json({ error: 'O sistema precisa manter ao menos um administrador ativo.' });
+      }
+      const updatedAt = new Date().toISOString();
+      await db.users.update({ id: target.id }, { $set: { name: name.value, role, active, updated_at: updatedAt } });
+      if (!active || role !== target.role) await db.sessions.remove({ user_id: target.id }, { multi: true });
+      await audit.fromRequest(req, {
+        action: 'user.update', entity_type: 'user', entity_id: target.id,
+        details: { username: target.username, old_role: target.role, role, active }
+      });
+      res.json({ ...publicUser({ ...target, name: name.value, role, active, updated_at: updatedAt }) });
     });
-    res.json({ ...publicUser({ ...target, name: name.value, role, active, updated_at: updatedAt }) });
   });
 
   app.post('/api/users/:id/reset-password', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {

@@ -3,7 +3,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { isLoopbackAddress, isPrivateAddress, validatePassword } = require('../src/security');
+const { isLoopback, isLoopbackAddress, isPrivateAddress, validatePassword } = require('../src/security');
+
+test('endereço resolvido como local não dispensa ativação se o socket é remoto', () => {
+  // Endereço de documentação: nenhum cliente real está envolvido.
+  assert.equal(isLoopback({ ip: '::1', socket: { remoteAddress: '2001:db8::10' } }), false);
+  assert.equal(isLoopback({ ip: '::1', socket: { remoteAddress: '::1' } }), true);
+});
 
 test('senhas novas exigem mais de quatro caracteres e preservam as demais restrições', () => {
   for (const password of [undefined, null, 12345, '', 'a', 'ab', 'abc', 'abcd']) {
