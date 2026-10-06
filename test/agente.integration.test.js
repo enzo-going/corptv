@@ -36,6 +36,7 @@ const servidor = {
   telasPedidas: [],
   downloads: 0,
   falhaHead: null,
+  atrasoDownloadMs: 0,
   consultasHead: 0
 };
 
@@ -130,6 +131,12 @@ test.before(async () => {
       }
       servidor.downloads++;
       res.writeHead(200);
+      if (servidor.atrasoDownloadMs) {
+        return setTimeout(() => {
+          servidor.foraDoAr = true;
+          res.end(servidor.midia);
+        }, servidor.atrasoDownloadMs);
+      }
       return res.end(servidor.midia);
     }
 
@@ -216,6 +223,19 @@ test('serve a mídia do disco, com Range, sem tocar no servidor', async () => {
   assert.equal((await pedaco.arrayBuffer()).byteLength, 100);
 
   assert.equal(servidor.downloads, antes, 'exibir não pode gerar download novo');
+});
+
+test('URL malformada e Range inválido não derrubam o agente', async () => {
+  const ruim = await fetch(`http://127.0.0.1:${portaAgente}/%ZZ`);
+  assert.equal(ruim.status, 400);
+  await ruim.text();
+  for (const range of ['bytes=-', 'bytes=-0', 'bytes=x-y', 'bytes=0-1,4-5']) {
+    const r = await fetch(`http://127.0.0.1:${portaAgente}/midia/${ARQUIVO}`, { headers: { Range: range } });
+    assert.equal(r.status, 416, range);
+    await r.text();
+  }
+  assert.equal((await status()).conteudos_prontos, 1);
+  assert.equal(agente.exitCode, null);
 });
 
 test('não baixa de novo enquanto o arquivo não muda no servidor', async () => {
@@ -426,7 +446,7 @@ test('sem rede, a Pi tira da tela o conteúdo que venceu', async () => {
   const original = servidor.playlist;
   servidor.playlist = { screen: { id: TELA }, slides: [{ id: 'aviso', type: 'txt', title: 'Aviso', duration: 5, cache_for_ms: 1500 }] };
   try {
-    await esperar(async () => (await lista()).some(s => s.cache_for_ms === 1500), 'o agente receber a validade do servidor');
+    await esperar(async () => (await lista()).some(s => s.id === 'aviso' && s.cache_for_ms > 0 && s.cache_for_ms <= 1500), 'o agente receber a validade do servidor');
     servidor.foraDoAr = true;
     await esperar(async () => (await lista()).length === 0, 'o conteúdo vencido sair da tela com a rede fora', 10000);
   } finally {
@@ -444,4 +464,26 @@ test('download pela metade abandonado não fica ocupando o disco', async () => {
   fs.writeFileSync(abandonado, Buffer.alloc(1024));
   await esperar(() => !fs.existsSync(abandonado), 'a limpeza apagar o .parcial que não é da programação');
   assert.ok(fs.existsSync(path.join(cache, ARQUIVO)), 'a mídia da programação tem de continuar');
+});
+
+test('download demorado não renova o prazo recebido antes da queda da rede', async () => {
+  const original = servidor.playlist;
+  servidor.playlist = playlistCom(ARQUIVO);
+  servidor.playlist.slides[0].cache_for_ms = 1000;
+  servidor.atrasoDownloadMs = 1600;
+  fs.unlinkSync(path.join(cache, ARQUIVO));
+  fs.writeFileSync(path.join(cache, 'estado.json'), '{}');
+  try {
+    await esperar(() => {
+      if (!fs.existsSync(path.join(cache, ARQUIVO))) return false;
+      const p = JSON.parse(fs.readFileSync(path.join(cache, 'playlist.json'), 'utf8'));
+      return p.slides.some(s => s.cache_for_ms === 1000);
+    }, 'baixar a mídia cuja validade acabou durante o download');
+    const p = await (await fetch(`http://127.0.0.1:${portaAgente}/api/player/x`)).json();
+    assert.deepEqual(p.slides, []);
+  } finally {
+    servidor.atrasoDownloadMs = 0;
+    servidor.foraDoAr = false;
+    servidor.playlist = original;
+  }
 });
