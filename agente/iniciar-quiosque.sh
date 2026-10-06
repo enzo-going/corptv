@@ -127,7 +127,39 @@ tela_cheia_pelo_labwc() {
 # entender por quê. E se a saída padrão fosse o fone (P2), a TV ficaria muda.
 # Nunca impede o quiosque de abrir: sem som é ruim, sem imagem é pior.
 configurar_audio() {
-  command -v pactl >/dev/null 2>&1 || { registrar "som: pactl ausente, saida nao configurada"; return; }
+  if ! command -v pactl >/dev/null 2>&1; then
+    command -v wpctl >/dev/null 2>&1 || { registrar "som: pactl e wpctl ausentes, saida nao configurada"; return 0; }
+    local status saida
+    for i in $(seq 1 15); do
+      status=$(wpctl status 2>/dev/null) && break
+      sleep 1
+    done
+    # Só os sinks de áudio: não confundir a HDMI com uma fonte ou dispositivo.
+    saida=$(printf '%s\n' "$status" | awk '
+      /^Audio/ { audio=1 }
+      /^Video/ { audio=0; sinks=0 }
+      /Sinks:/ { sinks=audio; next }
+      /Sources:|Filters:|Streams:|Devices:|Settings:/ { sinks=0 }
+      sinks && /^[^0-9]*[0-9]+\./ {
+        linha=tolower($0)
+        if (linha !~ /hdmi/) next
+        id=$0; sub(/^[^0-9]*/, "", id); sub(/\..*/, "", id)
+        if (!primeira) primeira=id
+        if (!preferida && (linha ~ /fef00700/ || linha ~ /hdmi[ _-]*0/)) preferida=id
+      }
+      END { if (preferida) print preferida; else if (primeira) print primeira }
+    ')
+    if [ -z "$saida" ]; then
+      registrar "som: nenhuma saida HDMI encontrada pelo wpctl (TV desligada na hora do boot?)"
+      return 0
+    fi
+    if wpctl set-default "$saida" && wpctl set-mute "$saida" 0 && wpctl set-volume "$saida" 1.0; then
+      registrar "som: saida $saida pelo wpctl, volume do sistema em 100%"
+    else
+      registrar "som: nao consegui configurar a saida $saida pelo wpctl"
+    fi
+    return 0
+  fi
   for i in $(seq 1 15); do pactl info >/dev/null 2>&1 && break; sleep 1; done
   local saida
   # HDMI0 (fef00700 na Pi 4) é a porta mais perto da energia, a que o checklist manda usar.
