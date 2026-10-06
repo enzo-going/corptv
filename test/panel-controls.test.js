@@ -156,7 +156,7 @@ test('o login não redireciona para um destino fornecido pela URL', () => {
 
 test('o painel usa o endereço oficial nos links', () => {
   // Aberto pelo IP, o painel distribuía links com IP e porta.
-  assert.match(panel, /api\('GET','\/api\/config'\);enderecoPublicoConfig=cfg\.endereco_publico\|\|null/);
+  assert.match(panel, /api\('GET','\/api\/config'\);\s*enderecoPublicoConfig=cfg\.endereco_publico\|\|null/);
   assert.match(panel, /if\(enderecoPublicoConfig\)return enderecoPublicoConfig;/);
 });
 
