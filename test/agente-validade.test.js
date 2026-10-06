@@ -7,7 +7,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 test('o cache do navegador recebe só o prazo restante sem alterar o prazo salvo no agente', () => {
-  const codigo = fs.readFileSync(path.join(__dirname, '../agente/agente.js'), 'utf8');
+  const codigo = fs.readFileSync(path.join(__dirname, '../agente/agente.js'), 'utf8').replace(/\r\n/g, '\n');
   const inicio = codigo.indexOf('function programacaoValida(');
   const funcao = codigo.slice(inicio, codigo.indexOf('\n}\n', inicio) + 3);
   let agora = 1500;
