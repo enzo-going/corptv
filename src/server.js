@@ -484,7 +484,8 @@ app.get('/api/slides', async (req, res) => {
   }));
 });
 
-app.get('/api/slides/:id/arquivo', async (req, res, next) => {
+// Mesmo limite de pedidos das mídias (por cliente); sem o limite de velocidade das TVs.
+app.get('/api/slides/:id/arquivo', mediaRequestLimiter, async (req, res, next) => {
   const slide = await db.slides.findOne({ id: req.params.id });
   if (!slide) return res.status(404).json({ error: 'Conteúdo não encontrado.' });
   if (slide.otimizacao && slide.otimizacao.estado === 'otimizando') {
