@@ -827,10 +827,13 @@ function renderSlides(){
         <div class="item-meta">${uso} · ${esc(meta)}</div>
         ${preparoDe(s)}
       </div>
-      <div class="item-actions editor-only">
-        ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:`<button class="btn btn-ghost btn-sm" onclick="editDuration('${s.id}')">Tempo</button>`}
-        <button class="btn btn-ghost btn-sm" onclick="renameSlide('${s.id}')">Renomear</button>
-        <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')" title="Remover da biblioteca">✕</button>
+      <div class="item-actions">
+        ${s.type==='vid'||s.type==='img'?`<a class="btn btn-ghost btn-sm" href="/api/slides/${encodeURIComponent(s.id)}/arquivo">Baixar</a>`:''}
+        <div class="item-actions editor-only">
+          ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:`<button class="btn btn-ghost btn-sm" onclick="editDuration('${s.id}')">Tempo</button>`}
+          <button class="btn btn-ghost btn-sm" onclick="renameSlide('${s.id}')">Renomear</button>
+          <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')" title="Remover da biblioteca">✕</button>
+        </div>
       </div>
     </div>`;
   }).join('');
