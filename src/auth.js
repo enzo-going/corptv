@@ -523,6 +523,27 @@ function createAuth({ app, db, audit, log, setupCodeFile }) {
     });
   });
 
+  app.delete('/api/users/:id', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {
+    return alterarPerfil(async () => {
+      const target = await db.users.findOne({ id: req.params.id });
+      if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
+      if (target.id === req.user.id) {
+        return res.status(400).json({ error: 'Você não pode excluir a própria conta.' });
+      }
+      if (target.role === 'admin' && target.active !== false) {
+        const admins = await db.users.count({ role: 'admin', active: { $ne: false } });
+        if (admins <= 1) return res.status(400).json({ error: 'O sistema precisa manter ao menos um administrador ativo.' });
+      }
+      await db.users.remove({ id: target.id }, {});
+      const removed = await db.sessions.remove({ user_id: target.id }, { multi: true });
+      await audit.fromRequest(req, {
+        action: 'user.delete', entity_type: 'user', entity_id: target.id,
+        details: { username: target.username, sessions: removed }
+      });
+      res.json({ ok: true });
+    });
+  });
+
   app.post('/api/users/:id/reset-password', authRequestLimiter, requireRole('admin'), requireCsrf, async (req, res) => {
     const target = await db.users.findOne({ id: req.params.id });
     if (!target) return res.status(404).json({ error: 'Usuário não encontrado.' });
