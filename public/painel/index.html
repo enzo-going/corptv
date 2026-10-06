@@ -398,6 +398,12 @@
         </div>
         <button class="btn btn-primary" style="margin-top:12px" onclick="addScreen()">Adicionar tela</button>
       </details>
+      <div id="tv-devices" hidden>
+        <div class="page-title" style="font-size:15px;margin:8px 0 4px">TVs com Raspberry</div>
+        <div class="page-sub" style="margin-bottom:10px">Escolha o que cada TV mostra. A troca chega à TV em até 1 minuto; o vídeo novo é baixado para a TV e depois toca mesmo sem rede.</div>
+        <div id="tv-device-list"></div>
+        <div class="page-title" style="font-size:15px;margin:20px 0 10px">Telas</div>
+      </div>
       <div id="screen-list"></div>
     </div>
 
@@ -642,7 +648,7 @@ async function logout(){const result=await api('POST','/api/auth/logout',{});if(
 // com os últimos dados; a próxima passagem se recupera sozinha.
 async function load(){
   try{
-    [slides,groups,screens,devices]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens'),permissions&&permissions.users?api('GET','/api/aparelhos'):Promise.resolve([])]);
+    [slides,groups,screens,devices]=await Promise.all([api('GET','/api/slides'),api('GET','/api/groups'),api('GET','/api/screens'),api('GET','/api/aparelhos')]);
     if(!Array.isArray(devices))devices=[];
   }catch(e){
     toast('Sem conexão com o servidor — tentando de novo em 30s');
@@ -1212,13 +1218,13 @@ async function renderScreens(){
     const playerUrl=`${origin}/player/${s.id}`;
     const vol=Number.isInteger(s.volume)?s.volume:100;
     const situacao=online?'No ar':'Fora do ar · '+lastSeenText(s.last_seen);
-    const pis=devices.filter(d=>d.screen_id===s.id).map(d=>d.name);
+    const pis=devices.filter(d=>d.screen_id===s.id).map(nomeDaTv);
     const aberto=menusAbertos.has(s.id);
     return `<div class="card screen-card">
       <div class="card-row">
         <div class="flex-gap">
           <span class="online-dot ${online?'on':'off'}"></span>
-          <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(situacao)} · ${esc(g?g.name:'Sem ambiente')}<span class="admin-only"> · ${pis.length?'Raspberry '+esc(pis.join(', ')):'sem Raspberry'}</span></div></div>
+          <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(situacao)} · ${esc(g?g.name:'Sem ambiente')}${pis.length?' · passando na TV '+esc(pis.join(', ')):''}</div></div>
         </div>
         <div class="flex-gap screen-actions">
           <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" title="Ver o que esta TV está exibindo">Abrir</a>
@@ -1256,29 +1262,65 @@ function volumeText(v){return v===0?'Mudo':v+'%';}
 function piCommand(origin){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash';}
 // Aparelho manda sinal a cada 15 s; 1 minuto sem sinal (4 perdidos) = desligado.
 function deviceOnline(d){return !!d.last_seen&&(Date.now()-new Date(d.last_seen).getTime())<60000;}
+function nomeDaTv(d){return d.apelido||d.name;}
+// O que a Pi contou de si no último registro, em linguagem de quem publica.
+function situacaoDaTv(d){
+  const s=d.situacao;
+  if(!d.screen_id)return 'sem tela escolhida';
+  if(!s)return '';
+  if(s.estado==='pronto')return 'conteúdo guardado na TV (toca mesmo sem rede)';
+  if(s.estado==='baixando')return 'recebendo o conteúdo novo'+(Number.isInteger(s.percentual)?': '+s.percentual+'%':'');
+  if(s.estado==='falha')return 'não conseguiu receber o conteúdo, tentando de novo';
+  if(s.estado==='vazio')return 'a tela escolhida não tem conteúdo no ar';
+  return '';
+}
+function linhaDeTv(d,ti){
+  const on=deviceOnline(d);
+  const semTela=!d.screen_id;
+  const opcoes=`<option value="" ${semTela?'selected':''}>Escolher tela…</option>`+screens.map(s=>`<option value="${esc(s.id)}" ${s.id===d.screen_id?'selected':''}>${esc(s.name)}</option>`).join('');
+  const partes=[semTela&&!d.last_seen?'Nova':(on?'Ligada':'Desligada · '+lastSeenText(d.last_seen)),situacaoDaTv(d)];
+  if(ti){
+    if(d.apelido)partes.push(d.name);
+    if(d.ip)partes.push('IP '+d.ip);
+    if(d.situacao&&Number.isInteger(d.situacao.livre_mb))partes.push((d.situacao.livre_mb/1024).toFixed(1)+' GB livres');
+  }
+  const alerta=semTela||(d.situacao&&d.situacao.estado==='falha');
+  return `<div class="device-row${alerta?' device-new':''}">
+    <span class="online-dot ${on?'on':'off'}"></span>
+    <div class="device-info"><div class="card-title">${esc(nomeDaTv(d))}</div><div class="card-sub">${esc(partes.filter(Boolean).join(' · '))}</div></div>
+    <select class="device-select editor-only" onchange="setDeviceScreen('${esc(d.id)}',this.value)" aria-label="O que a TV ${esc(nomeDaTv(d))} mostra">${opcoes}</select>
+    <button class="btn btn-ghost btn-sm editor-only" onclick="renameDevice('${esc(d.id)}')" aria-label="Dar um nome à TV ${esc(nomeDaTv(d))}">Nome</button>
+    ${ti?`<button class="btn btn-ghost btn-sm btn-icon" onclick="delDevice('${esc(d.id)}')" aria-label="Remover ${esc(nomeDaTv(d))} da lista">✕</button>`:''}
+  </div>`;
+}
 async function renderDevices(){
   // Não redesenha com a lista de telas aberta: o load() de 30 s fecharia a escolha.
   const ativo=document.activeElement;
   if(ativo&&ativo.classList&&ativo.classList.contains('device-select'))return;
   const cmd=document.getElementById('pi-command');
   if(cmd)cmd.value=piCommand(officialOrigin());
+  // As que pedem ação (sem tela, com falha) vêm primeiro.
+  const lista=devices.slice().sort((a,b)=>(!!a.screen_id-!!b.screen_id)||nomeDaTv(a).localeCompare(nomeDaTv(b)));
+  // Em Telas, para quem publica: as TVs e o que cada uma mostra.
+  const bloco=document.getElementById('tv-devices');
+  const tvs=document.getElementById('tv-device-list');
+  if(bloco&&tvs){
+    bloco.hidden=!lista.length;
+    tvs.innerHTML=lista.length?'<div class="card device-list">'+lista.map(d=>linhaDeTv(d,false)).join('')+'</div>':'';
+  }
   const el=document.getElementById('device-list');
   if(!el)return;
-  if(!devices.length){el.innerHTML='<div class="card" style="text-align:center;padding:24px;color:var(--muted)">Nenhuma Raspberry ainda. Use "Adicionar Raspberry" acima.</div>';return;}
-  // As que ainda não têm tela vêm primeiro: são as que pedem uma ação.
-  const lista=devices.slice().sort((a,b)=>(!!a.screen_id-!!b.screen_id)||a.name.localeCompare(b.name));
-  el.innerHTML='<div class="card device-list">'+lista.map(d=>{
-    const on=deviceOnline(d);
-    const semTela=!d.screen_id;
-    const opcoes=`<option value="" ${semTela?'selected':''}>Escolher tela…</option>`+screens.map(s=>`<option value="${esc(s.id)}" ${s.id===d.screen_id?'selected':''}>${esc(s.name)}</option>`).join('');
-    const situacao=(semTela?'Nova — escolha a tela que ela mostra':(on?'Ligada':'Desligada · '+lastSeenText(d.last_seen)))+(d.ip?' · IP '+d.ip:'');
-    return `<div class="device-row${semTela?' device-new':''}">
-      <span class="online-dot ${on?'on':'off'}"></span>
-      <div class="device-info"><div class="card-title">${esc(d.name)}</div><div class="card-sub">${esc(situacao)}</div></div>
-      <select class="device-select" onchange="setDeviceScreen('${esc(d.id)}',this.value)" aria-label="Tela que ${esc(d.name)} mostra">${opcoes}</select>
-      <button class="btn btn-ghost btn-sm btn-icon" onclick="delDevice('${esc(d.id)}')" aria-label="Remover ${esc(d.name)} da lista">✕</button>
-    </div>`;
-  }).join('')+'</div>';
+  if(!lista.length){el.innerHTML='<div class="card" style="text-align:center;padding:24px;color:var(--muted)">Nenhuma Raspberry ainda. Use "Adicionar Raspberry" acima.</div>';return;}
+  el.innerHTML='<div class="card device-list">'+lista.map(d=>linhaDeTv(d,!!(permissions&&permissions.users))).join('')+'</div>';
+}
+async function renameDevice(id){
+  const d=devices.find(x=>x.id===id);
+  if(!d)return;
+  const novo=prompt('Nome desta TV (ex.: TV da Comunicação):',d.apelido||'');
+  if(novo===null)return;
+  const r=await api('PUT','/api/aparelhos/'+id,{apelido:novo.trim()||null});
+  if(r.error){toast(r.error);return;}
+  await load();toast('Nome da TV salvo');
 }
 function togglePiSetup(){
   const caixa=document.getElementById('pi-setup');
@@ -1293,7 +1335,7 @@ async function setDeviceScreen(id,value){
   if(d)d.screen_id=value||null;
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   renderDevices();renderScreens();
-  toast(value?'Pronto: a TV muda para esta tela em até 2 minutos':'Aparelho sem tela: a TV mostra o aviso para escolher');
+  toast(value?'Pronto: a TV muda em até 1 minuto. Se o vídeo for novo para ela, aparece depois de baixado.':'TV sem tela: ela mostra o aviso para escolher',6000);
 }
 async function delDevice(id){
   const d=devices.find(x=>x.id===id);
@@ -1360,7 +1402,7 @@ async function delScreen(id){
   const s=screens.find(x=>x.id===id);
   if(!confirm('Remover a tela "'+(s?s.name:'selecionada')+'"? O endereço do player deixará de funcionar.'))return;
   const r=await api('DELETE','/api/screens/'+id);
-  if(r.error){toast(r.error);return;}
+  if(r.error){toast(r.error,9000);return;}
   await load();toast('Tela removida');
 }
 function legacyCopy(url,trigger){

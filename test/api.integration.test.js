@@ -253,8 +253,25 @@ test('aparelho se registra sozinho e a tela se escolhe no painel', async () => {
   const invalida = await json('/api/aparelhos/' + id, { method: 'PUT', body: { screen_id: 'nao-existe' } });
   assert.equal(invalida.response.status, 400);
 
-  // Tela apagada: o aparelho volta a "aguardando tela" em vez de apontar para o nada.
-  await json('/api/screens/' + outra.body.id, { method: 'DELETE', body: {} });
+  // Caso real: excluíram a tela que a Raspberry mostrava e a TV ficou sem programação.
+  // Tela em uso por um aparelho não sai; a mensagem diz o que fazer.
+  const recusada = await json('/api/screens/' + outra.body.id, { method: 'DELETE', body: {} });
+  assert.equal(recusada.response.status, 409);
+  assert.match(recusada.body.error, /está passando na TV raspberry-recepcao/);
+  assert.equal((await registrar({ id, nome: 'raspberry-recepcao' })).body.screen_id, outra.body.id);
+
+  // A Pi conta como está; só campos conhecidos passam, e o apelido é de quem publica.
+  await registrar({ id, nome: 'raspberry-recepcao', situacao: { estado: 'baixando', percentual: 35, livre_mb: 20000, extra: 'x' } });
+  await json('/api/aparelhos/' + id, { method: 'PUT', body: { apelido: 'TV da Recepção<script>' } });
+  const comSituacao = (await json('/api/aparelhos')).body.find(a => a.id === id);
+  assert.deepEqual(comSituacao.situacao, { estado: 'baixando', percentual: 35, total_mb: null, livre_mb: 20000, erro: null });
+  assert.equal(comSituacao.apelido, 'TV da Recepçãoscript');
+  await registrar({ id, nome: 'raspberry-recepcao', situacao: { estado: 'invadido' } });
+  assert.equal((await json('/api/aparelhos')).body.find(a => a.id === id).situacao, null);
+
+  // Movida a TV para outra tela, a antiga pode sair.
+  await json('/api/aparelhos/' + id, { method: 'PUT', body: { screen_id: null } });
+  assert.equal((await json('/api/screens/' + outra.body.id, { method: 'DELETE', body: {} })).response.status, 200);
   assert.equal((await registrar({ id, nome: 'raspberry-recepcao' })).body.screen_id, null);
 
   // O aviso automático das TVs não é ação de pessoa: não entra na auditoria.

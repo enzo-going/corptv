@@ -719,6 +719,13 @@ app.post('/api/screens/:id/recarregar', async (req, res) => {
 });
 
 app.delete('/api/screens/:id', async (req, res) => {
+  // Caso real: excluíram a tela que a Raspberry da sala mostrava e a TV ficou sem
+  // programação. Tela em uso por um aparelho só sai depois que ele for movido.
+  const emUso = await db.devices.find({ screen_id: req.params.id });
+  if (emUso.length) {
+    const nomes = emUso.map(d => d.apelido || d.name).join(', ');
+    return res.status(409).json({ error: `Esta tela está passando na TV ${nomes}. Em Telas, escolha outra tela para essa TV antes de excluir esta.` });
+  }
   const removed = await db.screens.remove({ id: req.params.id }, {});
   if (!removed) return res.status(404).json({ error: 'Tela não encontrada' });
   res.json({ ok: true });
@@ -787,8 +794,25 @@ async function telaExiste(id) {
   return typeof id === 'string' && id !== '' && !!(await db.screens.findOne({ id }));
 }
 
+// O que a Pi conta de si a cada registro: se o conteúdo dela já está no cartão
+// (toca sem rede), quanto falta baixar e quanto sobra de espaço. A rota é pública,
+// então só passam campos conhecidos e com formato conferido.
+const ESTADOS_APARELHO = new Set(['pronto', 'baixando', 'falha', 'sem_tela', 'vazio']);
+function situacaoAparelho(valor) {
+  if (!valor || typeof valor !== 'object' || !ESTADOS_APARELHO.has(valor.estado)) return null;
+  const inteiro = (v, max) => Number.isInteger(v) && v >= 0 && v <= max ? v : null;
+  return {
+    estado: valor.estado,
+    percentual: inteiro(valor.percentual, 100),
+    total_mb: inteiro(valor.total_mb, 1000000),
+    livre_mb: inteiro(valor.livre_mb, 10000000),
+    erro: typeof valor.erro === 'string' ? valor.erro.replace(/[^\w .:,()-]/g, '').slice(0, 120) : null
+  };
+}
+
 app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
   const { id, nome, tela_local, ip: ipInformado } = req.body || {};
+  const situacao = situacaoAparelho(req.body && req.body.situacao);
   // O IP que a Pi informa (o servidor vê o nginx, não a Pi). Só o formato; o
   // resto é ignorado para nada estranho chegar ao painel.
   const ip = typeof ipInformado === 'string' && /^(\d{1,3}\.){3}\d{1,3}$/.test(ipInformado) ? ipInformado : null;
@@ -801,11 +825,11 @@ app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
       // Aparelho instalado antes desta versão já tinha a tela na configuração local:
       // entra no painel com ela, sem ninguém precisar escolher de novo.
       const screen_id = (await telaExiste(tela_local)) ? tela_local : null;
-      aparelho = { id, name: nomeAparelho(nome), ip, screen_id, last_seen: agora, created_at: agora };
+      aparelho = { id, name: nomeAparelho(nome), ip, screen_id, situacao, last_seen: agora, created_at: agora };
       await db.devices.insert(aparelho);
       log('INFO', 'aparelho novo', { aparelho: id, nome: aparelho.name, tela: screen_id });
     } else {
-      await db.devices.update({ id }, { $set: { last_seen: agora, name: nomeAparelho(nome), ip } });
+      await db.devices.update({ id }, { $set: { last_seen: agora, name: nomeAparelho(nome), ip, situacao } });
     }
     // Tela apagada no painel: o aparelho volta a "aguardando tela".
     const screen_id = (await telaExiste(aparelho.screen_id)) ? aparelho.screen_id : null;
@@ -813,18 +837,34 @@ app.post('/api/aparelhos/registro', aparelhoLimiter, async (req, res) => {
   });
 });
 
-// Consultar e mexer nos aparelhos é do TI, como Usuários e Auditoria: o painel já
-// escondia a página, mas a API aceitava qualquer perfil de edição.
-app.get('/api/aparelhos', auth.requireRole('admin'), async (req, res) => {
-  res.json(await db.devices.find({}).sort({ name: 1 }));
+// O TI instala a Raspberry uma vez; daí em diante quem cuida da TV é quem publica.
+// Na prática (sala da comunicação, em outro prédio) o editor precisou trocar o que a
+// TV mostrava e, sem permissão no painel, abriu o player no navegador da própria TV —
+// que passou a depender da rede. Ver a lista, escolher a tela e dar um apelido é de
+// quem edita (o perfil de leitura só vê, pela regra geral da API). Remover o aparelho
+// e o comando de instalação continuam só do TI.
+app.get('/api/aparelhos', async (req, res) => {
+  const lista = await db.devices.find({}).sort({ name: 1 });
+  const ti = req.user && req.user.role === 'admin';
+  res.json(ti ? lista : lista.map(({ ip, ...resto }) => resto));
 });
 
-app.put('/api/aparelhos/:id', auth.requireRole('admin'), async (req, res) => {
-  const screen_id = req.body && req.body.screen_id;
-  if (screen_id !== null && !(await telaExiste(screen_id))) return res.status(400).json({ error: 'Escolha uma tela que exista' });
-  const affected = await db.devices.update({ id: req.params.id }, { $set: { screen_id } });
+app.put('/api/aparelhos/:id', async (req, res) => {
+  const corpo = req.body || {};
+  const set = {};
+  if (corpo.screen_id !== undefined) {
+    if (corpo.screen_id !== null && !(await telaExiste(corpo.screen_id))) return res.status(400).json({ error: 'Escolha uma tela que exista' });
+    set.screen_id = corpo.screen_id;
+  }
+  if (corpo.apelido !== undefined) {
+    if (corpo.apelido !== null && typeof corpo.apelido !== 'string') return res.status(400).json({ error: 'Apelido inválido' });
+    const apelido = String(corpo.apelido || '').replace(/[<>"'`]/g, '').trim().slice(0, 40);
+    set.apelido = apelido || null;
+  }
+  if (!Object.keys(set).length) return res.status(400).json({ error: 'Nada para alterar' });
+  const affected = await db.devices.update({ id: req.params.id }, { $set: set });
   if (!affected) return res.status(404).json({ error: 'Aparelho não encontrado' });
-  log('INFO', 'tela do aparelho escolhida no painel', { aparelho: req.params.id, tela: screen_id });
+  log('INFO', 'aparelho alterado no painel', { aparelho: req.params.id, ...set, por: req.user && req.user.username });
   res.json({ ok: true });
 });
 
