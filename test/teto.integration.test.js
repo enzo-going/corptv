@@ -19,7 +19,6 @@ Object.assign(process.env, {
   CORPTV_LIMITE_MBPS: '0', CORPTV_TETO_TOTAL_MBPS: '8', CORPTV_MEDIA_REQUESTS_PER_MINUTE: '1000'
 });
 const db = require('../src/db');
-const { hashPassword } = require('../src/security');
 const { app } = require('../src/server');
 let servidor, base;
 
@@ -46,24 +45,6 @@ test('duas TVs baixando juntas dividem o teto total, sem passar dele', async () 
   assert.deepEqual(tamanhos, [768 * 1024, 768 * 1024]);
   // 1,5 MB a 1 MB/s: pelo menos ~1,4 s. Sem o teto, no próprio computador, seria instantâneo.
   assert.ok(segundos >= 1.3, `as duas baixaram rápido demais (${segundos.toFixed(2)} s): o teto não segurou`);
-});
-
-test('o Baixar do painel também fica dentro do teto total', async () => {
-  const password_hash = await hashPassword('abcde');
-  await db.users.insert({ id: 'adm', username: 'adm', name: 'Conta de teste', role: 'admin', active: true, password_hash });
-  const login = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ username: 'adm', password: 'abcde' }) });
-  const cookie = login.headers.get('set-cookie').split(';')[0];
-  await login.json();
-  const nome = '123e4567-e89b-12d3-a456-4266141740bb.mp4';
-  fs.writeFileSync(path.join(process.env.CORPTV_UPLOADS_DIR, nome), Buffer.alloc(1024 * 1024, 5));
-  await db.slides.insert({ id: 'baixar-teto', type: 'vid', title: 'Video', url: '/uploads/' + nome });
-  const inicio = Date.now();
-  const r = await fetch(base + '/api/slides/baixar-teto/arquivo', { headers: { cookie } });
-  assert.equal(r.status, 200);
-  assert.match(r.headers.get('content-disposition'), /attachment; filename="Video\.mp4"/);
-  assert.equal(r.headers.get('content-length'), String(1024 * 1024));
-  assert.equal(Buffer.from(await r.arrayBuffer()).length, 1024 * 1024);
-  assert.ok((Date.now() - inicio) / 1000 >= 0.85, 'o download passou do teto');
 });
 
 test('a página Rede recebe o teto configurado', async () => {

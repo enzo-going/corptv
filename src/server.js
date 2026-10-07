@@ -163,8 +163,8 @@ const LIMITE_MBPS = process.env.CORPTV_LIMITE_MBPS !== undefined
   : 4.5; // ~1,5x a taxa do video de 2,9 Mb/s
 const LIMITE_BYTES_S = Math.round((LIMITE_MBPS * 1e6) / 8);
 
-// Teto da SOMA de tudo o que o CorporTV manda de vídeo e imagem: TVs, Raspberrys e o
-// "Baixar" do painel. O QoS do Windows (12 Mb/s) só pega a porta 3000 e, desde que o
+// Teto da SOMA de tudo o que o CorporTV manda de vídeo e imagem: TVs e Raspberrys.
+// O QoS do Windows (12 Mb/s) só pega a porta 3000 e, desde que o
 // acesso passou pelo nginx (porta 80), quase nada passa por ele. Aqui o teto é do
 // próprio CorporTV: não mexe no Windows, no nginx nem nos outros sistemas do servidor.
 // Com muitas Raspberrys baixando juntas, cada uma vai mais devagar e a rede não sente.
@@ -520,34 +520,6 @@ app.get('/api/slides', async (req, res) => {
     }
     return item;
   }));
-});
-
-// Mesmo limite de pedidos das mídias (por cliente); sem o limite de velocidade das TVs.
-app.get('/api/slides/:id/arquivo', mediaRequestLimiter, async (req, res, next) => {
-  const slide = await db.slides.findOne({ id: req.params.id });
-  if (!slide) return res.status(404).json({ error: 'Conteúdo não encontrado.' });
-  if (slide.otimizacao && slide.otimizacao.estado === 'otimizando') {
-    return res.status(409).json({ error: 'O vídeo ainda está sendo preparado' });
-  }
-  const arquivo = ['img', 'vid'].includes(slide.type) && uploadedPathFromUrl(slide.url, uploadsDir);
-  if (!arquivo) return res.status(404).json({ error: 'Conteúdo sem arquivo disponível.' });
-  let titulo = String(slide.title || '').replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, ' ')
-    .replace(/\s+/g, ' ').trim().replace(/^[. ]+|[. ]+$/g, '').slice(0, 120).trim() || 'Conteúdo';
-  if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(titulo)) titulo = '_' + titulo;
-  // Sem o limite por TV (é uma pessoa baixando), mas dentro do teto total do CorporTV:
-  // um download de 600 MB na velocidade cheia da rede seria justamente um pico.
-  let info;
-  try { info = await fs.promises.stat(arquivo); } catch (error) {
-    if (error.code === 'ENOENT') return res.status(404).json({ error: 'Arquivo não encontrado.' });
-    throw error;
-  }
-  res.attachment(titulo + path.extname(arquivo));
-  res.set({ 'Content-Type': TIPOS[path.extname(arquivo).toLowerCase()] || 'application/octet-stream', 'Content-Length': info.size });
-  const leitura = fs.createReadStream(arquivo);
-  res.on('close', () => leitura.destroy());
-  leitura.on('error', error => { if (!res.headersSent) next(error); else res.destroy(); });
-  const saida = teto.bytesS > 0 ? leitura.pipe(limitador(0)) : leitura;
-  saida.pipe(res);
 });
 
 // Sem titulo, o painel mostrava tudo como "vid" e ficava impossivel distinguir
