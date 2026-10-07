@@ -122,14 +122,18 @@ function isPrivateNetwork(req) {
 // todas as TVs e Raspberrys juntas (a partir de ~15 Pis o registro já era recusado).
 // O nginx grava o endereço real em X-Real-IP; o cabeçalho só vale quando a conexão
 // vem do próprio servidor, então quem acessa a porta 3000 direto não consegue forjar.
-function chaveDeLimite(req) {
-  const { ipKeyGenerator } = require('express-rate-limit');
+function enderecoDoCliente(req) {
   const socket = req.socket && req.socket.remoteAddress;
   const real = req.headers && req.headers['x-real-ip'];
   const endereco = socket && isLoopbackAddress(socket) && typeof real === 'string' && require('net').isIP(real.trim())
     ? real.trim()
     : (req.ip || socket || '');
-  return ipKeyGenerator(normalizedAddress(endereco));
+  return normalizedAddress(endereco);
+}
+
+function chaveDeLimite(req) {
+  const { ipKeyGenerator } = require('express-rate-limit');
+  return ipKeyGenerator(enderecoDoCliente(req));
 }
 
 function publicUser(user) {
@@ -148,6 +152,7 @@ function publicUser(user) {
 }
 
 module.exports = {
+  enderecoDoCliente,
   chaveDeLimite,
   hashPassword,
   isLoopback,

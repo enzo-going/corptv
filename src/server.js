@@ -5,7 +5,8 @@ const { Transform } = require('stream');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const { rateLimit } = require('express-rate-limit');
-const { chaveDeLimite } = require('./security');
+const { chaveDeLimite, enderecoDoCliente } = require('./security');
+const { criarMonitor } = require('./trafego');
 const db = require('./db');
 const { createAudit } = require('./audit');
 const { createAuth } = require('./auth');
@@ -81,6 +82,13 @@ function log(level, msg, extra) {
 });
 
 app.disable('x-powered-by');
+// Monitor de tráfego: primeiro de tudo, para contar todas as respostas (ver src/trafego.js).
+const monitorTrafego = criarMonitor({
+  pasta: path.join(path.resolve(process.env.CORPTV_LOG_DIR || path.join(__dirname, '../logs')), 'trafego'),
+  enderecoDoCliente,
+  log: (...args) => log(...args)
+});
+app.use(monitorTrafego.middleware);
 app.use(express.json({ limit: '100kb' }));
 app.use((req, res, next) => {
   req.requestId = uuidv4();
@@ -896,6 +904,71 @@ app.delete('/api/aparelhos/:id', auth.requireRole('admin'), async (req, res) => 
   res.json({ ok: true });
 });
 
+// ── TRÁFEGO DE REDE (só TI) ───────────────────────────────
+// Quanto o CorporTV mandou e recebeu, para quem e quando (ver src/trafego.js).
+function periodoDaConsulta(q) {
+  const ler = v => {
+    if (v === undefined || v === null || String(v).trim() === '') return null;
+    const texto = String(v).trim();
+    const t = /^\d+$/.test(texto) ? Number(texto) : Date.parse(texto);
+    return Number.isFinite(t) ? t : NaN;
+  };
+  const agora = Date.now();
+  let ate = ler(q.ate);
+  let de = ler(q.de);
+  if (Number.isNaN(ate) || Number.isNaN(de)) return { error: 'Período inválido' };
+  ate = ate === null ? agora : Math.min(ate, agora + 60000);
+  de = de === null ? ate - 86400000 : de;
+  if (de >= ate) return { error: 'O início precisa ser antes do fim' };
+  if (ate - de > 35 * 86400000) return { error: 'O período pode ter no máximo 35 dias' };
+  return { de, ate };
+}
+
+async function nomesDosClientes() {
+  const nomes = new Map([['127.0.0.1', 'o próprio servidor'], ['::1', 'o próprio servidor']]);
+  for (const d of await db.devices.find({})) {
+    if (d.ip) nomes.set(d.ip, (d.apelido ? d.apelido + ' — ' : '') + d.name + ' (Raspberry)');
+  }
+  return nomes;
+}
+
+app.get('/api/trafego', auth.requireRole('admin'), async (req, res) => {
+  const periodo = periodoDaConsulta(req.query);
+  if (periodo.error) return res.status(400).json({ error: periodo.error });
+  const { minutos, ...resumo } = monitorTrafego.consultar(periodo.de, periodo.ate);
+  const nomes = await nomesDosClientes();
+  resumo.clientes = resumo.clientes.map(c => ({ ...c, nome: nomes.get(c.endereco) || null }));
+  res.json(resumo);
+});
+
+app.get('/api/trafego/agora', auth.requireRole('admin'), (req, res) => {
+  res.json(monitorTrafego.agoraResumo());
+});
+
+// Planilha minuto a minuto (separador ";" e vírgula decimal: abre direto no Excel).
+app.get('/api/trafego/exportar', auth.requireRole('admin'), async (req, res) => {
+  const periodo = periodoDaConsulta(req.query);
+  if (periodo.error) return res.status(400).json({ error: periodo.error });
+  const { minutos } = monitorTrafego.consultar(periodo.de, periodo.ate);
+  const nomes = await nomesDosClientes();
+  const num = (v, casas) => v.toFixed(casas).replace('.', ',');
+  const p2 = n => String(n).padStart(2, '0');
+  const quando = t => { const d = new Date(t); return `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`; };
+  const linhas = ['data_hora;enviado_mb;recebido_mb;media_mbps;pico_1s_mbps;pedidos;maior_cliente;maior_cliente_mb'];
+  for (const m of minutos) {
+    const maior = (m.clientes || [])[0];
+    const nomeMaior = maior ? (nomes.get(maior[0]) || maior[0]).replace(/[;\r\n]/g, ' ') : '';
+    linhas.push([
+      quando(m.t), num(m.saida / 1048576, 2), num(m.entrada / 1048576, 2),
+      num(((m.saida + m.entrada) * 8) / 60 / 1e6, 3), num((m.pico_bps || 0) / 1e6, 3), m.pedidos || 0,
+      nomeMaior, maior ? num((maior[1] + maior[2]) / 1048576, 2) : ''
+    ].join(';'));
+  }
+  res.set('Content-Type', 'text/csv; charset=utf-8');
+  res.attachment(`trafego-corportv-${new Date(periodo.de).toISOString().slice(0, 10)}.csv`);
+  res.send('﻿' + linhas.join('\r\n') + '\r\n');
+});
+
 // ── PROGRAMAÇÃO ───────────────────────────────────────────
 // Responde "o que esta no ar, em qual tela, e o que esta oculto por que".
 // Usado pela Visao geral do painel.
@@ -1083,8 +1156,11 @@ function iniciar() {
 
   // Encerramento gracioso: para de aceitar conexoes e deixa as respostas em
   // andamento terminarem antes de sair (evita cortar o download de um video).
+  monitorTrafego.iniciar();
+
   function shutdown(signal) {
     log('INFO', 'encerrando', { signal });
+    try { monitorTrafego.parar(); } catch (e) { /* não impede o encerramento */ }
     server.close(() => process.exit(0));
     setTimeout(() => process.exit(0), 10000).unref();
   }
