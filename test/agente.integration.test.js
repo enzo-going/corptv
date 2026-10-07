@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const net = require('node:net');
 const http = require('node:http');
@@ -180,7 +181,7 @@ test.after(async () => {
     await new Promise(resolve => agente.once('exit', resolve));
   }
   await new Promise(resolve => http1.close(resolve));
-  fs.rmSync(sandbox, { recursive: true, force: true });
+  limparTemporario(sandbox);
 });
 
 test('guarda a mídia inteira no disco antes de publicá-la', async () => {

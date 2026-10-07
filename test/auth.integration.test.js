@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 
@@ -56,7 +57,7 @@ test.before(async () => {
 test.after(async () => {
   await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
   db.stopMaintenance();
-  fs.rmSync(sandbox, { recursive: true, force: true });
+  limparTemporario(sandbox);
 });
 
 test('inicialização usa código descartável na rede e cria o primeiro administrador', async () => {
