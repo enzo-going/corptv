@@ -823,7 +823,10 @@ const ESTADOS_APARELHO = new Set(['pronto', 'baixando', 'falha', 'sem_tela', 'va
 function situacaoAparelho(valor) {
   if (!valor || typeof valor !== 'object' || !ESTADOS_APARELHO.has(valor.estado)) return null;
   const inteiro = (v, max) => Number.isInteger(v) && v >= 0 && v <= max ? v : null;
+  const temperatura = inteiro(valor.temperatura_c, 120);
   return {
+    ...(temperatura !== null ? { temperatura_c: temperatura } : {}),
+    ...(typeof valor.limitada === 'boolean' ? { limitada: valor.limitada } : {}),
     estado: valor.estado,
     percentual: inteiro(valor.percentual, 100),
     total_mb: inteiro(valor.total_mb, 1000000),
