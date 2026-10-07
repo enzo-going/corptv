@@ -531,11 +531,14 @@ function removerMidias(remover) {
     if (!TIPOS[path.extname(base).toLowerCase()] || !remover(base)) continue;
     try { fs.unlinkSync(path.join(CONFIG.pasta, arq)); removidos++; } catch (e) {}
   }
-  if (removidos) {
-    const estado = lerEstado();
-    Object.keys(estado).forEach(k => { if (remover(k)) delete estado[k]; });
-    salvarEstado(estado);
+  const estado = lerEstado();
+  let estadoMudou = false;
+  for (const nome of Object.keys(estado)) {
+    if (!remover(nome)) continue;
+    delete estado[nome];
+    estadoMudou = true;
   }
+  if (estadoMudou) salvarEstado(estado);
   return removidos;
 }
 
