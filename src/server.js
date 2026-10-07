@@ -7,6 +7,7 @@ const multer = require('multer');
 const { rateLimit } = require('express-rate-limit');
 const { chaveDeLimite, enderecoDoCliente } = require('./security');
 const { criarMonitor } = require('./trafego');
+const { criarConferencia } = require('./conferencia');
 const db = require('./db');
 const { createAudit } = require('./audit');
 const { createAuth } = require('./auth');
@@ -29,6 +30,12 @@ const STARTED_AT = Date.now();
 const uploadsDir = path.resolve(process.env.CORPTV_UPLOADS_DIR || path.join(__dirname, '../public/uploads'));
 const logDir = path.resolve(process.env.CORPTV_LOG_DIR || path.join(__dirname, '../logs'));
 const accessLog = path.join(logDir, 'corptv-media-access.log');
+// SHA-256 de cada mídia, para a Raspberry conferir o que baixou (ver src/conferencia.js).
+const conferencia = criarConferencia({
+  uploadsDir,
+  arquivoCache: path.join(path.resolve(process.env.CORPTV_DATA_DIR || path.join(__dirname, '../data')), 'conferencia-midias.json'),
+  log: (...args) => log(...args)
+});
 
 function positiveInteger(value, fallback) {
   const parsed = Number(value);
@@ -804,10 +811,13 @@ app.get('/api/player/:slug', playerRequestLimiter, async (req, res) => {
     // Vídeo ainda sendo otimizado (ou que falhou) não vai para a TV: o arquivo bruto
     // é justamente o que derrubaria a rede.
     if (emPreparo(slide)) return null;
+    // A Raspberry confere o arquivo baixado com este hash antes de pôr no ar.
+    const arquivo = slide && uploadedPathFromUrl(slide.url, uploadsDir);
+    const sha256 = arquivo ? await conferencia.hashDe(path.basename(arquivo)) : null;
     // Por quanto tempo uma cópia offline (player ou agente) ainda pode exibir o
     // conteúdo sem falar com o servidor. Sem isso, um conteúdo vencido seguia na
     // TV enquanto a rede estivesse fora. null = a agenda não tem prazo à frente.
-    return slide && { ...slide, cache_for_ms: scheduling.activeForMs(agenda, now) };
+    return slide && { ...slide, ...(sha256 && { sha256 }), cache_for_ms: scheduling.activeForMs(agenda, now) };
   }));
   // Telas cadastradas antes do controle de volume não têm o campo: tocam no máximo,
   // como sempre tocaram.
