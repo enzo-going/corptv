@@ -23,7 +23,9 @@ Energia → Raspberry Pi → rede → agente → cartão → Chromium em tela ch
 
 O agente baixa cada arquivo uma vez e o reutiliza enquanto ele estiver igual e
 presente no cartão. Compara versão e tamanho; baixa novamente se o arquivo mudou
-ou falta no cache. Um download incompleto fica como `.parcial` e pode ser retomado.
+ou falta no cache. Antes de pôr um arquivo baixado no lugar, confere o SHA-256 que
+o servidor informa na programação; arquivo que não confere é descartado. Um
+download incompleto fica como `.parcial` e pode ser retomado.
 O navegador toca a cópia local, sem buscar o vídeo no servidor a cada reprodução.
 
 A rede continua sendo usada para consultar programação, registrar o aparelho,
