@@ -228,6 +228,23 @@ else
   ok "AVISO: sem raspi-config; desligar o apagamento de tela e ligar o login automático à mão"
 fi
 
+# ── 6. Watchdog de hardware ─────────────────────────────────────────────────
+passo "Watchdog de hardware"
+if [ -e /dev/watchdog ]; then
+  conf=/etc/systemd/system.conf.d/90-corptv-watchdog.conf
+  esperado=$'[Manager]\n# Reinicia a Pi se o sistema travar e deixar de alimentar o watchdog.\nRuntimeWatchdogSec=15\nRebootWatchdogSec=2min'
+  if [ "$(cat "$conf" 2>/dev/null)" != "$esperado" ]; then
+    mkdir -p /etc/systemd/system.conf.d
+    printf '%s\n' "$esperado" > "$conf"
+    systemctl daemon-reexec
+    ok "criado $conf"
+  else
+    ok "já estava"
+  fi
+else
+  ok "sem watchdog de hardware; pulando"
+fi
+
 # ── Rede: aplicar o sufixo por último ────────────────────────────────────────
 # Reaplicar a conexão pode derrubar o SSH por um instante. Por isso fica no fim,
 # quando todo o resto já terminou.
