@@ -535,9 +535,12 @@ function removerMidias(remover) {
     if (!TIPOS[path.extname(base).toLowerCase()] || !remover(base)) continue;
     try { fs.unlinkSync(path.join(CONFIG.pasta, arq)); removidos++; } catch (e) {}
   }
-  if (removidos) {
-    const estado = lerEstado();
-    Object.keys(estado).forEach(k => { if (remover(k)) delete estado[k]; });
+  // O registro sai mesmo sem arquivo para apagar: registro de mídia que já não
+  // estava no cartão ficava para sempre no /status, com "no_disco": false.
+  const estado = lerEstado();
+  const orfaos = Object.keys(estado).filter(remover);
+  if (orfaos.length) {
+    orfaos.forEach(k => { delete estado[k]; });
     salvarEstado(estado);
   }
   return removidos;

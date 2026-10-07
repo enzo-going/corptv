@@ -519,3 +519,17 @@ test('vídeo apagado do cartão não volta para a lista do agente', async () => 
   const situacao = await status();
   assert.deepEqual(situacao.arquivos.map(a => a.arquivo), [ARQUIVO_NOVO]);
 });
+
+test('registro antigo de vídeo que não está no cartão sai da lista sozinho', async () => {
+  // Aparelhos que já tinham o registro órfão antes da correção acima.
+  const orfao = '00000000-dead-beef-0000-000000000000.mp4';
+  const arqEstado = path.join(cache, 'estado.json');
+  const estado = JSON.parse(fs.readFileSync(arqEstado, 'utf8'));
+  estado[orfao] = { etag: '"velho"', tamanho: 1024, em: new Date().toISOString() };
+  fs.writeFileSync(arqEstado, JSON.stringify(estado));
+
+  await esperar(async () => !(await status()).arquivos.some(a => a.arquivo === orfao),
+    'a limpeza tirar o registro órfão');
+  assert.ok((await status()).arquivos.some(a => a.arquivo === ARQUIVO_NOVO && a.no_disco),
+    'o vídeo da programação tem de continuar registrado');
+});
