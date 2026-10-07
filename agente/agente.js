@@ -466,8 +466,12 @@ async function sincronizar(opcoes = {}) {
       try {
         await baixarComTentativas(urlRemota, destino, tamanho);
         const final = tamanho || fs.statSync(destino).size;
-        estado[nome] = { etag, tamanho: final, em: new Date().toISOString() };
-        salvarEstado(estado);
+        // Grava por cima do que está no disco agora: a limpeza do início do ciclo já
+        // tirou de lá a mídia apagada, e regravar a lista lida antes dela trazia de
+        // volta o registro de um vídeo que não existe mais no cartão.
+        const atual = lerEstado();
+        atual[nome] = { etag, tamanho: final, em: new Date().toISOString() };
+        salvarEstado(atual);
         andamento.feito += final;
       } catch (err) {
         if (err.message === DOWNLOAD_CANCELADO) break;
