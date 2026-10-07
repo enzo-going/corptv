@@ -15,6 +15,7 @@ const sandbox = fs.mkdtempSync(path.join(os.tmpdir(), 'corptv-agente-'));
 const cache = path.join(sandbox, 'cache');
 
 const ARQUIVO = 'aabbccdd-1111-2222-3333-444455556666.mp4';
+const ARQUIVO_NOVO = 'eeff0011-7777-8888-9999-aaaabbbbcccc.mp4';
 const TELA = 'recepcao';
 
 // Mídia de mentira: previsível e grande o bastante para não caber num pacote só.
@@ -139,6 +140,14 @@ test.before(async () => {
         }, servidor.atrasoDownloadMs);
       }
       return res.end(servidor.midia);
+    }
+
+    // Segunda mídia, para trocar a programação de um vídeo por outro.
+    if (pathname === '/uploads/' + ARQUIVO_NOVO) {
+      res.setHeader('ETag', '"novo"');
+      res.setHeader('Content-Length', MIDIA_V2.length);
+      res.writeHead(200);
+      return res.end(req.method === 'HEAD' ? undefined : MIDIA_V2);
     }
 
     res.writeHead(404);
@@ -487,4 +496,26 @@ test('download demorado não renova o prazo recebido antes da queda da rede', as
     servidor.foraDoAr = false;
     servidor.playlist = original;
   }
+});
+
+test('vídeo apagado do cartão não volta para a lista do agente', async () => {
+  servidor.registro = { screen_id: TELA };
+  servidor.playlist = playlistCom(ARQUIVO);
+  await esperar(async () => (await status()).arquivos.some(a => a.arquivo === ARQUIVO && a.no_disco),
+    'a mídia antiga estar no disco');
+
+  // Caso real: a TV ficou sem tela e depois recebeu outra programação. Sem nada na
+  // TV, a limpeza do início do ciclo apaga o vídeo antigo; o download do novo não
+  // pode regravar o registro dele.
+  servidor.registro = { screen_id: null };
+  await esperar(async () => (await status()).tela === null, 'o agente ficar sem tela');
+  servidor.playlist = playlistCom(ARQUIVO_NOVO);
+  servidor.registro = { screen_id: TELA };
+  await esperar(async () => (await status()).arquivos.some(a => a.arquivo === ARQUIVO_NOVO && a.no_disco),
+    'o vídeo novo estar no disco');
+  await new Promise(resolve => setTimeout(resolve, 1500)); // mais um ciclo de sincronização
+
+  assert.equal(fs.existsSync(path.join(cache, ARQUIVO)), false);
+  const situacao = await status();
+  assert.deepEqual(situacao.arquivos.map(a => a.arquivo), [ARQUIVO_NOVO]);
 });
