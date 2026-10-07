@@ -26,7 +26,7 @@ test('a API do painel apresenta falha de rede ou demora sem rejeição não trat
     opts.signal.addEventListener('abort', () => {
       const erro = new Error('demora'); erro.name = 'AbortError'; reject(erro);
     });
-  }), (fn, ms) => { assert.equal(ms, 15000); return setTimeout(fn, 1); });
+  }), (fn, ms) => { assert.equal(ms, 30000); return setTimeout(fn, 1); });
   assert.match((await lento.contexto.api('POST', '/api/groups', {})).error, /demorou/);
 });
 
