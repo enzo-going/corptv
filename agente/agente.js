@@ -164,6 +164,20 @@ const esperar = ms => new Promise(r => setTimeout(r, ms));
 const DOWNLOAD_CANCELADO = 'download cancelado: a tela mudou';
 let cancelarDownload = null;
 
+// Conferência: o servidor manda o SHA-256 de cada mídia na programação. Antes só o
+// tamanho era conferido, e um arquivo do tamanho certo com bytes errados ia para o ar.
+const SHA256_VALIDO = /^[0-9a-f]{64}$/;
+const CONFERENCIA_FALHOU = 'CORPTV_CONFERENCIA';
+function sha256DoArquivo(arquivo) {
+  return new Promise((resolve, reject) => {
+    const hash = crypto.createHash('sha256');
+    const leitura = fs.createReadStream(arquivo, { highWaterMark: 1024 * 1024 });
+    leitura.on('data', pedaco => hash.update(pedaco));
+    leitura.on('end', () => resolve(hash.digest('hex')));
+    leitura.on('error', reject);
+  });
+}
+
 function fecharArquivo(stream) {
   return new Promise(resolve => {
     if (stream.closed) return resolve();
@@ -174,7 +188,7 @@ function fecharArquivo(stream) {
 
 // Baixa para um arquivo .parcial e só renomeia no fim. Se cair no meio, na
 // próxima tentativa retoma de onde parou usando Range — não recomeça do zero.
-async function baixarArquivo(urlRemota, destino, tamanhoEsperado) {
+async function baixarArquivo(urlRemota, destino, tamanhoEsperado, sha256Esperado) {
   const parcial = destino + '.parcial';
   let jaTemos = 0;
   try { jaTemos = fs.statSync(parcial).size; } catch (e) { jaTemos = 0; }
@@ -190,7 +204,7 @@ async function baixarArquivo(urlRemota, destino, tamanhoEsperado) {
     // Servidor não aceitou retomar: recomeça limpo.
     res.destroy();
     try { fs.unlinkSync(parcial); } catch (e) {}
-    return baixarArquivo(urlRemota, destino, tamanhoEsperado);
+    return baixarArquivo(urlRemota, destino, tamanhoEsperado, sha256Esperado);
   }
   if (res.statusCode !== 200 && res.statusCode !== 206) {
     res.destroy();
@@ -249,6 +263,15 @@ async function baixarArquivo(urlRemota, destino, tamanhoEsperado) {
     throw new Error('tamanho nao confere: ' + total + ' de ' + tamanhoEsperado);
   }
 
+  // Confere antes de pôr no lugar: arquivo com defeito não substitui o que está na
+  // TV. O .parcial sai junto, porque retomar em cima de bytes errados repetiria o erro.
+  if (sha256Esperado && await sha256DoArquivo(parcial) !== sha256Esperado) {
+    try { fs.unlinkSync(parcial); } catch (e) {}
+    const err = new Error('arquivo baixado nao confere com o servidor');
+    err.code = CONFERENCIA_FALHOU;
+    throw err;
+  }
+
   // No Windows, renomear por cima de um arquivo que o navegador está lendo
   // falha com EPERM/EBUSY (no Linux não). Na prática quase não acontece — cada
   // upload no servidor gera um nome UUID novo — mas se acontecer, tenta de novo
@@ -272,14 +295,15 @@ async function baixarArquivo(urlRemota, destino, tamanhoEsperado) {
 }
 
 // Tenta várias vezes, esperando cada vez mais entre elas (1s, 2s, 5s, 10s, 30s).
-async function baixarComTentativas(urlRemota, destino, tamanho) {
+async function baixarComTentativas(urlRemota, destino, tamanho, sha256) {
   const esperas = [1000, 2000, 5000, 10000, 30000];
   for (let i = 0; i <= esperas.length; i++) {
     try {
-      return await baixarArquivo(urlRemota, destino, tamanho);
+      return await baixarArquivo(urlRemota, destino, tamanho, sha256);
     } catch (err) {
-      // Tela trocada ou disco cheio: tentar de novo o mesmo arquivo não resolve.
-      if (err.message === DOWNLOAD_CANCELADO || err.code === 'ENOSPC') throw err;
+      // Tela trocada, disco cheio ou arquivo que não confere: tentar de novo já o
+      // mesmo arquivo não resolve (e baixar tudo de novo seis vezes gastaria o Wi-Fi).
+      if (err.message === DOWNLOAD_CANCELADO || err.code === 'ENOSPC' || err.code === CONFERENCIA_FALHOU) throw err;
       if (i === esperas.length) {
         log('AVISO', 'download falhou apos seis tentativas; retomo no proximo ciclo', {
           arquivo: path.basename(destino), erro: err.message
@@ -381,6 +405,24 @@ function nomeLocal(urlRemota) {
   return path.basename(new URL(urlRemota, CONFIG.servidor).pathname);
 }
 
+// Mídia baixada antes da conferência existir: o hash é calculado uma vez no próprio
+// cartão (sem rede) e lembrado enquanto o arquivo não mudar.
+const hashNoCartao = new Map();
+async function sha256Guardado(nome, arquivo) {
+  const { mtimeMs } = fs.statSync(arquivo);
+  const lembrado = hashNoCartao.get(nome);
+  if (lembrado && lembrado.mtimeMs === mtimeMs) return lembrado.sha256;
+  const sha256 = await sha256DoArquivo(arquivo);
+  hashNoCartao.set(nome, { mtimeMs, sha256 });
+  return sha256;
+}
+
+// Arquivo que chegou com defeito duas vezes seguidas espera 30 min antes de outra
+// tentativa: se o problema não é passageiro, baixar de novo a cada minuto só
+// gastaria o Wi-Fi do prédio.
+const ESPERA_APOS_DEFEITO_MS = 30 * 60 * 1000;
+const defeitos = new Map();
+
 // semEspera: troca de tela feita no painel. A espera aleatória existe para várias
 // TVs não baixarem o mesmo vídeo novo ao mesmo tempo; numa troca, é um aparelho só.
 async function sincronizar(opcoes = {}) {
@@ -418,6 +460,8 @@ async function sincronizar(opcoes = {}) {
       const nome = nomeLocal(slide.url);
       const destino = path.join(CONFIG.pasta, nome);
       const urlRemota = CONFIG.servidor + slide.url;
+      // Servidor antigo ou hash ainda não calculado: confere só o tamanho, como antes.
+      const sha256 = SHA256_VALIDO.test(slide.sha256 || '') ? slide.sha256 : null;
 
       let etag = null, tamanho = null, headFalhou = false;
       try {
@@ -436,9 +480,21 @@ async function sincronizar(opcoes = {}) {
       const registro = estado[nome];
       // Sem confirmação do servidor, conserva a mídia completa já registrada.
       // Um arquivo sem registro ainda precisa ser baixado e conferido.
-      const atualizado = temArquivo && registro && (headFalhou ||
-                         (registro.etag === etag && (!tamanho || tamanhoLocal === tamanho)));
-      itens.push({ nome, destino, urlRemota, etag, tamanho, temArquivo, atualizado, tamanhoLocal });
+      let atualizado = temArquivo && registro && (headFalhou ||
+                       (registro.etag === etag && (!tamanho || tamanhoLocal === tamanho)));
+      // Com a conferência, o registro tem de ter o mesmo hash. Mídia baixada antes
+      // dela é conferida no cartão; se não bater, baixa de novo.
+      if (atualizado && sha256 && registro.sha256 !== sha256) {
+        const local = registro.sha256 ? null : await sha256Guardado(nome, destino).catch(() => null);
+        if (local === sha256) {
+          const atual = lerEstado();
+          if (atual[nome]) { atual[nome].sha256 = sha256; salvarEstado(atual); }
+        } else {
+          atualizado = false;
+          if (!registro.sha256) log('AVISO', 'midia guardada no cartao nao confere com o servidor; baixando de novo', { arquivo: nome });
+        }
+      }
+      itens.push({ nome, destino, urlRemota, etag, tamanho, sha256, temArquivo, atualizado, tamanhoLocal });
     }
     if (tela !== telaAtual) return;
 
@@ -451,7 +507,13 @@ async function sincronizar(opcoes = {}) {
 
     // 2ª etapa: baixa o que falta.
     for (const item of pendentes) {
-      const { nome, destino, urlRemota, etag, tamanho } = item;
+      const { nome, destino, urlRemota, etag, tamanho, sha256 } = item;
+      const defeito = defeitos.get(nome);
+      if (defeito && defeito.sha256 === sha256 && Date.now() < defeito.ate) {
+        andamento.falhou = true;
+        andamento.erro = 'arquivo chegou com defeito; nova tentativa em ' + Math.ceil((defeito.ate - Date.now()) / 60000) + ' min';
+        continue;
+      }
       if (item.temArquivo) log('INFO', 'midia mudou no servidor, baixando de novo', { arquivo: nome });
       else log('INFO', 'midia nova, baixando', { arquivo: nome, mb: tamanho ? +(tamanho / 1048576).toFixed(1) : '?' });
 
@@ -464,20 +526,26 @@ async function sincronizar(opcoes = {}) {
       // Uma mídia que falha não trava as outras nem a atualização da programação:
       // antes, uma falha aqui pulava direto para "sem contato com o servidor".
       try {
-        await baixarComTentativas(urlRemota, destino, tamanho);
+        await baixarComTentativas(urlRemota, destino, tamanho, sha256);
         const final = tamanho || fs.statSync(destino).size;
         // Grava por cima do que está no disco agora: a limpeza do início do ciclo já
         // tirou de lá a mídia apagada, e regravar a lista lida antes dela trazia de
         // volta o registro de um vídeo que não existe mais no cartão.
         const atual = lerEstado();
-        atual[nome] = { etag, tamanho: final, em: new Date().toISOString() };
+        atual[nome] = { etag, tamanho: final, ...(sha256 && { sha256 }), em: new Date().toISOString() };
         salvarEstado(atual);
+        defeitos.delete(nome);
         andamento.feito += final;
       } catch (err) {
         if (err.message === DOWNLOAD_CANCELADO) break;
         andamento.falhou = true;
         andamento.erro = String(err.message || '').slice(0, 100);
         log('AVISO', 'nao consegui baixar a midia; sigo com o resto', { arquivo: nome, erro: err.message, codigo: err.code || null });
+        if (err.code === CONFERENCIA_FALHOU) {
+          const anterior = defeitos.get(nome);
+          const vezes = anterior && anterior.sha256 === sha256 ? anterior.vezes + 1 : 1;
+          defeitos.set(nome, { sha256, vezes, ate: vezes >= 2 ? Date.now() + ESPERA_APOS_DEFEITO_MS : 0 });
+        }
         // Disco cheio: tira também o que está na tela mas saiu da programação.
         if (err.code === 'ENOSPC') limparAntigos(slides);
       } finally {

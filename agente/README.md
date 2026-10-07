@@ -121,8 +121,12 @@ continua exibindo o conteúdo anterior enquanto o novo baixa.
 - **Tentativas espaçadas**: 1s, 2s, 5s, 10s, 30s. Não fica martelando o servidor.
 - **Só troca quando muda**: compara o `ETag` e o tamanho do arquivo. Se o vídeo
   é o mesmo, não baixa nada — só o JSON de ~1 KB por minuto.
-- **Arquivo incompleto nunca é exibido**: baixa como `.parcial` e só renomeia no
-  fim, depois de conferir o tamanho.
+- **Arquivo incompleto ou com defeito nunca é exibido**: baixa como `.parcial` e
+  só renomeia no fim, depois de conferir o tamanho e o SHA-256 que o servidor
+  manda na programação. Se não bater, o arquivo é descartado; com dois defeitos
+  seguidos no mesmo vídeo, espera 30 min antes de tentar de novo (não gasta o
+  Wi-Fi em vão). Vídeo baixado antes da conferência é conferido uma vez no
+  próprio cartão, sem usar a rede.
 - **Funciona sem servidor**: se o servidor cair, continua exibindo o que está no
   disco. Ao voltar, sincroniza sozinho.
 - **Espalha a carga**: com vários aparelhos ligando juntos, o jitter evita que
@@ -155,7 +159,9 @@ em andamento:
 ## Limites conhecidos
 
 - O agente serve só em `127.0.0.1` — de propósito. Não é um servidor de rede.
-- Não valida hash do arquivo, só o tamanho. O servidor não expõe checksum hoje;
-  se algum dia expuser, dá para apertar essa checagem.
+- A conferência por SHA-256 só vale quando o servidor já calculou o hash do
+  arquivo (logo depois do primeiro pedido de cada vídeo); até lá, e com servidor
+  antigo, confere só o tamanho. O vídeo já guardado não é conferido de novo a
+  cada início.
 - A primeira exibição depois de trocar o vídeo espera o download terminar. É o
   comportamento desejado: melhor esperar do que exibir travando.
