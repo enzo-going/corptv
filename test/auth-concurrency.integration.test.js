@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'corptv-perfis-'));
@@ -23,7 +24,7 @@ test('alterações simultâneas de perfil mantêm pelo menos um administrador at
   await new Promise(resolve => servidor.once('listening', resolve));
   t.after(async () => {
     await new Promise(resolve => servidor.close(resolve)); db.stopMaintenance();
-    fs.rmSync(pasta, { recursive: true, force: true });
+    limparTemporario(pasta);
   });
   const base = `http://localhost:${servidor.address().port}`;
   const contas = [];

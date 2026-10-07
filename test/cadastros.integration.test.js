@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
@@ -40,7 +41,7 @@ test.before(async () => {
 test.after(async () => {
   await new Promise(resolve => servidor.close(resolve));
   db.stopMaintenance();
-  fs.rmSync(pasta, { recursive: true, force: true });
+  limparTemporario(pasta);
 });
 
 test('telas com o mesmo nome cadastradas juntas recebem endereços diferentes', async () => {

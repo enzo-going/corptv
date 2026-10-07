@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const path = require('node:path');
 
 const quiosque = fs.readFileSync(path.join(__dirname, '../agente/iniciar-quiosque.sh'), 'utf8');
@@ -132,7 +133,7 @@ test('a regra de tela cheia funciona de verdade no rc.xml (novo e já existente)
   assert.match(xml, /<doubleClickTime>400<\/doubleClickTime>/);
   assert.ok(xml.indexOf('identifier="corptv-tv"') < xml.indexOf('</openbox_config>'));
   assert.ok(fs.existsSync(`${rc}.antes-corptv`));
-  fs.rmSync(casa, { recursive: true, force: true });
+  limparTemporario(casa);
 });
 
 test('o quiosque aponta para o agente local, nunca para o servidor', () => {
