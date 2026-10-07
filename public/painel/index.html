@@ -483,7 +483,7 @@
         <div class="rede-legenda" aria-hidden="true">
           <span><i class="rede-key rede-key-pico"></i>Pico de 1 s</span>
           <span><i class="rede-key rede-key-media"></i>Média</span>
-          <span><i class="rede-key rede-key-ref"></i>Referência: 12 Mb/s</span>
+          <span><i class="rede-key rede-key-ref"></i><span id="rede-ref-legenda">Teto do CorporTV: 12 Mb/s</span></span>
         </div>
         <div class="rede-grafico" id="rede-grafico"></div>
         <div class="rede-tooltip" id="rede-tooltip" hidden></div>
@@ -712,7 +712,7 @@ function roleLabel(role){return role==='admin'?'TI administrador':role==='editor
 // ── REDE (só TI) ─────────────────────────────────────────
 // Quanto o CorporTV usou da rede (ver src/trafego.js no servidor). Feito para
 // responder "a rede caiu às 10:40, foi o CorporTV?" com números.
-const REDE_REF_MBPS=12;
+let REDE_REF_MBPS=12; // vem do servidor (teto_mbps); 0 = sem teto
 const REDE_TIPOS={video:'Vídeos para TVs e Raspberrys',tv:'Telas (programação e sinal de vida)',raspberry:'Raspberrys (registro e instalação)',painel:'Painel',envio:'Envio de vídeos'};
 let redeDados=null,redePeriodo={preset:'24h'},redeTimer=null,redeIndice=null;
 function fmtMbps(v){return (v>=10?v.toFixed(1):v>=1?v.toFixed(2):v.toFixed(3)).replace('.',',')+' Mb/s'}
@@ -761,6 +761,8 @@ async function carregarRede(){
   g.style.opacity='';
   if(r.error){document.getElementById('rede-resumo').textContent='Não foi possível consultar: '+r.error;return;}
   redeDados=r;
+  if(Number.isFinite(r.teto_mbps))REDE_REF_MBPS=r.teto_mbps;
+  document.getElementById('rede-ref-legenda').textContent=REDE_REF_MBPS?'Teto do CorporTV: '+String(REDE_REF_MBPS).replace('.',',')+' Mb/s':'Sem teto configurado';
   const longo=ate-de>86400000;
   const quando=t=>longo?dataHoraDe(t):horaDe(t);
   document.getElementById('rede-pico').textContent=fmtMbps(r.pico.mbps);
@@ -771,10 +773,10 @@ async function carregarRede(){
   if(!r.total.mb&&!r.pico.mbps){
     resumo.textContent='Entre '+quando(de)+' e '+quando(ate)+' não há tráfego do CorporTV registrado.';
   }else{
-    const pct=Math.round(r.pico.mbps/REDE_REF_MBPS*100);
+    const pct=REDE_REF_MBPS?Math.round(r.pico.mbps/REDE_REF_MBPS*100):0;
     resumo.textContent='Entre '+quando(de)+' e '+quando(ate)+', o CorporTV usou em média '+fmtMbps(r.total.media_mbps)+
       ' e no máximo '+fmtMbps(r.pico.mbps)+' (pico de 1 segundo'+(r.pico.em?', às '+quando(r.pico.em):'')+'), '+
-      (pct<1?'menos de 1%':pct>=200?Math.round(pct/100)+' vezes':pct+'%')+' da referência de '+REDE_REF_MBPS+' Mb/s. Total no período: '+fmtMB(r.total.mb)+'.';
+      (REDE_REF_MBPS?(pct<1?'menos de 1%':pct+'%')+' do teto de '+String(REDE_REF_MBPS).replace('.',',')+' Mb/s do CorporTV':'sem teto configurado')+'. Total no período: '+fmtMB(r.total.mb)+'.';
   }
   redeDesenhar();
   redeTabelas();
@@ -792,7 +794,7 @@ function redeDesenhar(){
   const serie=r.serie;
   const maxPico=serie.reduce((m,p)=>Math.max(m,p.pico_mbps,p.media_mbps),0);
   const ampliar=document.getElementById('rede-ampliar').checked;
-  const yMax=escalaBonita(ampliar?Math.max(maxPico*1.1,0.01):Math.max(maxPico*1.1,REDE_REF_MBPS*1.1));
+  const yMax=escalaBonita(ampliar?Math.max(maxPico*1.1,0.01):Math.max(maxPico*1.1,(REDE_REF_MBPS||1)*1.1));
   const x=t=>ml+((t-r.de)/(r.ate-r.de))*iw;
   const y=v=>mt+ih-(Math.min(v,yMax)/yMax)*ih;
   const passo=r.passo_min*60000;
@@ -816,10 +818,10 @@ function redeDesenhar(){
     add('text',{x:x(t),y:H-8,'text-anchor':i===0?'start':i===5?'end':'middle','font-size':11,fill:'#888890'},longo?dataHoraDe(t):horaDe(t));
   }
   // Referência de 12 Mb/s (só se cabe na escala).
-  if(REDE_REF_MBPS<=yMax){
+  if(REDE_REF_MBPS>0&&REDE_REF_MBPS<=yMax){
     const yr=y(REDE_REF_MBPS);
     add('line',{x1:ml,x2:W-mr,y1:yr,y2:yr,stroke:'#888890','stroke-width':1});
-    add('text',{x:ml+6,y:yr-5,'text-anchor':'start','font-size':11,fill:'#b8b8c0'},'referência: '+REDE_REF_MBPS+' Mb/s');
+    add('text',{x:ml+6,y:yr-5,'text-anchor':'start','font-size':11,fill:'#b8b8c0'},'teto do CorporTV: '+String(REDE_REF_MBPS).replace('.',',')+' Mb/s');
   }
   if(serie.length){
     const linha=k=>serie.map((p,i)=>(i?'L':'M')+cx(p).toFixed(1)+' '+y(p[k]).toFixed(1)).join(' ');

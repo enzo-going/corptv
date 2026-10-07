@@ -147,15 +147,25 @@ app.use('/uploads', (req, res, next) => {
 // o arquivo inteiro em 76 segundos. Esse pico e o que assusta a rede.
 //
 // Aqui a entrega e paginada no tempo: manda um pouco mais rapido que a
-// reproducao, o suficiente para o buffer encher com folga, sem rajada. O QoS
-// da maquina continua sendo a rede de seguranca do total; isto controla cada
-// conexao individualmente.
+// reproducao, o suficiente para o buffer encher com folga, sem rajada. Isto
+// controla cada conexao; o teto da soma de todas e o TETO_TOTAL_MBPS abaixo.
 //
 // Ajustavel sem mexer no codigo: CORPTV_LIMITE_MBPS (0 = sem limite).
 const LIMITE_MBPS = process.env.CORPTV_LIMITE_MBPS !== undefined
   ? parseFloat(process.env.CORPTV_LIMITE_MBPS)
   : 4.5; // ~1,5x a taxa do video de 2,9 Mb/s
 const LIMITE_BYTES_S = Math.round((LIMITE_MBPS * 1e6) / 8);
+
+// Teto da SOMA de tudo o que o CorporTV manda de vídeo e imagem: TVs, Raspberrys e o
+// "Baixar" do painel. O QoS do Windows (12 Mb/s) só pega a porta 3000 e, desde que o
+// acesso passou pelo nginx (porta 80), quase nada passa por ele. Aqui o teto é do
+// próprio CorporTV: não mexe no Windows, no nginx nem nos outros sistemas do servidor.
+// Com muitas Raspberrys baixando juntas, cada uma vai mais devagar e a rede não sente.
+// Ajustável: CORPTV_TETO_TOTAL_MBPS (0 = sem teto).
+const TETO_TOTAL_MBPS = process.env.CORPTV_TETO_TOTAL_MBPS !== undefined
+  ? Math.max(0, parseFloat(process.env.CORPTV_TETO_TOTAL_MBPS) || 0)
+  : 12;
+const teto = { bytesS: Math.round((TETO_TOTAL_MBPS * 1e6) / 8), usado: 0, inicio: Date.now() };
 
 const TIPOS = {
   '.mp4': 'video/mp4', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
@@ -164,9 +174,11 @@ const TIPOS = {
 
 // Deixa passar no maximo `bytesPorSegundo`, em fatias de 100ms. Fatias curtas
 // evitam que a TV veja a conexao "parada" e desista.
+// `bytesPorSegundo` 0 = sem limite próprio da conexão (só o teto total vale).
 function limitador(bytesPorSegundo) {
   const JANELA = 100;
-  const cota = Math.max(1024, Math.round(bytesPorSegundo * JANELA / 1000));
+  const cota = bytesPorSegundo > 0 ? Math.max(1024, Math.round(bytesPorSegundo * JANELA / 1000)) : Infinity;
+  const cotaTotal = teto.bytesS > 0 ? Math.max(1024, Math.round(teto.bytesS * JANELA / 1000)) : Infinity;
   let usado = 0;
   let inicio = Date.now();
   return new Transform({
@@ -175,13 +187,18 @@ function limitador(bytesPorSegundo) {
         if (!buf.length) return pronto();
         const agora = Date.now();
         if (agora - inicio >= JANELA) { inicio = agora; usado = 0; }
-        const espaco = cota - usado;
+        if (agora - teto.inicio >= JANELA) { teto.inicio = agora; teto.usado = 0; }
+        const espaco = Math.min(cota - usado, cotaTotal - teto.usado);
         if (espaco <= 0) {
-          setTimeout(() => enviar(buf), Math.max(1, JANELA - (agora - inicio)));
+          // Espera a janela do limite que acabou (o outro pode ainda ter folga).
+          const local = cota - usado <= 0 ? JANELA - (agora - inicio) : 0;
+          const total = cotaTotal - teto.usado <= 0 ? JANELA - (agora - teto.inicio) : 0;
+          setTimeout(() => enviar(buf), Math.max(1, local, total));
           return;
         }
-        const fatia = buf.subarray(0, espaco);
+        const fatia = buf.subarray(0, Math.min(buf.length, espaco));
         usado += fatia.length;
+        teto.usado += fatia.length;
         this.push(fatia);
         const resto = buf.subarray(fatia.length);
         if (resto.length) setTimeout(() => enviar(resto), Math.max(1, JANELA - (Date.now() - inicio)));
@@ -251,7 +268,7 @@ app.get('/uploads/:arquivo', mediaRequestLimiter, (req, res, next) => {
     res.on('close', encerrar);
     leitura.on('error', () => { encerrar(); res.destroy(); });
 
-    if (LIMITE_BYTES_S > 0) leitura.pipe(limitador(LIMITE_BYTES_S)).pipe(res);
+    if (LIMITE_BYTES_S > 0 || teto.bytesS > 0) leitura.pipe(limitador(LIMITE_BYTES_S)).pipe(res);
     else leitura.pipe(res);
   });
 });
@@ -504,14 +521,20 @@ app.get('/api/slides/:id/arquivo', mediaRequestLimiter, async (req, res, next) =
   let titulo = String(slide.title || '').replace(/[<>:"/\\|?*\x00-\x1f\x7f]/g, ' ')
     .replace(/\s+/g, ' ').trim().replace(/^[. ]+|[. ]+$/g, '').slice(0, 120).trim() || 'Conteúdo';
   if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(titulo)) titulo = '_' + titulo;
-  res.download(arquivo, titulo + path.extname(arquivo), error => {
-    if (!error) return;
-    if (!res.headersSent && (error.code === 'ENOENT' || error.status === 404)) {
-      res.removeHeader('Content-Disposition');
-      return res.status(404).json({ error: 'Arquivo não encontrado.' });
-    }
-    next(error);
-  });
+  // Sem o limite por TV (é uma pessoa baixando), mas dentro do teto total do CorporTV:
+  // um download de 600 MB na velocidade cheia da rede seria justamente um pico.
+  let info;
+  try { info = await fs.promises.stat(arquivo); } catch (error) {
+    if (error.code === 'ENOENT') return res.status(404).json({ error: 'Arquivo não encontrado.' });
+    throw error;
+  }
+  res.attachment(titulo + path.extname(arquivo));
+  res.set({ 'Content-Type': TIPOS[path.extname(arquivo).toLowerCase()] || 'application/octet-stream', 'Content-Length': info.size });
+  const leitura = fs.createReadStream(arquivo);
+  res.on('close', () => leitura.destroy());
+  leitura.on('error', error => { if (!res.headersSent) next(error); else res.destroy(); });
+  const saida = teto.bytesS > 0 ? leitura.pipe(limitador(0)) : leitura;
+  saida.pipe(res);
 });
 
 // Sem titulo, o painel mostrava tudo como "vid" e ficava impossivel distinguir
@@ -940,6 +963,7 @@ app.get('/api/trafego', auth.requireRole('admin'), async (req, res) => {
   const periodo = periodoDaConsulta(req.query);
   if (periodo.error) return res.status(400).json({ error: periodo.error });
   const { minutos, ...resumo } = monitorTrafego.consultar(periodo.de, periodo.ate);
+  resumo.teto_mbps = TETO_TOTAL_MBPS;
   const nomes = await nomesDosClientes();
   resumo.clientes = resumo.clientes.map(c => ({ ...c, nome: nomes.get(c.endereco) || null }));
   res.json(resumo);
