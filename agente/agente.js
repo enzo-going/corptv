@@ -28,6 +28,7 @@ const path = require('path');
 const crypto = require('crypto');
 const dns = require('dns');
 const os = require('os');
+const { execFileSync } = require('child_process');
 const { URL } = require('url');
 
 const CONFIG = {
@@ -323,9 +324,38 @@ function espacoLivreMb() {
   } catch (e) { return null; }
 }
 
+let ultimaLeituraTermica = -Infinity;
+let cacheTermico = {};
+
+function saudeTermica() {
+  const agora = Date.now();
+  if (agora - ultimaLeituraTermica < 60000) return cacheTermico;
+  ultimaLeituraTermica = agora;
+  cacheTermico = {};
+  try {
+    const texto = fs.readFileSync('/sys/class/thermal/thermal_zone0/temp', 'utf8').trim();
+    const miligraus = Number(texto);
+    if (!/^\d+$/.test(texto) || !Number.isInteger(miligraus) || miligraus > 120000) return cacheTermico;
+    const resposta = execFileSync('vcgencmd', ['get_throttled'], {
+      encoding: 'utf8', timeout: 1000, maxBuffer: 1024, windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore']
+    }).trim();
+    const flags = /^throttled=0x([0-9a-f]{1,8})$/i.exec(resposta);
+    if (!flags) return cacheTermico;
+    // Bits 0–3: subtensão, frequência limitada e limites térmicos atuais.
+    // Bits 16–19: os mesmos eventos desde a última inicialização.
+    cacheTermico = {
+      temperatura_c: Math.round(miligraus / 1000),
+      limitada: (parseInt(flags[1], 16) & 0xf000f) !== 0
+    };
+  } catch (_) { /* Medição indisponível: o agente continua sem estes campos. */ }
+  return cacheTermico;
+}
+
 function situacaoAtual() {
-  if (!telaAtual) return { estado: 'sem_tela' };
-  const base = { livre_mb: espacoLivreMb(), total_mb: Math.round(andamento.total / 1048576) };
+  const termica = saudeTermica();
+  if (!telaAtual) return { estado: 'sem_tela', ...termica };
+  const base = { livre_mb: espacoLivreMb(), total_mb: Math.round(andamento.total / 1048576), ...termica };
   const daTela = andamento.tela === telaAtual;
   if (daTela && andamento.emCurso) return Object.assign(base, { estado: 'baixando', percentual: percentualBaixado() });
   if (daTela && andamento.falhou) return Object.assign(base, { estado: 'falha', percentual: percentualBaixado(), erro: andamento.erro });
