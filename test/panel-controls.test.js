@@ -50,7 +50,7 @@ test('Aparelhos é uma página só do TI, com um comando único para Raspberry n
   assert.ok(panel.includes("function piCommand(origin){return 'curl -fsSL '+origin+'/pi/preparar.sh | sudo bash';}"));
   assert.ok(panel.includes(`onclick="goTo('aparelhos',this)"`));
   assert.ok(panel.includes(`<button class="nav-item" data-admin-only hidden onclick="goTo('aparelhos',this)">`));
-  assert.ok(panel.includes("if((p==='users'||p==='audit'||p==='aparelhos')&&(!permissions||!permissions.users))"));
+  assert.ok(panel.includes("if((p==='users'||p==='audit'||p==='aparelhos'||p==='rede')&&(!permissions||!permissions.users))"));
   const pagina = panel.slice(panel.indexOf('<div class="page" id="page-aparelhos">'), panel.indexOf('<!-- MINHA CONTA -->'));
   assert.ok(pagina.includes('Adicionar Raspberry'));
   assert.ok(pagina.includes('<div class="card" id="pi-setup" hidden>'), 'o passo a passo começa fechado');

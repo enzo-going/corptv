@@ -102,3 +102,18 @@ test('cada rota cai no tipo certo', () => {
   assert.equal(tipoDaRota('POST', '/api/heartbeat'), 'tv');
   assert.equal(tipoDaRota('GET', '/api/slides'), 'painel');
 });
+
+test('a página Rede é do TI, com gráfico acessível, resumo e exportação', () => {
+  const painel = fs.readFileSync(path.join(__dirname, '../public/painel/index.html'), 'utf8');
+  assert.ok(painel.includes(`<button class="nav-item" data-admin-only hidden onclick="goTo('rede',this)">`));
+  assert.ok(painel.includes("p==='rede')&&(!permissions||!permissions.users)"));
+  assert.ok(painel.includes('<div class="page" id="page-rede">'));
+  assert.ok(painel.includes('id="rede-exportar" href="/api/trafego/exportar"'));
+  assert.ok(painel.includes("svg.setAttribute('role','img');svg.setAttribute('tabindex','0');"), 'gráfico com teclado e leitor de tela');
+  assert.ok(painel.includes("if(ev.key!=='ArrowLeft'&&ev.key!=='ArrowRight')return;"));
+  // Texto do detalhe por textContent (nome de aparelho vem da rede).
+  assert.ok(!/rede-tooltip[^\n]*innerHTML/.test(painel));
+  assert.ok(painel.includes("o CorporTV usou em média"));
+  // A página para de consultar "agora" quando sai dela.
+  assert.ok(painel.includes("if(p==='rede')abrirRede();else fecharRede();"));
+});
