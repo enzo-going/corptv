@@ -404,8 +404,9 @@ function toMinutes(hhmm) {
 
 function parseDays(value) {
   if (value === undefined || value === null || value === '') return [];
-  const arr = Array.isArray(value) ? value : String(value).split(',');
-  return arr.map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n >= 0 && n <= 6);
+  const arr = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  return arr.filter(v => typeof v === 'string' || typeof v === 'number')
+    .map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n >= 0 && n <= 6);
 }
 
 // Converte para ISO com seguranca: data vazia ou invalida vira null (sem
@@ -416,7 +417,7 @@ function toIso(value) {
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-// Interpreta a data SEMPRE no fuso do servidor. Cuidado: new Date('2026-08-14')
+// Interpreta datas sem fuso no fuso do servidor. Cuidado: new Date('2026-08-14')
 // no JavaScript vale meia-noite UTC, que aqui cai no dia 13 as 21h. Por isso a
 // data e montada campo a campo.
 //   fimDoDia=false -> 00:00:00 do dia (inicio da janela)
@@ -424,17 +425,20 @@ function toIso(value) {
 // Aceita 'AAAA-MM-DD' (formato novo, so data) e 'AAAA-MM-DDTHH:MM' (dados antigos).
 function parseDataLocal(valor, fimDoDia) {
   if (!valor) return null;
-  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2}))?/.exec(String(valor));
-  if (!m) {
-    const solto = new Date(valor);
-    return isNaN(solto.getTime()) ? null : solto.toISOString();
-  }
-  const [, ano, mes, dia, hora, min] = m;
-  const d = hora !== undefined
-    ? new Date(+ano, +mes - 1, +dia, +hora, +min, 0, 0)
-    : fimDoDia
-      ? new Date(+ano, +mes - 1, +dia, 23, 59, 59, 999)
-      : new Date(+ano, +mes - 1, +dia, 0, 0, 0, 0);
+  if (typeof valor !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.(\d{1,3}))?)?(Z|[+-]\d{2}:\d{2})?)?$/.exec(valor.trim());
+  if (!m) return null;
+  const [, ano, mes, dia, hora, min, seg, ms, fuso] = m;
+  const calendario = new Date(0);
+  calendario.setUTCFullYear(+ano, +mes - 1, +dia);
+  if (calendario.getUTCFullYear() !== +ano || calendario.getUTCMonth() !== +mes - 1 || calendario.getUTCDate() !== +dia) return null;
+  if (hora !== undefined && (+hora > 23 || +min > 59 || +(seg || 0) > 59)) return null;
+  // Datas com fuso explícito já representam um instante: não descartar o fuso.
+  if (fuso) return scheduling.toIso(valor.trim().replace(' ', 'T'));
+  const d = new Date(0);
+  d.setFullYear(+ano, +mes - 1, +dia);
+  if (hora !== undefined) d.setHours(+hora, +min, +(seg || 0), +(ms || '').padEnd(3, '0'));
+  else d.setHours(fimDoDia ? 23 : 0, fimDoDia ? 59 : 0, fimDoDia ? 59 : 0, fimDoDia ? 999 : 0);
   return isNaN(d.getTime()) ? null : d.toISOString();
 }
 
@@ -475,18 +479,20 @@ function statusAgenda(a, now) {
 // Recusa combinacoes que nunca tocariam, para o conteudo nao sumir da tela sem
 // explicacao. Com data sem hora, "de 14/08 ate 14/08" e valido e significa
 // "so nesse dia" (00:00 as 23:59).
-function validarAgendamento(a) {
-  if (a.starts_at && a.expires_at && new Date(a.expires_at) < new Date(a.starts_at)) {
-    return 'A data de expiração é anterior à data de início.';
+function validarAgendamento(a, raw) {
+  for (const campo of ['starts_at', 'expires_at', 'time_start', 'time_end']) {
+    const valor = raw[campo];
+    if (valor !== undefined && valor !== null && valor !== '' && typeof valor !== 'string') {
+      return 'Datas e horários devem ser texto.';
+    }
   }
-  const ts = toMinutes(a.time_start);
-  const te = toMinutes(a.time_end);
-  if (a.time_start && !a.time_end) return 'Informe também o horário de fim.';
-  if (a.time_end && !a.time_start) return 'Informe também o horário de início.';
-  if (ts !== null && te !== null && ts === te) {
-    return 'O horário de início e de fim são iguais: o conteúdo nunca apareceria.';
+  const dias = raw.days;
+  if (dias !== undefined && dias !== null && dias !== '') {
+    if (!Array.isArray(dias) && typeof dias !== 'string') return 'Dias da semana inválidos.';
+    const itens = Array.isArray(dias) ? dias : dias.split(',');
+    if (itens.some(d => !['string', 'number'].includes(typeof d) || !/^[0-6]$/.test(String(d).trim()))) return 'Dias da semana inválidos.';
   }
-  return null;
+  return scheduling.validarAgendamento(a, raw);
 }
 
 // ── CONTEÚDO (biblioteca) ────────────────────────────────
@@ -675,7 +681,7 @@ app.post('/api/groups/:id/slides', async (req, res) => {
     if (exists) return res.status(400).json({ error: 'Este conteúdo já está no ambiente' });
 
     const agenda = scheduleFromBody(body);
-    const invalido = validarAgendamento(agenda);
+    const invalido = validarAgendamento(agenda, body);
     if (invalido) return res.status(400).json({ error: invalido });
 
     const all = await db.gslides.find({ group_id: req.params.id });
@@ -696,8 +702,9 @@ app.put('/api/groups/:gid/slides/:sid', async (req, res) => {
   const vinculo = await db.gslides.findOne({ group_id: req.params.gid, slide_id: req.params.sid });
   if (!vinculo) return res.status(404).json({ error: 'Conteúdo não está neste ambiente' });
 
-  const agenda = scheduleFromBody(req.body || {});
-  const invalido = validarAgendamento(agenda);
+  const body = req.body || {};
+  const agenda = scheduleFromBody(body);
+  const invalido = validarAgendamento(agenda, body);
   if (invalido) return res.status(400).json({ error: invalido });
 
   await db.gslides.update({ _id: vinculo._id }, { $set: agenda });
