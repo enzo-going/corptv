@@ -94,7 +94,6 @@ test('período longo vira no máximo 720 pontos', () => {
 
 test('cada rota cai no tipo certo', () => {
   assert.equal(tipoDaRota('GET', '/uploads/x.mp4'), 'video');
-  assert.equal(tipoDaRota('GET', '/api/slides/abc/arquivo'), 'video');
   assert.equal(tipoDaRota('POST', '/api/slides'), 'envio');
   assert.equal(tipoDaRota('POST', '/api/aparelhos/registro'), 'raspberry');
   assert.equal(tipoDaRota('GET', '/pi/preparar.sh'), 'raspberry');

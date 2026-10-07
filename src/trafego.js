@@ -22,7 +22,7 @@ const MAX_PONTOS = 720;
 const PASSOS_MIN = [1, 2, 5, 10, 15, 30, 60, 120, 240];
 
 function tipoDaRota(metodo, caminho) {
-  if (caminho.startsWith('/uploads/') || /^\/api\/slides\/[^/]+\/arquivo$/.test(caminho)) return 'video';
+  if (caminho.startsWith('/uploads/')) return 'video';
   if (metodo === 'POST' && caminho === '/api/slides') return 'envio';
   if (caminho.startsWith('/pi/') || caminho === '/api/aparelhos/registro') return 'raspberry';
   if (caminho.startsWith('/api/player/') || caminho === '/api/heartbeat' || caminho.startsWith('/player/')) return 'tv';
