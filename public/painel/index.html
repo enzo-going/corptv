@@ -84,6 +84,29 @@
   .pill.on{background:rgba(108,99,255,.15);border-color:rgba(108,99,255,.4);color:var(--accent)}
   .pill-dot{width:6px;height:6px;border-radius:50%}
   .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px}
+  /* Rede: um eixo só (Mb/s); cores validadas no fundo escuro do painel. */
+  .rede-filtros{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:14px}
+  .rede-filtros .btn.ativo{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .rede-sep{width:1px;height:22px;background:var(--border2)}
+  .rede-campo{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .rede-campo input[type=datetime-local]{width:auto;padding:5px 8px;font-size:12px}
+  .rede-stats{margin-bottom:12px;grid-template-columns:repeat(4,minmax(0,1fr))}
+  @media(max-width:720px){.rede-stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .rede-resumo{font-size:14px;line-height:1.6}
+  .rede-grafico-card{position:relative}
+  .rede-legenda{display:flex;gap:18px;font-size:12px;color:var(--muted);margin-bottom:8px;flex-wrap:wrap}
+  .rede-key{display:inline-block;width:16px;height:2px;vertical-align:middle;margin-right:6px;border-radius:1px}
+  .rede-key-pico{background:#d95926}.rede-key-media{background:#3987e5}.rede-key-ref{background:var(--muted)}
+  .rede-grafico svg{display:block;width:100%;height:auto;touch-action:none}
+  .rede-tooltip{position:absolute;pointer-events:none;background:var(--bg3);border:1px solid var(--border2);border-radius:8px;padding:8px 10px;font-size:12px;min-width:150px;z-index:5}
+  .rede-tooltip b{font-size:13px;color:var(--text)}
+  .rede-tooltip .rk{display:inline-block;width:12px;height:2px;margin-right:6px;vertical-align:middle}
+  .rede-colunas{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+  @media(max-width:900px){.rede-colunas{grid-template-columns:1fr}}
+  .rede-tabela{width:100%;border-collapse:collapse;font-size:12px}
+  .rede-tabela th,.rede-tabela td{text-align:left;padding:6px 8px;border-top:1px solid var(--border)}
+  .rede-tabela th{color:var(--muted);font-weight:500;border-top:0}
+  .rede-tabela td.num,.rede-tabela th.num{text-align:right;font-variant-numeric:tabular-nums}
   .stat{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
   .stat-val{font-size:24px;font-weight:600}
   .stat-label{font-size:11px;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.5px}
@@ -263,6 +286,9 @@
       <button class="nav-item" data-admin-only hidden onclick="goTo('aparelhos',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>Aparelhos
       </button>
+      <button class="nav-item" data-admin-only hidden onclick="goTo('rede',this)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>Rede
+      </button>
       <button class="nav-item" data-admin-only hidden onclick="goTo('users',this)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>Usuários
       </button>
@@ -429,6 +455,46 @@
       <div id="device-list"></div>
     </div>
 
+    <!-- REDE (só TI) -->
+    <div class="page" id="page-rede">
+      <div class="page-header"><div><div class="page-title">Rede</div><div class="page-sub">Quanto o CorporTV usou da rede, segundo a segundo. Mede tudo o que passa pelo servidor do CorporTV (TVs, Raspberrys, painel e envio de vídeos), não o resto da rede.</div></div></div>
+      <div class="rede-filtros" role="group" aria-label="Período">
+        <button class="btn btn-ghost btn-sm" data-periodo="1h" onclick="redePreset('1h')">Última hora</button>
+        <button class="btn btn-ghost btn-sm" data-periodo="hoje" onclick="redePreset('hoje')">Hoje</button>
+        <button class="btn btn-ghost btn-sm" data-periodo="24h" onclick="redePreset('24h')">24 horas</button>
+        <button class="btn btn-ghost btn-sm" data-periodo="7d" onclick="redePreset('7d')">7 dias</button>
+        <button class="btn btn-ghost btn-sm" data-periodo="30d" onclick="redePreset('30d')">30 dias</button>
+        <span class="rede-sep"></span>
+        <label class="rede-campo">de <input type="datetime-local" id="rede-de"></label>
+        <label class="rede-campo">até <input type="datetime-local" id="rede-ate"></label>
+        <button class="btn btn-primary btn-sm" onclick="redeVerificar()">Verificar horário</button>
+        <span class="rede-sep"></span>
+        <label class="rede-campo"><input type="checkbox" id="rede-ampliar" onchange="redeDesenhar()"> ampliar a escala</label>
+        <a class="btn btn-ghost btn-sm" id="rede-exportar" href="/api/trafego/exportar">Exportar planilha</a>
+      </div>
+      <div class="stats-row rede-stats">
+        <div class="stat"><div class="stat-val" id="rede-agora">—</div><div class="stat-label">Agora (últimos 10 s)</div></div>
+        <div class="stat"><div class="stat-val" id="rede-pico">—</div><div class="stat-label" id="rede-pico-quando">Pico de 1 s no período</div></div>
+        <div class="stat"><div class="stat-val" id="rede-media">—</div><div class="stat-label">Média no período</div></div>
+        <div class="stat"><div class="stat-val" id="rede-total">—</div><div class="stat-label">Total enviado e recebido</div></div>
+      </div>
+      <div class="card rede-resumo" id="rede-resumo" role="status" aria-live="polite">Carregando…</div>
+      <div class="card rede-grafico-card">
+        <div class="rede-legenda" aria-hidden="true">
+          <span><i class="rede-key rede-key-pico"></i>Pico de 1 s</span>
+          <span><i class="rede-key rede-key-media"></i>Média</span>
+          <span><i class="rede-key rede-key-ref"></i>Referência: 12 Mb/s</span>
+        </div>
+        <div class="rede-grafico" id="rede-grafico"></div>
+        <div class="rede-tooltip" id="rede-tooltip" hidden></div>
+      </div>
+      <div class="rede-colunas">
+        <div class="card"><div class="card-title" style="margin-bottom:10px">Quem mais recebeu no período</div><div id="rede-clientes"></div></div>
+        <div class="card"><div class="card-title" style="margin-bottom:10px">Por tipo de uso</div><div id="rede-tipos"></div></div>
+      </div>
+      <details class="card"><summary>Ver os números (momentos de maior uso)</summary><div id="rede-momentos" style="margin-top:10px"></div></details>
+    </div>
+
     <!-- MINHA CONTA -->
     <div class="page" id="page-profile">
       <div class="page-header"><div><div class="page-title">Minha conta</div><div class="page-sub">Sessão e credenciais de acesso</div></div></div>
@@ -539,7 +605,7 @@ function syncLayout(){
 mobileLayout.addEventListener('change',syncLayout);
 syncLayout();
 function goTo(p,btn){
-  if((p==='users'||p==='audit'||p==='aparelhos')&&(!permissions||!permissions.users)){toast('Acesso restrito ao setor de TI');return;}
+  if((p==='users'||p==='audit'||p==='aparelhos'||p==='rede')&&(!permissions||!permissions.users)){toast('Acesso restrito ao setor de TI');return;}
   document.querySelectorAll('.page').forEach(e=>e.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -549,6 +615,7 @@ function goTo(p,btn){
   if(p==='dash')renderDash();
   if(p==='users')loadUsers();
   if(p==='aparelhos')renderDevices();
+  if(p==='rede')abrirRede();else fecharRede();
   if(p==='audit')loadAudit(true);
 }
 async function api(method,url,body,isForm=false){
@@ -642,6 +709,196 @@ async function bootstrap(){
   }catch(error){if(!location.pathname.startsWith('/login'))toast('Não foi possível iniciar o painel');}
 }
 function roleLabel(role){return role==='admin'?'TI administrador':role==='editor'?'Colaborador editor':'Somente leitura'}
+// ── REDE (só TI) ─────────────────────────────────────────
+// Quanto o CorporTV usou da rede (ver src/trafego.js no servidor). Feito para
+// responder "a rede caiu às 10:40, foi o CorporTV?" com números.
+const REDE_REF_MBPS=12;
+const REDE_TIPOS={video:'Vídeos para TVs e Raspberrys',tv:'Telas (programação e sinal de vida)',raspberry:'Raspberrys (registro e instalação)',painel:'Painel',envio:'Envio de vídeos'};
+let redeDados=null,redePeriodo={preset:'24h'},redeTimer=null,redeIndice=null;
+function fmtMbps(v){return (v>=10?v.toFixed(1):v>=1?v.toFixed(2):v.toFixed(3)).replace('.',',')+' Mb/s'}
+function fmtMB(mb){return mb>=1024?(mb/1024).toFixed(2).replace('.',',')+' GB':(mb>=10?String(Math.round(mb)):mb.toFixed(1).replace('.',','))+' MB'}
+function p2(n){return String(n).padStart(2,'0')}
+function horaDe(t){const d=new Date(t);return p2(d.getHours())+':'+p2(d.getMinutes())}
+function dataHoraDe(t){const d=new Date(t);return p2(d.getDate())+'/'+p2(d.getMonth()+1)+' '+horaDe(t)}
+function paraCampo(t){const d=new Date(t);return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())+'T'+horaDe(t)}
+function redeIntervalo(){
+  const agora=Date.now();
+  const p=redePeriodo;
+  if(p.preset==='1h')return{de:agora-3600000,ate:agora};
+  if(p.preset==='hoje'){const d=new Date();d.setHours(0,0,0,0);return{de:d.getTime(),ate:agora};}
+  if(p.preset==='7d')return{de:agora-7*86400000,ate:agora};
+  if(p.preset==='30d')return{de:agora-30*86400000,ate:agora};
+  if(p.preset==='custom')return{de:p.de,ate:p.ate};
+  return{de:agora-86400000,ate:agora};
+}
+function abrirRede(){
+  carregarRede();
+  clearInterval(redeTimer);
+  redeTimer=setInterval(atualizarAgora,5000);
+  atualizarAgora();
+}
+function fecharRede(){clearInterval(redeTimer);redeTimer=null;}
+function redePreset(p){redePeriodo={preset:p};carregarRede();}
+function redeVerificar(){
+  const de=Date.parse(document.getElementById('rede-de').value);
+  const ate=Date.parse(document.getElementById('rede-ate').value);
+  if(!Number.isFinite(de)||!Number.isFinite(ate)||de>=ate){toast('Escolha o início e o fim do horário a verificar',5000);return;}
+  redePeriodo={preset:'custom',de,ate};carregarRede();
+}
+async function atualizarAgora(){
+  try{const a=await api('GET','/api/trafego/agora');if(typeof a.mbps==='number')document.getElementById('rede-agora').textContent=fmtMbps(a.mbps);}catch(e){}
+}
+async function carregarRede(){
+  const {de,ate}=redeIntervalo();
+  document.querySelectorAll('.rede-filtros [data-periodo]').forEach(b=>b.classList.toggle('ativo',b.dataset.periodo===redePeriodo.preset));
+  document.getElementById('rede-de').value=paraCampo(de);
+  document.getElementById('rede-ate').value=paraCampo(ate);
+  document.getElementById('rede-exportar').href='/api/trafego/exportar?de='+Math.round(de)+'&ate='+Math.round(ate);
+  // Recarregando: mantém o gráfico anterior esmaecido, sem pular a página.
+  const g=document.getElementById('rede-grafico');g.style.opacity='.5';
+  let r;
+  try{r=await api('GET','/api/trafego?de='+Math.round(de)+'&ate='+Math.round(ate));}catch(e){r={error:'Sem conexão com o servidor'};}
+  g.style.opacity='';
+  if(r.error){document.getElementById('rede-resumo').textContent='Não foi possível consultar: '+r.error;return;}
+  redeDados=r;
+  const longo=ate-de>86400000;
+  const quando=t=>longo?dataHoraDe(t):horaDe(t);
+  document.getElementById('rede-pico').textContent=fmtMbps(r.pico.mbps);
+  document.getElementById('rede-pico-quando').textContent=r.pico.em?'Pico de 1 s, às '+quando(r.pico.em):'Pico de 1 s no período';
+  document.getElementById('rede-media').textContent=fmtMbps(r.total.media_mbps);
+  document.getElementById('rede-total').textContent=fmtMB(r.total.mb);
+  const resumo=document.getElementById('rede-resumo');
+  if(!r.total.mb&&!r.pico.mbps){
+    resumo.textContent='Entre '+quando(de)+' e '+quando(ate)+' não há tráfego do CorporTV registrado.';
+  }else{
+    const pct=Math.round(r.pico.mbps/REDE_REF_MBPS*100);
+    resumo.textContent='Entre '+quando(de)+' e '+quando(ate)+', o CorporTV usou em média '+fmtMbps(r.total.media_mbps)+
+      ' e no máximo '+fmtMbps(r.pico.mbps)+' (pico de 1 segundo'+(r.pico.em?', às '+quando(r.pico.em):'')+'), '+
+      (pct<1?'menos de 1%':pct>=200?Math.round(pct/100)+' vezes':pct+'%')+' da referência de '+REDE_REF_MBPS+' Mb/s. Total no período: '+fmtMB(r.total.mb)+'.';
+  }
+  redeDesenhar();
+  redeTabelas();
+}
+function escalaBonita(v){
+  if(v<=0)return 1;
+  const e=Math.pow(10,Math.floor(Math.log10(v)));
+  for(const m of [1,1.2,1.5,2,2.5,3,4,5,6,8,10])if(m*e>=v)return m*e;
+  return 10*e;
+}
+function redeDesenhar(){
+  const r=redeDados;const el=document.getElementById('rede-grafico');
+  if(!r)return;
+  const W=900,H=290,ml=56,mr=16,mt=26,mb=28,iw=W-ml-mr,ih=H-mt-mb;
+  const serie=r.serie;
+  const maxPico=serie.reduce((m,p)=>Math.max(m,p.pico_mbps,p.media_mbps),0);
+  const ampliar=document.getElementById('rede-ampliar').checked;
+  const yMax=escalaBonita(ampliar?Math.max(maxPico*1.1,0.01):Math.max(maxPico*1.1,REDE_REF_MBPS*1.1));
+  const x=t=>ml+((t-r.de)/(r.ate-r.de))*iw;
+  const y=v=>mt+ih-(Math.min(v,yMax)/yMax)*ih;
+  const passo=r.passo_min*60000;
+  const cx=p=>x(p.t+passo/2);
+  const ns='http://www.w3.org/2000/svg';
+  const svg=document.createElementNS(ns,'svg');
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);svg.setAttribute('role','img');svg.setAttribute('tabindex','0');
+  svg.setAttribute('aria-label','Uso de rede do CorporTV no período, em megabits por segundo. Os números estão em "Ver os números".');
+  const add=(tag,at,txt)=>{const n=document.createElementNS(ns,tag);for(const k in at)n.setAttribute(k,at[k]);if(txt!==undefined)n.textContent=txt;svg.appendChild(n);return n;};
+  // Grade e eixo Y (4 divisões, números redondos).
+  for(let i=0;i<=4;i++){
+    const v=yMax*i/4,yy=y(v);
+    add('line',{x1:ml,x2:W-mr,y1:yy,y2:yy,stroke:'rgba(255,255,255,.08)','stroke-width':1});
+    add('text',{x:ml-8,y:yy+4,'text-anchor':'end','font-size':11,fill:'#888890'},String(+v.toFixed(v>=1?1:3)).replace('.',','));
+  }
+  add('text',{x:ml-8,y:12,'text-anchor':'end','font-size':10,fill:'#888890'},'Mb/s');
+  // Eixo X: 6 marcas.
+  const longo=r.ate-r.de>86400000;
+  for(let i=0;i<=5;i++){
+    const t=r.de+(r.ate-r.de)*i/5;
+    add('text',{x:x(t),y:H-8,'text-anchor':i===0?'start':i===5?'end':'middle','font-size':11,fill:'#888890'},longo?dataHoraDe(t):horaDe(t));
+  }
+  // Referência de 12 Mb/s (só se cabe na escala).
+  if(REDE_REF_MBPS<=yMax){
+    const yr=y(REDE_REF_MBPS);
+    add('line',{x1:ml,x2:W-mr,y1:yr,y2:yr,stroke:'#888890','stroke-width':1});
+    add('text',{x:ml+6,y:yr-5,'text-anchor':'start','font-size':11,fill:'#b8b8c0'},'referência: '+REDE_REF_MBPS+' Mb/s');
+  }
+  if(serie.length){
+    const linha=k=>serie.map((p,i)=>(i?'L':'M')+cx(p).toFixed(1)+' '+y(p[k]).toFixed(1)).join(' ');
+    const base=y(0).toFixed(1);
+    add('path',{d:linha('media_mbps')+' L'+cx(serie[serie.length-1]).toFixed(1)+' '+base+' L'+cx(serie[0]).toFixed(1)+' '+base+' Z',fill:'#3987e5','fill-opacity':.1,stroke:'none'});
+    add('path',{d:linha('pico_mbps'),fill:'none',stroke:'#d95926','stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'});
+    add('path',{d:linha('media_mbps'),fill:'none',stroke:'#3987e5','stroke-width':2,'stroke-linejoin':'round','stroke-linecap':'round'});
+    // Rótulo direto só no pico do período.
+    const iPico=serie.reduce((b,p,i)=>p.pico_mbps>serie[b].pico_mbps?i:b,0);
+    const pp=serie[iPico];
+    if(pp.pico_mbps>0){
+      add('circle',{cx:cx(pp),cy:y(pp.pico_mbps),r:4,fill:'#d95926',stroke:'#18181c','stroke-width':2});
+      const direita=cx(pp)>W-200;
+      add('text',{x:cx(pp)+(direita?-8:8),y:Math.max(mt+10,y(pp.pico_mbps)-6),'text-anchor':direita?'end':'start','font-size':12,fill:'#e8e8ea'},'pico '+fmtMbps(pp.pico_mbps));
+    }
+  }
+  // Mira: acha o ponto mais próximo do ponteiro (ou das setas do teclado).
+  const mira=add('line',{x1:0,x2:0,y1:mt,y2:mt+ih,stroke:'rgba(255,255,255,.35)','stroke-width':1,visibility:'hidden'});
+  const area=add('rect',{x:ml,y:mt,width:iw,height:ih,fill:'transparent'});
+  const tip=document.getElementById('rede-tooltip');
+  const mostrar=i=>{
+    if(!serie.length)return;
+    redeIndice=Math.max(0,Math.min(serie.length-1,i));
+    const p=serie[redeIndice];const px=cx(p);
+    mira.setAttribute('x1',px);mira.setAttribute('x2',px);mira.setAttribute('visibility','visible');
+    tip.replaceChildren();
+    const titulo=document.createElement('div');titulo.style.color='var(--muted)';titulo.style.marginBottom='4px';
+    titulo.textContent=(longo?dataHoraDe(p.t):horaDe(p.t))+(r.passo_min>1?' (intervalo de '+r.passo_min+' min)':'');
+    tip.appendChild(titulo);
+    for(const [k,cor,nome] of [['pico_mbps','#d95926','pico de 1 s'],['media_mbps','#3987e5','média']]){
+      const l=document.createElement('div');
+      const key=document.createElement('i');key.className='rk';key.style.background=cor;
+      const v=document.createElement('b');v.textContent=fmtMbps(p[k]);
+      const n=document.createElement('span');n.style.color='var(--muted)';n.textContent=' '+nome;
+      l.append(key,v,n);tip.appendChild(l);
+    }
+    const mbl=document.createElement('div');mbl.style.color='var(--muted)';mbl.style.marginTop='4px';mbl.textContent=fmtMB(p.mb)+' no intervalo';tip.appendChild(mbl);
+    tip.hidden=false;
+    const caixa=el.getBoundingClientRect();const escala=caixa.width/W;
+    tip.style.left=Math.max(0,Math.min(px*escala+16,caixa.width-tip.offsetWidth))+'px';
+    tip.style.top=(el.offsetTop+mt*escala)+'px';
+  };
+  const indicePelo=ev=>{
+    const caixa=svg.getBoundingClientRect();
+    const vx=(ev.clientX-caixa.left)*(W/caixa.width);
+    const t=r.de+((vx-ml)/iw)*(r.ate-r.de);
+    return Math.round((t-r.de-passo/2)/passo);
+  };
+  area.addEventListener('pointermove',ev=>mostrar(indicePelo(ev)));
+  area.addEventListener('pointerleave',()=>{mira.setAttribute('visibility','hidden');tip.hidden=true;});
+  svg.addEventListener('keydown',ev=>{
+    if(ev.key!=='ArrowLeft'&&ev.key!=='ArrowRight')return;
+    ev.preventDefault();
+    mostrar((redeIndice===null?serie.length-1:redeIndice)+(ev.key==='ArrowRight'?1:-1));
+  });
+  svg.addEventListener('blur',()=>{mira.setAttribute('visibility','hidden');tip.hidden=true;});
+  el.replaceChildren(svg);
+}
+function redeTabelas(){
+  const r=redeDados;if(!r)return;
+  const total=(r.total.saida+r.total.entrada)||1;
+  const cel=(tag,txt,classe)=>{const c=document.createElement(tag);c.textContent=txt;if(classe)c.className=classe;return c;};
+  const tabela=(cabecalho,linhas,numericas)=>{
+    const t=document.createElement('table');t.className='rede-tabela';
+    const h=document.createElement('tr');cabecalho.forEach((c,i)=>h.appendChild(cel('th',c,numericas.includes(i)?'num':'')));t.appendChild(h);
+    linhas.forEach(l=>{const tr=document.createElement('tr');l.forEach((c,i)=>tr.appendChild(cel('td',c,numericas.includes(i)?'num':'')));t.appendChild(tr);});
+    return t;
+  };
+  const vazio=txt=>{const d=document.createElement('div');d.className='card-sub';d.textContent=txt;return d;};
+  const cli=r.clientes.map(c=>[c.nome?c.nome+' · '+c.endereco:c.endereco,fmtMB((c.saida+c.entrada)/1048576),Math.round((c.saida+c.entrada)/total*100)+'%',String(c.pedidos)]);
+  document.getElementById('rede-clientes').replaceChildren(cli.length?tabela(['Aparelho ou computador','Usou','Do total','Pedidos'],cli,[1,2,3]):vazio('Nada no período.'));
+  const tipos=Object.entries(r.tipos).sort((a,b)=>(b[1].saida+b[1].entrada)-(a[1].saida+a[1].entrada))
+    .map(([k,v])=>[REDE_TIPOS[k]||k,fmtMB((v.saida+v.entrada)/1048576)]);
+  document.getElementById('rede-tipos').replaceChildren(tipos.length?tabela(['Uso','Total'],tipos,[1]):vazio('Nada no período.'));
+  const longo=r.ate-r.de>86400000;
+  const top=r.serie.filter(p=>p.pico_mbps>0).sort((a,b)=>b.pico_mbps-a.pico_mbps).slice(0,10)
+    .map(p=>[longo?dataHoraDe(p.t):horaDe(p.t),fmtMbps(p.pico_mbps),fmtMbps(p.media_mbps),fmtMB(p.mb)]);
+  document.getElementById('rede-momentos').replaceChildren(top.length?tabela(['Quando','Pico de 1 s','Média','Total'],top,[1,2,3]):vazio('Nada no período.'));
+}
 async function logout(){const result=await api('POST','/api/auth/logout',{});if(!result.error)location.href='/login'}
 // O painel recarrega sozinho a cada 30s. Se o servidor estiver reiniciando
 // (deploy, queda), avisa em vez de estourar erro no console e mantém a tela
