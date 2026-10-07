@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
@@ -21,7 +22,7 @@ function carregarBusca(pasta, lookup) {
 
 test('com o DNS falhando, a Pi usa o último endereço em que o servidor respondeu', async t => {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'corptv-dns-'));
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  t.after(() => limparTemporario(pasta));
   // Endereço de documentação: nenhum servidor real.
   let falhar = false;
   const lookup = (host, opcoes, cb) => falhar

@@ -5,6 +5,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
@@ -75,7 +76,7 @@ test.before(async () => {
 test.after(async () => {
   if (server) await new Promise(r => server.close(r));
   if (!pular) require('../src/db').stopMaintenance();
-  fs.rmSync(sandbox, { recursive: true, force: true });
+  limparTemporario(sandbox);
 });
 
 test('MP4 com assinatura válida mas análise inválida é recusado e removido', { skip: pular }, async () => {

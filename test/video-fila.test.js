@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const path = require('node:path');
 const os = require('node:os');
 const vm = require('node:vm');
@@ -10,7 +11,7 @@ const video = require('../src/video');
 
 test('falha no banco depois de converter conserva o original e limpa a saída sem vínculo', async t => {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'corptv-fila-'));
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  t.after(() => limparTemporario(pasta));
   const original = path.join(pasta, 'original.mp4');
   fs.writeFileSync(original, 'video original');
   let slide = { id: 'teste', url: '/uploads/original.mp4', otimizacao: { estado: 'otimizando', duracao_s: 5 } };

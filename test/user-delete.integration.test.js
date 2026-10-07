@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 
@@ -61,7 +62,7 @@ test.beforeEach(async () => {
 test.after(async () => {
   if (servidor) await new Promise(resolve => servidor.close(resolve));
   db.stopMaintenance();
-  fs.rmSync(pasta, { recursive: true, force: true });
+  limparTemporario(pasta);
 });
 
 test('admin exclui editor, apaga todas as sessões e preserva a auditoria antiga', async () => {

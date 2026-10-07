@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 const video = require('../src/video');
@@ -95,7 +96,7 @@ test('o início rápido é lido da ordem das caixas do MP4', async () => {
     assert.equal(await video.inicioRapido(grava('c.mp4', [caixa('ftyp', 24), grande, caixa('moov', 40)])), true);
     assert.equal(await video.inicioRapido(grava('d.mp4', [Buffer.from('lixo')])), false);
   } finally {
-    fs.rmSync(pasta, { recursive: true, force: true });
+    limparTemporario(pasta);
   }
 });
 

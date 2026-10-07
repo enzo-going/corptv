@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
@@ -12,7 +13,7 @@ const { spawn } = require('node:child_process');
 for (const mesmaTela of [true, false]) {
   test(mesmaTela ? 'inicia com player e programação salvos sem esperar a rede' : 'não restaura a programação salva de outra tela ao iniciar sem rede', async t => {
     const cache = fs.mkdtempSync(path.join(os.tmpdir(), 'corptv-inicio-'));
-    t.after(() => fs.rmSync(cache, { recursive: true, force: true }));
+    t.after(() => limparTemporario(cache));
     fs.writeFileSync(path.join(cache, 'player.html'), '<html><body>player salvo</body></html>');
     fs.writeFileSync(path.join(cache, 'playlist.json'), JSON.stringify({
       screen: { id: mesmaTela ? 'sala' : 'outra' },

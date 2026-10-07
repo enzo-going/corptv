@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('node:path');
 const http = require('node:http');
@@ -10,7 +11,7 @@ const vm = require('node:vm');
 
 test('seis falhas preservam o parcial e o próximo ciclo retoma por Range', async (t) => {
   const pasta = fs.mkdtempSync(path.join(os.tmpdir(), 'corptv-retomada-'));
-  t.after(() => fs.rmSync(pasta, { recursive: true, force: true }));
+  t.after(() => limparTemporario(pasta));
   const destino = path.join(pasta, 'video.mp4');
   const midia = Buffer.from('conteudo completo do video');
   const pedaco = midia.subarray(0, 8);

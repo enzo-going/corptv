@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
+const limparTemporario = require('./limpar-temporario');
 const os = require('node:os');
 const path = require('path');
 const {
@@ -47,6 +48,6 @@ test('recusa leitura e remoção fora da pasta de uploads', async () => {
     assert.equal(await removeFile(external, root), false);
     assert.equal(fs.existsSync(external), true);
   } finally {
-    fs.rmSync(sandbox, { recursive: true, force: true });
+    limparTemporario(sandbox);
   }
 });
