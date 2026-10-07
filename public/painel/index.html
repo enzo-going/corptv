@@ -1546,6 +1546,7 @@ function linhaDeTv(d,ti){
     const s=d.situacao;
     if(s&&Number.isInteger(s.temperatura_c))partes.push(s.temperatura_c+' °C');
     if(s&&(s.limitada===true||s.temperatura_c>75))partes.push('esquentando: precisa de ventilação');
+    if(s&&s.subtensao===true)partes.push('fonte fraca: use a fonte oficial 5 V/3 A');
   }
   const alerta=semTela||(d.situacao&&d.situacao.estado==='falha');
   return `<div class="device-row${alerta?' device-new':''}">

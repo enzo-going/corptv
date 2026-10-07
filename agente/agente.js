@@ -28,7 +28,6 @@ const path = require('path');
 const crypto = require('crypto');
 const dns = require('dns');
 const os = require('os');
-const { execFileSync } = require('child_process');
 const { URL } = require('url');
 
 const CONFIG = {
@@ -327,29 +326,35 @@ function espacoLivreMb() {
 let ultimaLeituraTermica = -Infinity;
 let cacheTermico = {};
 
+// Calor e fonte fraca, lidos de arquivos do sistema que qualquer usuário lê. O
+// vcgencmd não serve aqui: o agente roda com usuário próprio, sem acesso a /dev/vcio
+// (só do root; conferido na Pi). Sem comando externo, nada segura o agente.
+// Medido na Pi da comunicação: 76 °C e velocidade reduzida por calor.
+function lerArquivoDoSistema(caminho) {
+  try { return String(fs.readFileSync(caminho, 'utf8')).trim(); } catch (_) { return null; }
+}
+
 function saudeTermica() {
   const agora = Date.now();
-  if (agora - ultimaLeituraTermica < 60000) return cacheTermico;
+  if (agora - ultimaLeituraTermica < 60000) return { ...cacheTermico };
   ultimaLeituraTermica = agora;
-  cacheTermico = {};
-  try {
-    const texto = fs.readFileSync('/sys/class/thermal/thermal_zone0/temp', 'utf8').trim();
-    const miligraus = Number(texto);
-    if (!/^\d+$/.test(texto) || !Number.isInteger(miligraus) || miligraus > 120000) return cacheTermico;
-    const resposta = execFileSync('vcgencmd', ['get_throttled'], {
-      encoding: 'utf8', timeout: 1000, maxBuffer: 1024, windowsHide: true,
-      stdio: ['ignore', 'pipe', 'ignore']
-    }).trim();
-    const flags = /^throttled=0x([0-9a-f]{1,8})$/i.exec(resposta);
-    if (!flags) return cacheTermico;
-    // Bits 0–3: subtensão, frequência limitada e limites térmicos atuais.
-    // Bits 16–19: os mesmos eventos desde a última inicialização.
-    cacheTermico = {
-      temperatura_c: Math.round(miligraus / 1000),
-      limitada: (parseInt(flags[1], 16) & 0xf000f) !== 0
-    };
-  } catch (_) { /* Medição indisponível: o agente continua sem estes campos. */ }
-  return cacheTermico;
+  const r = {};
+  const texto = lerArquivoDoSistema('/sys/class/thermal/thermal_zone0/temp');
+  if (texto !== null && /^\d+$/.test(texto) && Number(texto) <= 120000) {
+    r.temperatura_c = Math.round(Number(texto) / 1000);
+    // A Pi 4 reduz a velocidade sozinha a partir de 80 °C.
+    r.limitada = Number(texto) >= 80000;
+  }
+  // Subtensão (fonte fraca ou cabo ruim): sensor rpi_volt, 1 = abaixo do mínimo agora.
+  let sensores = [];
+  try { sensores = fs.readdirSync('/sys/class/hwmon'); } catch (_) { /* fora de uma Pi */ }
+  for (const h of sensores) {
+    if (lerArquivoDoSistema('/sys/class/hwmon/' + h + '/name') !== 'rpi_volt') continue;
+    const alarme = lerArquivoDoSistema('/sys/class/hwmon/' + h + '/in0_lcrit_alarm');
+    if (alarme === '0' || alarme === '1') r.subtensao = alarme === '1';
+  }
+  cacheTermico = r;
+  return { ...cacheTermico };
 }
 
 function situacaoAtual() {

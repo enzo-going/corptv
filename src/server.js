@@ -835,6 +835,7 @@ function situacaoAparelho(valor) {
   return {
     ...(temperatura !== null ? { temperatura_c: temperatura } : {}),
     ...(typeof valor.limitada === 'boolean' ? { limitada: valor.limitada } : {}),
+    ...(typeof valor.subtensao === 'boolean' ? { subtensao: valor.subtensao } : {}),
     estado: valor.estado,
     percentual: inteiro(valor.percentual, 100),
     total_mb: inteiro(valor.total_mb, 1000000),
