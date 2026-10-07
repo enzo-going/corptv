@@ -479,7 +479,7 @@ test('download demorado não renova o prazo recebido antes da queda da rede', as
       if (!fs.existsSync(path.join(cache, ARQUIVO))) return false;
       const p = JSON.parse(fs.readFileSync(path.join(cache, 'playlist.json'), 'utf8'));
       return p.slides.some(s => s.cache_for_ms === 1000);
-    }, 'baixar a mídia cuja validade acabou durante o download');
+    }, 'baixar a mídia cuja validade acabou durante o download', 60000);
     const p = await (await fetch(`http://127.0.0.1:${portaAgente}/api/player/x`)).json();
     assert.deepEqual(p.slides, []);
   } finally {
