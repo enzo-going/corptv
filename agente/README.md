@@ -1,5 +1,9 @@
 # CorporTV — Agente local
 
+Para preparar, diagnosticar e manter uma Raspberry Pi, consulte o
+[guia de preparo e manutenção](RASPBERRY_CORPTV_SETUP.md), incluindo os ajustes
+do instalador e como desfazê-los.
+
 Roda no aparelho atrás da TV (Raspberry Pi, mini PC). Resolve o problema de
 **pico de rede** e de **oscilação durante a exibição**.
 
