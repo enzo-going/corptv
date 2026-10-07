@@ -621,7 +621,8 @@ function goTo(p,btn){
 async function api(method,url,body,isForm=false){
   const opts={method,headers:{}};
   const controller=new AbortController();
-  const timeout=setTimeout(()=>controller.abort(),15000);
+  // 30 s: de manhã o servidor fica lento (antivírus) e a página Rede consulta até 30 dias.
+  const timeout=setTimeout(()=>controller.abort(),30000);
   opts.signal=controller.signal;
   if(!['GET','HEAD','OPTIONS'].includes(method)&&csrfToken)opts.headers['X-CSRF-Token']=csrfToken;
   if(body&&!isForm){opts.headers['Content-Type']='application/json';opts.body=JSON.stringify(body);}
