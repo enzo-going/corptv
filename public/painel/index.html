@@ -1543,6 +1543,9 @@ function linhaDeTv(d,ti){
     if(d.apelido)partes.push(d.name);
     if(d.ip)partes.push('IP '+d.ip);
     if(d.situacao&&Number.isInteger(d.situacao.livre_mb))partes.push((d.situacao.livre_mb/1024).toFixed(1)+' GB livres');
+    const s=d.situacao;
+    if(s&&Number.isInteger(s.temperatura_c))partes.push(s.temperatura_c+' °C');
+    if(s&&(s.limitada===true||s.temperatura_c>75))partes.push('esquentando: precisa de ventilação');
   }
   const alerta=semTela||(d.situacao&&d.situacao.estado==='falha');
   return `<div class="device-row${alerta?' device-new':''}">
