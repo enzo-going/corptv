@@ -115,7 +115,10 @@ sobrescrever versões anteriores dos próprios arquivos.
    O hardware pode reiniciar a Pi se o sistema travar e parar de alimentar o
    watchdog. Só executa `systemctl daemon-reexec` se a configuração mudar;
    sem o dispositivo, informa que pulou o passo.
-9. Se acrescentou sufixos de rede, tenta reaplicá-los às interfaces conectadas
+9. Configura o journal persistente do sistema com `SystemMaxUse=50M` e
+   `MaxRetentionSec=1month`, para limitar o espaço dos logs no cartão e sua
+   retenção. Só reinicia `systemd-journald` se o conteúdo da configuração mudar.
+10. Se acrescentou sufixos de rede, tenta reaplicá-los às interfaces conectadas
    por último. A conexão de manutenção pode cair por um instante.
 
 ### Arquivos e serviços instalados ou alterados diretamente
@@ -138,6 +141,7 @@ Aqui, `~` é a pasta do usuário da **sessão gráfica escolhida pelo preparo**.
 | `/etc/chromium.d/corptv` | Se `/etc/chromium.d` existir, acrescenta `--password-store=basic` às opções do Chromium. |
 | Configurações mantidas por `raspi-config` | Executa `do_blanking 1` e `do_boot_behaviour B4`. Os arquivos internos alterados dependem da versão do Raspberry Pi OS e do desktop instalado; o preparo não fixa esses caminhos. Se faltar a ferramenta ou uma chamada falhar, imprime um aviso. |
 | `/etc/systemd/system.conf.d/90-corptv-watchdog.conf` | Se `/dev/watchdog` existir, cria o diretório e grava `[Manager]`, um comentário explicativo, `RuntimeWatchdogSec=15` e `RebootWatchdogSec=2min`. Compara o conteúdo antes de gravar; somente uma mudança executa `systemctl daemon-reexec` para aplicar. |
+| `/etc/systemd/journald.conf.d/90-corptv-journal.conf` | Cria o diretório e grava `[Journal]`, um comentário explicativo, `SystemMaxUse=50M` e `MaxRetentionSec=1month`. Compara o conteúdo antes de gravar; somente uma mudança executa `systemctl restart systemd-journald` para aplicar. Vale para o journal do sistema inteiro. |
 | Diretório temporário criado por `mktemp -d` | Guarda os downloads e a montagem de `agente.env`; é removido ao encerrar o preparo. |
 
 O único serviço CorporTV instalado é **`corptv-agente.service`**. Ele usa
@@ -409,6 +413,20 @@ sudo systemctl daemon-reexec
 Se esse arquivo já existia antes do preparo, restaure o backup em vez de apagá-lo
 e execute o mesmo `daemon-reexec`. Outras configurações de watchdog do sistema
 continuam valendo.
+
+### Retirar o limite do journal
+
+Para desfazer este passo, retire somente o arquivo do CorporTV e reinicie o
+serviço de logs para reler a configuração:
+
+```bash
+sudo rm -f /etc/systemd/journald.conf.d/90-corptv-journal.conf
+sudo systemctl restart systemd-journald
+```
+
+Se esse arquivo já existia antes do preparo, restaure o backup em vez de apagá-lo
+e execute o mesmo reinício. Outras configurações do journal continuam valendo;
+logs já descartados pela retenção não são recuperados.
 
 ### Voltar as configurações do navegador e da sessão
 

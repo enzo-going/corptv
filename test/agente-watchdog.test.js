@@ -10,7 +10,7 @@ const limparTemporario = require('./limpar-temporario');
 
 const preparo = fs.readFileSync(path.join(__dirname, '../agente/preparar-pi.sh'), 'utf8');
 const inicio = preparo.indexOf('# ── 6. Watchdog de hardware');
-const fim = preparo.indexOf('# ── Rede: aplicar o sufixo por último');
+const fim = preparo.indexOf('# ── 7. Limite do journal');
 const passo = preparo.slice(inicio, fim);
 const esperado = '[Manager]\n# Reinicia a Pi se o sistema travar e deixar de alimentar o watchdog.\nRuntimeWatchdogSec=15\nRebootWatchdogSec=2min\n';
 

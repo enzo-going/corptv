@@ -245,6 +245,19 @@ else
   ok "sem watchdog de hardware; pulando"
 fi
 
+# ── 7. Limite do journal ────────────────────────────────────────────────────
+passo "Limite do journal"
+conf=/etc/systemd/journald.conf.d/90-corptv-journal.conf
+esperado=$'[Journal]\n# Limita os logs no cartão para preservar espaço para os vídeos.\nSystemMaxUse=50M\nMaxRetentionSec=1month'
+if [ "$(cat "$conf" 2>/dev/null)" != "$esperado" ]; then
+  mkdir -p /etc/systemd/journald.conf.d
+  printf '%s\n' "$esperado" > "$conf"
+  systemctl restart systemd-journald
+  ok "criado $conf"
+else
+  ok "já estava"
+fi
+
 # ── Rede: aplicar o sufixo por último ────────────────────────────────────────
 # Reaplicar a conexão pode derrubar o SSH por um instante. Por isso fica no fim,
 # quando todo o resto já terminou.
