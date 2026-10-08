@@ -110,7 +110,12 @@ sobrescrever versões anteriores dos próprios arquivos.
    habilita e reinicia o serviço do agente. Confere o `/status` local.
 7. Instala autostart, atalho e políticas do Chromium. Com `raspi-config`, solicita
    tela sem apagamento e login automático no desktop.
-8. Se acrescentou sufixos de rede, tenta reaplicá-los às interfaces conectadas
+8. Se `/dev/watchdog` existir, configura o watchdog de hardware pelo systemd:
+   prazo de 15 segundos durante o funcionamento e 2 minutos durante o reinício.
+   O hardware pode reiniciar a Pi se o sistema travar e parar de alimentar o
+   watchdog. Só executa `systemctl daemon-reexec` se a configuração mudar;
+   sem o dispositivo, informa que pulou o passo.
+9. Se acrescentou sufixos de rede, tenta reaplicá-los às interfaces conectadas
    por último. A conexão de manutenção pode cair por um instante.
 
 ### Arquivos e serviços instalados ou alterados diretamente
@@ -132,6 +137,7 @@ Aqui, `~` é a pasta do usuário da **sessão gráfica escolhida pelo preparo**.
 | `/etc/chromium/policies/managed/corptv.json` | Cria diretórios e substitui a política: tradução desativada, todos os destinos bloqueados, com exceção de `127.0.0.1:8080` e `localhost:8080`. Vale também para Chromium aberto à mão. |
 | `/etc/chromium.d/corptv` | Se `/etc/chromium.d` existir, acrescenta `--password-store=basic` às opções do Chromium. |
 | Configurações mantidas por `raspi-config` | Executa `do_blanking 1` e `do_boot_behaviour B4`. Os arquivos internos alterados dependem da versão do Raspberry Pi OS e do desktop instalado; o preparo não fixa esses caminhos. Se faltar a ferramenta ou uma chamada falhar, imprime um aviso. |
+| `/etc/systemd/system.conf.d/90-corptv-watchdog.conf` | Se `/dev/watchdog` existir, cria o diretório e grava `[Manager]`, um comentário explicativo, `RuntimeWatchdogSec=15` e `RebootWatchdogSec=2min`. Compara o conteúdo antes de gravar; somente uma mudança executa `systemctl daemon-reexec` para aplicar. |
 | Diretório temporário criado por `mktemp -d` | Guarda os downloads e a montagem de `agente.env`; é removido ao encerrar o preparo. |
 
 O único serviço CorporTV instalado é **`corptv-agente.service`**. Ele usa
@@ -389,6 +395,20 @@ sudo systemctl disable --now corptv-agente
 Isso impede novas aberturas no login e para o agente. O cache permanece guardado.
 Não há uma unidade `corptv-quiosque.service` para desabilitar, nem um usuário fixo
 do agente para excluir.
+
+### Retirar a configuração do watchdog
+
+Para desfazer este passo, retire somente o arquivo do CorporTV e faça o systemd
+reler sua configuração:
+
+```bash
+sudo rm -f /etc/systemd/system.conf.d/90-corptv-watchdog.conf
+sudo systemctl daemon-reexec
+```
+
+Se esse arquivo já existia antes do preparo, restaure o backup em vez de apagá-lo
+e execute o mesmo `daemon-reexec`. Outras configurações de watchdog do sistema
+continuam valendo.
 
 ### Voltar as configurações do navegador e da sessão
 
