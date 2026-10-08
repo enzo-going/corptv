@@ -258,7 +258,7 @@ test('aparelho se registra sozinho e a tela se escolhe no painel', async () => {
   // Tela em uso por um aparelho não sai; a mensagem diz o que fazer.
   const recusada = await json('/api/screens/' + outra.body.id, { method: 'DELETE', body: {} });
   assert.equal(recusada.response.status, 409);
-  assert.match(recusada.body.error, /está passando na TV raspberry-recepcao/);
+  assert.match(recusada.body.error, /está passando em “raspberry-recepcao”/);
   assert.equal((await registrar({ id, nome: 'raspberry-recepcao' })).body.screen_id, outra.body.id);
 
   // A Pi conta como está; só campos conhecidos passam, e o apelido é de quem publica.

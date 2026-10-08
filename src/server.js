@@ -762,8 +762,8 @@ app.delete('/api/screens/:id', async (req, res) => {
   // programação. Tela em uso por um aparelho só sai depois que ele for movido.
   const emUso = await db.devices.find({ screen_id: req.params.id });
   if (emUso.length) {
-    const nomes = emUso.map(d => d.apelido || d.name).join(', ');
-    return res.status(409).json({ error: `Esta tela está passando na TV ${nomes}. Em Telas, escolha outra tela para essa TV antes de excluir esta.` });
+    const nomes = emUso.map(d => '“' + (d.apelido || d.name) + '”').join(', ');
+    return res.status(409).json({ error: `Esta tela está passando em ${nomes}. Em Telas, escolha outra tela para essa TV antes de excluir esta.` });
   }
   const removed = await db.screens.remove({ id: req.params.id }, {});
   if (!removed) return res.status(404).json({ error: 'Tela não encontrada' });

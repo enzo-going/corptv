@@ -1500,7 +1500,7 @@ async function renderScreens(){
       <div class="card-row">
         <div class="flex-gap">
           <span class="online-dot ${online?'on':'off'}"></span>
-          <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(situacao)} · ${esc(g?g.name:'Sem ambiente')}${pis.length?' · passando na TV '+esc(pis.join(', ')):''}</div></div>
+          <div><div class="card-title">${esc(s.name)}</div><div class="card-sub">${esc(situacao)} · ${esc(g?g.name:'Sem ambiente')}${pis.length?' · passando em “'+esc(pis.join('”, “'))+'”':''}</div></div>
         </div>
         <div class="flex-gap screen-actions">
           <a href="${esc(playerUrl)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" title="Ver o que esta TV está exibindo">Abrir</a>
