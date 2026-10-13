@@ -61,7 +61,7 @@ test('o TI vê quanto o CorporTV mandou, para quem, e exporta a planilha; o edit
   const csv = await fetch(base + '/api/trafego/exportar', { headers: { cookie: contas.admin } });
   assert.equal(csv.status, 200);
   assert.match(csv.headers.get('content-type'), /text\/csv/);
-  assert.match(csv.headers.get('content-disposition'), /attachment; filename="trafego-corportv-/);
+  assert.match(csv.headers.get('content-disposition'), /attachment; filename="?trafego-corportv-/);
   const bytes = Buffer.from(await csv.arrayBuffer());
   // Marca UTF-8 no início: o Excel abre com os acentos certos.
   assert.deepEqual([...bytes.subarray(0, 3)], [0xef, 0xbb, 0xbf]);
