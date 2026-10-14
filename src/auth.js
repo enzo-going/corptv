@@ -16,7 +16,7 @@ const {
   tokenHash,
   validatePassword,
   validateUsername,
-  verifyPassword,
+  verifyPassword,
   chaveDeLimite
 } = require('./security');
 
