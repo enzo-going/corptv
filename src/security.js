@@ -151,6 +151,14 @@ function publicUser(user) {
   };
 }
 
+// Texto que vai para planilha (CSV aberto no Excel): começando com = + - @ ou
+// tabulação, o Excel o executaria como fórmula. Um apóstrofo na frente o mantém
+// como texto — o apelido que um editor deu a um aparelho não pode virar fórmula.
+function textoDePlanilha(value) {
+  const text = value === undefined || value === null ? '' : String(value);
+  return /^[=+\-@\t\r]/.test(text) ? "'" + text : text;
+}
+
 module.exports = {
   enderecoDoCliente,
   chaveDeLimite,
@@ -164,6 +172,7 @@ module.exports = {
   publicUser,
   randomToken,
   safeEqualText,
+  textoDePlanilha,
   tokenHash,
   validatePassword,
   validateUsername,
