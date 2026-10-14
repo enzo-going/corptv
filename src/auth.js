@@ -17,7 +17,8 @@ const {
   validatePassword,
   validateUsername,
   verifyPassword,
-  chaveDeLimite
+  chaveDeLimite,
+  textoDePlanilha
 } = require('./security');
 
 const COOKIE_NAME = 'corptv_session';
@@ -118,7 +119,8 @@ function clearLoginFailures(ip, username) {
 }
 
 function csvCell(value) {
-  const text = value === undefined || value === null ? '' : String(value);
+  // Número fica número; texto passa pela proteção contra fórmula.
+  const text = typeof value === 'number' ? String(value) : textoDePlanilha(value);
   return '"' + text.replace(/"/g, '""') + '"';
 }
 

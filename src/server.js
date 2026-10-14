@@ -5,7 +5,7 @@ const { Transform } = require('stream');
 const { v4: uuidv4 } = require('uuid');
 const multer = require('multer');
 const { rateLimit } = require('express-rate-limit');
-const { chaveDeLimite, enderecoDoCliente } = require('./security');
+const { chaveDeLimite, enderecoDoCliente, textoDePlanilha } = require('./security');
 const { criarMonitor } = require('./trafego');
 const { criarConferencia } = require('./conferencia');
 const db = require('./db');
@@ -974,7 +974,7 @@ app.get('/api/trafego/exportar', auth.requireRole('admin'), async (req, res) => 
   const linhas = ['data_hora;enviado_mb;recebido_mb;media_mbps;pico_1s_mbps;pedidos;maior_cliente;maior_cliente_mb'];
   for (const m of minutos) {
     const maior = (m.clientes || [])[0];
-    const nomeMaior = maior ? (nomes.get(maior[0]) || maior[0]).replace(/[;\r\n]/g, ' ') : '';
+    const nomeMaior = maior ? textoDePlanilha((nomes.get(maior[0]) || maior[0]).replace(/[;\r\n]/g, ' ')) : '';
     linhas.push([
       quando(m.t), num(m.saida / 1048576, 2), num(m.entrada / 1048576, 2),
       num(((m.saida + m.entrada) * 8) / 60 / 1e6, 3), num((m.pico_bps || 0) / 1e6, 3), m.pedidos || 0,

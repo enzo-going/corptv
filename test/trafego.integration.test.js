@@ -75,3 +75,16 @@ test('o TI vê quanto o CorporTV mandou, para quem, e exporta a planilha; o edit
   const longo = new Date(Date.now() - 40 * 86400000).toISOString();
   assert.equal((await fetch(base + '/api/trafego?de=' + longo, { headers: { cookie: contas.admin } })).status, 400);
 });
+
+test('apelido de aparelho que começa com = sai como texto na planilha, não como fórmula', async () => {
+  // Quem dá o apelido é o editor; quem abre a planilha no Excel é o TI.
+  await db.devices.insert({
+    id: '0f8fad5b-d9cb-469f-a165-70867728950e', name: 'pi-recepcao', apelido: '=1+1',
+    ip: '192.0.2.77', screen_id: null, created_at: new Date().toISOString(), last_seen: new Date().toISOString()
+  });
+  const csv = await fetch(base + '/api/trafego/exportar', { headers: { cookie: contas.admin } });
+  assert.equal(csv.status, 200);
+  const texto = Buffer.from(await csv.arrayBuffer()).subarray(3).toString('utf8');
+  assert.match(texto, /;'=1\+1 — pi-recepcao \(Raspberry\);/);
+  assert.doesNotMatch(texto, /;=1\+1/);
+});

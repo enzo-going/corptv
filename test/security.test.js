@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { isLoopback, isLoopbackAddress, isPrivateAddress, validatePassword } = require('../src/security');
+const { isLoopback, isLoopbackAddress, isPrivateAddress, textoDePlanilha, validatePassword } = require('../src/security');
 
 test('endereço resolvido como local não dispensa ativação se o socket é remoto', () => {
   // Endereço de documentação: nenhum cliente real está envolvido.
@@ -49,4 +49,15 @@ test('atrás do nginx cada TV conta no próprio limite, e o cabeçalho não é f
   assert.equal(chaveDeLimite(direto), '192.0.2.50');
   // Cabeçalho que não é endereço: cai no endereço da conexão.
   assert.equal(chaveDeLimite(viaNginx('qualquer coisa')), '127.0.0.1');
+});
+
+test('texto de planilha que o Excel leria como fórmula ganha um apóstrofo na frente', () => {
+  for (const perigoso of ['=1+1', '+5', '-2', '@SOMA(A1)', '\tcampo', '\rcampo']) {
+    assert.equal(textoDePlanilha(perigoso), "'" + perigoso, JSON.stringify(perigoso));
+  }
+  for (const comum of ['Recepção', 'pi-recepcao', '192.0.2.77', 'a=b', '']) {
+    assert.equal(textoDePlanilha(comum), comum);
+  }
+  assert.equal(textoDePlanilha(null), '');
+  assert.equal(textoDePlanilha(undefined), '');
 });
