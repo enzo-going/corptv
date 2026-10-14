@@ -6,7 +6,7 @@
 [![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com/)
 [![License: MIT](https://img.shields.io/github/license/enzo-going/corptv)](LICENSE)
 
-Digital signage leve para distribuir conteúdo em TVs corporativas. O painel centraliza conteúdo, playlists e agendamentos; cada TV Box abre uma URL permanente e recebe mudanças sem precisar ser reiniciada.
+Digital signage leve para distribuir conteúdo em TVs corporativas. O painel centraliza conteúdo, playlists e agendamentos; cada tela abre uma URL permanente e recebe mudanças sem precisar ser reiniciada, direto no navegador de uma TV Box ou num Raspberry Pi com o [agente local](#agente-local-nos-aparelhos), que exibe a mídia do disco e tira o vídeo da rede.
 
 ![Visão geral do painel do CorporTV, com telas online, programação no ar e conteúdo oculto por prazo vencido](docs/assets/painel.png)
 
@@ -30,6 +30,11 @@ Atualizar TVs espalhadas manualmente gera conteúdo desatualizado, horários inc
 - Atualização automática, heartbeat e visão consolidada da programação
 - Status de cada tela com "visto há X min" e recarga do player à distância pelo painel
 - Cache offline que respeita o prazo de cada conteúdo
+- Agente local para Raspberry Pi ou mini PC: mídia baixada uma vez, conferida por SHA-256 e exibida do disco
+- Aparelhos se registram sozinhos; a tela de cada um se escolhe no painel, sem terminal
+- Vídeo fora do padrão convertido automaticamente com ffmpeg antes de ir para as TVs
+- Volume de cada tela ajustado pelo painel, sem reiniciar o vídeo
+- Monitor do tráfego do próprio CorporTV, minuto a minuto, com exportação para planilha
 - HTTP Range, cache imutável e limite de banda por conexão para servir vídeos com eficiência
 - Validação de campos, MIME e assinatura real dos uploads
 - Remoção automática da mídia quando um conteúdo é excluído
@@ -45,6 +50,8 @@ flowchart LR
     B --> C[(NeDB)]
     B --> D[Uploads locais]
     B -->|playlist ativa| E[Player da TV]
+    B -.->|mídia, uma vez| G[Agente no aparelho]
+    G -.->|127.0.0.1, do disco| E
     E -->|heartbeat| B
     E --> F[Cache offline com validade]
 ```
@@ -241,7 +248,7 @@ vulnerabilidades.
 
 O navegador não baixa o vídeo na velocidade em que o assiste: ele puxa o arquivo o mais rápido que a rede permitir, e repete isso a cada volta da playlist. Com poucas telas tocando direto do servidor, o tráfego fica permanentemente no teto e qualquer oscilação vira travamento na tela.
 
-A pasta [`agente`](agente/) resolve isso no aparelho atrás da TV (Raspberry Pi ou mini PC). O agente baixa a mídia **uma vez**, no ritmo configurado, com retomada e início espalhado entre os aparelhos, guarda no disco e serve em `127.0.0.1`. Durante a exibição o vídeo sai do disco e a rede não é usada — sobra apenas a consulta da programação, alguns KB por minuto. O player não muda: ele continua pedindo `/api/player/<tela>` e a mídia, só que ao agente.
+A pasta [`agente`](agente/) resolve isso no aparelho atrás da TV (Raspberry Pi ou mini PC). O agente baixa a mídia **uma vez**, no ritmo configurado, com retomada e início espalhado entre os aparelhos, guarda no disco e serve em `127.0.0.1`. Durante a exibição o vídeo sai do disco e a rede não é usada — sobra apenas a consulta da programação, alguns KB por minuto. Medido neste ambiente: quatro TVs tocando direto do servidor ocupavam 11,6 Mb/s o tempo todo (o teto do QoS é 12); com o agente, cerca de 106 KB por hora. O player não muda: ele continua pedindo `/api/player/<tela>` e a mídia, só que ao agente.
 
 Instalação, configuração e o checklist de campo do Raspberry Pi estão em [agente/README.md](agente/README.md) e [agente/CHECKLIST-INSTALACAO-PI.md](agente/CHECKLIST-INSTALACAO-PI.md).
 
