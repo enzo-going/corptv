@@ -335,28 +335,28 @@
         <summary>Adicionar conteúdo</summary>
         <div class="card-title desktop-form-title" style="margin-bottom:14px">Novo conteúdo</div>
         <div class="form-grid">
-          <div><label>Tipo</label>
+          <div><label for="sl-type">Tipo</label>
             <select id="sl-type" onchange="slTypeChange()">
               <option value="txt">Texto</option>
               <option value="img">Imagem</option>
               <option value="vid">Vídeo</option>
             </select>
           </div>
-          <div id="sl-duration-wrap"><label>Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300">
+          <div id="sl-duration-wrap"><label for="sl-dur">Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300">
             <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;margin-top:6px;text-transform:none;letter-spacing:0;font-size:12px;cursor:pointer"><input type="checkbox" id="sl-sem-tempo" onchange="semTempoChange()" style="width:auto;margin:0"> Sem tempo — fica na tela até ser tirado</label>
           </div>
-          <div class="form-full"><label>Título</label><input type="text" id="sl-title" placeholder="Ex: Bom dia, equipe!"></div>
-          <div class="form-full" id="sl-body-wrap"><label>Texto</label><input type="text" id="sl-body" placeholder="Ex: Reunião às 14h"></div>
+          <div class="form-full"><label for="sl-title">Título</label><input type="text" id="sl-title" placeholder="Ex: Bom dia, equipe!"></div>
+          <div class="form-full" id="sl-body-wrap"><label for="sl-body">Texto</label><input type="text" id="sl-body" placeholder="Ex: Reunião às 14h"></div>
           <div class="form-full" id="sl-video-text-wrap" style="display:none">
             <div class="form-grid" style="margin-bottom:0">
-              <div><label>Texto sobre o vídeo</label>
+              <div><label for="sl-video-text-mode">Texto sobre o vídeo</label>
                 <select id="sl-video-text-mode" onchange="videoTextModeChange('sl')">
                   <option value="fixed">Fixo durante todo o vídeo</option>
                   <option value="timed">Temporário com fade</option>
                   <option value="none">Não exibir texto</option>
                 </select>
               </div>
-              <div id="sl-video-text-seconds-wrap" style="display:none"><label>Tempo visível antes do fade (segundos)</label><input type="number" id="sl-video-text-seconds" value="5" min="1" max="300"></div>
+              <div id="sl-video-text-seconds-wrap" style="display:none"><label for="sl-video-text-seconds">Tempo visível antes do fade (segundos)</label><input type="number" id="sl-video-text-seconds" value="5" min="1" max="300"></div>
             </div>
             <div style="font-size:11px;color:var(--muted);margin-top:8px">O título acima identifica o conteúdo na biblioteca e, quando habilitado, aparece no centro do vídeo.</div>
           </div>
@@ -370,7 +370,7 @@
             <div id="sl-preview" class="preview-img" style="display:none"></div>
             <button class="btn btn-danger btn-sm" id="sl-cancel" style="display:none;margin-top:8px" onclick="cancelFile()">✕ Cancelar arquivo</button>
           </div>
-          <div><label>Cor de fundo</label>
+          <div><label for="sl-bg">Cor de fundo</label>
             <select id="sl-bg">
               <option value="#0a0a1a">Azul escuro</option>
               <option value="#0a1a12">Verde escuro</option>
@@ -401,8 +401,8 @@
       <details class="card editor-only mobile-fold" open>
         <summary>Criar ambiente</summary>
         <div class="form-grid">
-          <div><label>Nome do ambiente</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
-          <div><label>Cor</label><input type="color" id="gr-color" value="#6c63ff"></div>
+          <div><label for="gr-name">Nome do ambiente</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
+          <div><label for="gr-color">Cor</label><input type="color" id="gr-color" value="#6c63ff"></div>
         </div>
         <button class="btn btn-primary" onclick="addGroup()">Criar ambiente</button>
       </details>
@@ -415,8 +415,8 @@
       <details class="card editor-only mobile-fold" open>
         <summary>Adicionar tela</summary>
         <div class="form-grid">
-          <div><label>Nome da tela</label><input type="text" id="sc-name" placeholder="Ex: Recepção Principal" oninput="previewSlug(this.value)"></div>
-          <div><label>Ambiente onde ela fica</label><select id="sc-group"></select></div>
+          <div><label for="sc-name">Nome da tela</label><input type="text" id="sc-name" placeholder="Ex: Recepção Principal" oninput="previewSlug(this.value)"></div>
+          <div><label for="sc-group">Ambiente onde ela fica</label><select id="sc-group"></select></div>
         </div>
         <div id="slug-preview" style="display:none" class="slug-box">
           <span style="color:var(--muted)">URL:</span>
@@ -501,7 +501,7 @@
       <div class="card"><div class="card-title" id="profile-name">—</div><div class="card-sub" id="profile-meta">—</div></div>
       <div class="card">
         <div class="card-title">Alterar minha senha</div><div class="card-sub" style="margin-bottom:14px">Ao salvar, as outras sessões desta conta serão encerradas.</div>
-        <div class="form-grid"><div><label>Senha atual</label><input type="password" id="pw-current" autocomplete="current-password"></div><div><label>Nova senha</label><input type="password" id="pw-new" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
+        <div class="form-grid"><div><label for="pw-current">Senha atual</label><input type="password" id="pw-current" autocomplete="current-password"></div><div><label for="pw-new">Nova senha</label><input type="password" id="pw-new" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
         <button class="btn btn-primary" onclick="changeOwnPassword()">Alterar senha</button>
       </div>
     </div>
@@ -512,7 +512,7 @@
       <div class="security-grid"><div class="security-stat"><b id="user-total">—</b><span>Contas</span></div><div class="security-stat"><b id="user-active">—</b><span>Ativas</span></div><div class="security-stat"><b id="user-sessions">—</b><span>Sessões abertas</span></div></div>
       <div class="card">
         <div class="card-title" style="margin-bottom:14px">Nova conta</div>
-        <div class="form-grid"><div><label>Nome completo</label><input type="text" id="us-name" maxlength="80"></div><div><label>Usuário</label><input type="text" id="us-username" maxlength="40" autocapitalize="none"></div><div><label>Perfil</label><select id="us-role"><option value="viewer">Somente leitura</option><option value="editor">Colaborador editor</option><option value="admin">TI administrador</option></select></div><div><label>Senha inicial</label><input type="password" id="us-password" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
+        <div class="form-grid"><div><label for="us-name">Nome completo</label><input type="text" id="us-name" maxlength="80"></div><div><label for="us-username">Usuário</label><input type="text" id="us-username" maxlength="40" autocapitalize="none"></div><div><label for="us-role">Perfil</label><select id="us-role"><option value="viewer">Somente leitura</option><option value="editor">Colaborador editor</option><option value="admin">TI administrador</option></select></div><div><label for="us-password">Senha inicial</label><input type="password" id="us-password" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
         <button class="btn btn-primary" onclick="addUser()">Criar conta</button>
       </div>
       <div id="user-list"></div>
@@ -522,7 +522,7 @@
     <div class="page" id="page-audit">
       <div class="page-header"><div><div class="page-title">Auditoria</div><div class="page-sub">Histórico de acessos, alterações e tentativas negadas</div></div><div id="audit-integrity" class="integrity"></div></div>
       <div class="card">
-        <div class="audit-tools"><div><label>Ação ou evento</label><input type="text" id="au-action" placeholder="Ex: login, content, user"></div><div><label>Usuário</label><input type="text" id="au-actor"></div><div><label>Resultado</label><select id="au-outcome"><option value="">Todos</option><option value="success">Sucesso</option><option value="failure">Falha</option><option value="denied">Negado</option></select></div><div><label>Desde</label><input type="date" id="au-from"></div><button class="btn btn-primary" onclick="loadAudit(true)">Filtrar</button></div>
+        <div class="audit-tools"><div><label for="au-action">Ação ou evento</label><input type="text" id="au-action" placeholder="Ex: login, content, user"></div><div><label for="au-actor">Usuário</label><input type="text" id="au-actor"></div><div><label for="au-outcome">Resultado</label><select id="au-outcome"><option value="">Todos</option><option value="success">Sucesso</option><option value="failure">Falha</option><option value="denied">Negado</option></select></div><div><label for="au-from">Desde</label><input type="date" id="au-from"></div><button class="btn btn-primary" onclick="loadAudit(true)">Filtrar</button></div>
         <div class="flex-gap" style="justify-content:space-between;margin-top:12px"><span class="card-sub" id="audit-count">—</span><button class="btn btn-ghost btn-sm" onclick="exportAudit()">Exportar CSV</button></div>
         <div id="audit-list" class="audit-list"></div>
         <div class="flex-gap" style="justify-content:flex-end;margin-top:12px"><button id="audit-prev" class="btn btn-ghost btn-sm" onclick="auditPage(-1)">Anterior</button><button id="audit-next" class="btn btn-ghost btn-sm" onclick="auditPage(1)">Próxima</button></div>
@@ -537,12 +537,12 @@
     <div class="card-sub" id="ed-slide-name" style="margin-bottom:16px"></div>
     <div class="form-grid">
       <div class="form-full" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Período (dias corridos)</div>
-      <div><label>Começa em</label><input type="date" id="ed-starts"></div>
-      <div><label>Termina em</label><input type="date" id="ed-expires"></div>
+      <div><label for="ed-starts">Começa em</label><input type="date" id="ed-starts"></div>
+      <div><label for="ed-expires">Termina em</label><input type="date" id="ed-expires"></div>
       <div class="form-full" style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:6px">Dentro do período, repete assim</div>
-      <div class="form-full"><label>Dias da semana</label><div id="ed-days" class="days-row"></div></div>
-      <div><label>Das</label><input type="time" id="ed-tstart"></div>
-      <div><label>Até</label><input type="time" id="ed-tend"></div>
+      <div class="form-full"><label id="ed-days-label">Dias da semana</label><div id="ed-days" class="days-row" role="group" aria-labelledby="ed-days-label"></div></div>
+      <div><label for="ed-tstart">Das</label><input type="time" id="ed-tstart"></div>
+      <div><label for="ed-tend">Até</label><input type="time" id="ed-tend"></div>
     </div>
     <div id="ed-hint" class="sched-hint"></div>
     <div style="font-size:11px;color:var(--muted);margin:8px 0 18px">Tudo em branco = aparece sempre. Sem dias marcados = todos os dias. Sem horário = o dia inteiro.</div>
@@ -558,14 +558,14 @@
     <div class="card-title" style="margin-bottom:2px">Texto sobre o vídeo</div>
     <div class="card-sub" id="video-text-name" style="margin-bottom:16px"></div>
     <div class="form-grid">
-      <div class="form-full"><label>Como o texto deve aparecer</label>
+      <div class="form-full"><label for="video-text-mode">Como o texto deve aparecer</label>
         <select id="video-text-mode" onchange="videoTextModeChange('edit')">
           <option value="fixed">Fixo durante todo o vídeo</option>
           <option value="timed">Temporário com fade</option>
           <option value="none">Não exibir texto</option>
         </select>
       </div>
-      <div class="form-full" id="video-text-seconds-wrap" style="display:none"><label>Tempo visível antes do fade (segundos)</label><input type="number" id="video-text-seconds" value="5" min="1" max="300"></div>
+      <div class="form-full" id="video-text-seconds-wrap" style="display:none"><label for="video-text-seconds">Tempo visível antes do fade (segundos)</label><input type="number" id="video-text-seconds" value="5" min="1" max="300"></div>
     </div>
     <div id="video-text-hint" class="sched-hint" style="margin-bottom:18px"></div>
     <div class="flex-gap" style="justify-content:flex-end">
@@ -1426,7 +1426,7 @@ async function renderGroups(){
 
     const disponiveis=slides.filter(s=>!pl.find(p=>p.id===s.id));
     const seletor=disponiveis.length
-      ? `<select class="editor-only" onchange="addToGroup('${g.id}',this)" style="max-width:340px">
+      ? `<select class="editor-only" onchange="addToGroup('${g.id}',this)" style="max-width:340px" aria-label="Adicionar conteúdo ao ambiente ${esc(g.name)}">
            <option value="">+ Adicionar conteúdo…</option>
            ${disponiveis.map(s=>`<option value="${s.id}">${esc(nomeDe(s))}</option>`).join('')}
          </select>`
@@ -1744,7 +1744,7 @@ async function loadUsers(){
   const list=document.getElementById('user-list');
   list.innerHTML=users.map(user=>`<div class="user-row${user.active?'':' user-off'}">
     <div><div class="card-title">${esc(user.name)} ${user.id===currentUser.id?'<span class="badge badge-online">você</span>':''}</div><div class="card-sub">@${esc(user.username)} · último login: ${esc(formatDateTime(user.last_login_at))}</div></div>
-    <select class="role-select" onchange="updateUser('${user.id}',{role:this.value})" ${user.id===currentUser.id?'disabled':''}><option value="viewer" ${user.role==='viewer'?'selected':''}>Somente leitura</option><option value="editor" ${user.role==='editor'?'selected':''}>Editor</option><option value="admin" ${user.role==='admin'?'selected':''}>TI admin</option></select>
+    <select class="role-select" aria-label="Perfil de ${esc(user.name)}" onchange="updateUser('${user.id}',{role:this.value})" ${user.id===currentUser.id?'disabled':''}><option value="viewer" ${user.role==='viewer'?'selected':''}>Somente leitura</option><option value="editor" ${user.role==='editor'?'selected':''}>Editor</option><option value="admin" ${user.role==='admin'?'selected':''}>TI admin</option></select>
     <span class="badge ${user.active_sessions?'badge-online':'badge-offline'}">${user.active_sessions||0} sessão(ões)</span>
     <div class="user-actions">${user.id===currentUser.id?'<span class="card-sub">Gerencie a senha em Minha conta</span>':`<button class="btn btn-ghost btn-sm" onclick="resetUserPassword('${user.id}','${esc(user.username)}')">Redefinir senha</button><button class="btn btn-ghost btn-sm" onclick="revokeUserSessions('${user.id}')" ${user.active_sessions?'':'disabled'}>Encerrar sessões</button><button class="btn ${user.active?'btn-danger':'btn-ghost'} btn-sm" onclick="updateUser('${user.id}',{active:${!user.active}})">${user.active?'Desativar':'Reativar'}</button><button class="btn btn-danger btn-sm" data-id="${esc(user.id)}" data-name="${esc(user.name)}" onclick="deleteUser(this.dataset.id,this.dataset.name)">Excluir</button>`}</div>
   </div>`).join('');
