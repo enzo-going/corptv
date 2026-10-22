@@ -135,6 +135,8 @@
   .modo-opcao{display:flex;align-items:center;gap:8px;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text);font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer}
   .modo-opcao input{width:auto;margin:0;accent-color:var(--accent)}
   .modo-opcao:has(input:checked){border-color:var(--accent);background:rgba(108,99,255,.15)}
+  .btn:disabled{opacity:.55;cursor:not-allowed}
+  .btn[aria-busy="true"]{cursor:progress}
   body:not(.admin) .admin-only{display:none!important}
   .screen-actions{flex-shrink:0}
   .screen-actions a.btn{text-decoration:none}
@@ -410,7 +412,7 @@
           <div><label for="gr-name">Nome do ambiente</label><input type="text" id="gr-name" placeholder="Ex: Recepção"></div>
           <div><label for="gr-color">Cor</label><input type="color" id="gr-color" value="#6c63ff"></div>
         </div>
-        <button class="btn btn-primary" onclick="addGroup()">Criar ambiente</button>
+        <button class="btn btn-primary" onclick="emAndamento(this,addGroup)">Criar ambiente</button>
       </details>
       <div id="group-list"></div>
     </div>
@@ -428,7 +430,7 @@
           <span style="color:var(--muted)">URL:</span>
           <span id="slug-preview-text"></span>
         </div>
-        <button class="btn btn-primary" style="margin-top:12px" onclick="addScreen()">Adicionar tela</button>
+        <button class="btn btn-primary" style="margin-top:12px" onclick="emAndamento(this,addScreen)">Adicionar tela</button>
       </details>
       <div id="tv-devices" hidden>
         <div class="page-title" style="font-size:15px;margin:8px 0 4px">TVs com Raspberry</div>
@@ -508,7 +510,7 @@
       <div class="card">
         <div class="card-title">Alterar minha senha</div><div class="card-sub" style="margin-bottom:14px">Ao salvar, as outras sessões desta conta serão encerradas.</div>
         <div class="form-grid"><div><label for="pw-current">Senha atual</label><input type="password" id="pw-current" autocomplete="current-password"></div><div><label for="pw-new">Nova senha</label><input type="password" id="pw-new" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
-        <button class="btn btn-primary" onclick="changeOwnPassword()">Alterar senha</button>
+        <button class="btn btn-primary" onclick="emAndamento(this,changeOwnPassword)">Alterar senha</button>
       </div>
     </div>
 
@@ -519,7 +521,7 @@
       <div class="card">
         <div class="card-title" style="margin-bottom:14px">Nova conta</div>
         <div class="form-grid"><div><label for="us-name">Nome completo</label><input type="text" id="us-name" maxlength="80"></div><div><label for="us-username">Usuário</label><input type="text" id="us-username" maxlength="40" autocapitalize="none"></div><div><label for="us-role">Perfil</label><select id="us-role"><option value="viewer">Somente leitura</option><option value="editor">Colaborador editor</option><option value="admin">TI administrador</option></select></div><div><label for="us-password">Senha inicial</label><input type="password" id="us-password" minlength="5" maxlength="128" autocomplete="new-password"></div></div>
-        <button class="btn btn-primary" onclick="addUser()">Criar conta</button>
+        <button class="btn btn-primary" onclick="emAndamento(this,addUser)">Criar conta</button>
       </div>
       <div id="user-list"></div>
     </div>
@@ -554,8 +556,8 @@
     <div style="font-size:11px;color:var(--muted);margin:8px 0 18px">Tudo em branco = aparece sempre. Sem dias marcados = todos os dias. Sem horário = o dia inteiro.</div>
     <div class="flex-gap" style="justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeSched()">Cancelar</button>
-      <button class="btn btn-danger" onclick="clearSched()">Deixar sempre no ar</button>
-      <button class="btn btn-primary" onclick="saveSched()">Salvar</button>
+      <button class="btn btn-danger" onclick="emAndamento(this,clearSched)">Deixar sempre no ar</button>
+      <button class="btn btn-primary" id="sched-save" onclick="emAndamento(this,saveSched)">Salvar</button>
     </div>
   </div>
 </div>
@@ -576,7 +578,7 @@
     <div id="video-text-hint" class="sched-hint" style="margin-bottom:18px"></div>
     <div class="flex-gap" style="justify-content:flex-end">
       <button class="btn btn-ghost" onclick="closeVideoText()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveVideoText()">Salvar</button>
+      <button class="btn btn-primary" onclick="emAndamento(this,saveVideoText)">Salvar</button>
     </div>
   </div>
 </div>
@@ -594,6 +596,14 @@ const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade8
 
 let toastTimer=null;
 function toast(msg,ms=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms)}
+// Botão que salva fica travado até a resposta. Sem isso, cliques repetidos criavam cópias
+// (06/10: o mesmo ambiente foi criado três vezes no mesmo segundo).
+async function emAndamento(botao,acao){
+  if(!botao||botao.disabled)return;
+  botao.disabled=true;botao.setAttribute('aria-busy','true');
+  try{return await acao();}
+  finally{botao.disabled=false;botao.removeAttribute('aria-busy');}
+}
 function esc(value){return String(value===undefined||value===null?'':value).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]))}
 const mobileLayout=window.matchMedia('(max-width:767px), (max-width:1023px) and (hover:none) and (pointer:coarse)');
 function setMenu(open,restoreFocus=false){
@@ -1356,7 +1366,7 @@ function updateSchedHint(){
   const el=document.getElementById('ed-hint');
   const b=schedForm();
   const problema=schedProblema(b);
-  const btn=document.querySelector('[onclick="saveSched()"]');
+  const btn=document.getElementById('sched-save');
   if(problema){
     el.className='sched-hint bad';
     el.innerHTML='⚠ '+problema;
@@ -1407,7 +1417,7 @@ function clearSched(){
   document.getElementById('ed-tstart').value='';
   document.getElementById('ed-tend').value='';
   setDays('ed-days',[]);
-  saveSched();
+  return saveSched();
 }
 
 // AMBIENTES — é aqui que se define o que toca em cada lugar, e quando
@@ -1424,9 +1434,12 @@ async function addGroup(){
 async function addToGroup(gid,select){
   const sid=select.value;
   if(!sid)return;
-  const r=await api('POST','/api/groups/'+gid+'/slides',{slide_id:sid});
-  if(r&&r.error){toast(r.error);return;}
-  await load();toast('Adicionado — clique em Agendar para definir quando aparece');
+  select.disabled=true;
+  try{
+    const r=await api('POST','/api/groups/'+gid+'/slides',{slide_id:sid});
+    if(r&&r.error){toast(r.error);return;}
+    await load();toast('Adicionado — clique em Agendar para definir quando aparece');
+  }finally{select.disabled=false;}
 }
 async function removeFromGroup(gid,sid){
   const r=await api('DELETE','/api/groups/'+gid+'/slides/'+sid);
