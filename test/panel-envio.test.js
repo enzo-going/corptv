@@ -134,3 +134,64 @@ test('os botões de cadastro e de salvar usam a trava', () => {
   assert.match(adicionar, /select\.disabled=true;/);
   assert.match(adicionar, /finally\{select\.disabled=false;\}/);
 });
+
+function carregarToast() {
+  const timers = [];
+  const elemento = () => ({ textContent: '', type: '', className: '', onclick: null });
+  const classes = new Set();
+  const toastEl = {
+    filhos: [],
+    replaceChildren(...filhos) { this.filhos = filhos; },
+    classList: {
+      add: c => classes.add(c), remove: c => classes.delete(c), contains: c => classes.has(c),
+      toggle: (c, ligar) => { if (ligar) classes.add(c); else classes.delete(c); }
+    }
+  };
+  const contexto = vm.createContext({
+    document: { getElementById: () => toastEl, createElement: elemento },
+    setTimeout: fn => { timers.push(fn); return timers.length; }, clearTimeout: () => {}
+  });
+  vm.runInContext(trecho('let toastTimer=null;', '// Botão que salva fica travado'), contexto);
+  return { contexto, toastEl, classes, timers };
+}
+
+test('aviso que diz o que falta fica na tela até a pessoa fechar', () => {
+  const { contexto, toastEl, classes, timers } = carregarToast();
+  let foi = false;
+  contexto.toast('Falta colocar em um ambiente.', 0, { texto: 'Ir para Ambientes', fazer: () => { foi = true; } });
+  assert.ok(classes.has('show') && classes.has('fixo'));
+  assert.equal(timers.length, 0, 'não some sozinho');
+  const [texto, ir, fechar] = toastEl.filhos;
+  assert.equal(texto.textContent, 'Falta colocar em um ambiente.');
+  assert.equal(ir.textContent, 'Ir para Ambientes');
+  assert.equal(fechar.textContent, 'Fechar');
+  ir.onclick();
+  assert.equal(foi, true);
+  assert.equal(classes.has('show'), false, 'o botão de ação também fecha o aviso');
+
+  // Os avisos comuns continuam sumindo sozinhos.
+  contexto.toast('Renomeado');
+  assert.equal(classes.has('fixo'), false);
+  assert.equal(timers.length, 1);
+  assert.equal(toastEl.filhos.length, 1);
+});
+
+test('o aviso fica numa região anunciada ao leitor de tela', () => {
+  assert.match(html, /<div id="toast" role="status" aria-live="polite"><\/div>/);
+  assert.match(html, /#toast\.show\.fixo\{pointer-events:auto\}/, 'só o aviso visível recebe clique');
+});
+
+test('depois de enviar ou de pôr no ambiente, o aviso diz onde vai passar ou o que falta', () => {
+  const envio = trecho('async function addSlide(){', 'function renderSlides(){');
+  assert.match(envio, /ainda não está em nenhuma TV/);
+  assert.match(envio, /0,\{texto:'Ir para Ambientes',fazer:\(\)=>irPara\('grupos'\)\}/);
+
+  const contexto = vm.createContext({});
+  vm.runInContext(trecho('function avisoNoAmbiente(', 'async function addToGroup('), contexto);
+  const semTela = contexto.avisoNoAmbiente('Coworking', []);
+  assert.match(semTela, /nenhuma tela usa este ambiente/);
+  assert.match(semTela, /Falta /);
+  const comTela = contexto.avisoNoAmbiente('Comunicação', [{ name: 'TV 1' }, { name: 'TV 2' }]);
+  assert.match(comTela, /vai aparecer em "TV 1", "TV 2"/);
+  assert.doesNotMatch(comTela, /clique em Agendar/, 'agendar é opcional, não um passo obrigatório');
+});

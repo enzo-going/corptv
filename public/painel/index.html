@@ -125,6 +125,8 @@
   .online-dot.off{background:var(--border2)}
   #toast{position:fixed;bottom:24px;right:24px;background:var(--bg2);border:1px solid var(--border2);border-radius:10px;padding:12px 18px;font-size:13px;opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;z-index:999}
   #toast.show{opacity:1;transform:translateY(0)}
+  #toast.fixo{display:flex;align-items:center;flex-wrap:wrap;gap:10px;max-width:min(520px,calc(100vw - 48px));line-height:1.5}
+  #toast.show.fixo{pointer-events:auto}
   .sep{height:1px;background:var(--border);margin:20px 0}
   .mt8{margin-top:8px}
   .flex-gap{display:flex;gap:8px;align-items:center}
@@ -582,7 +584,7 @@
     </div>
   </div>
 </div>
-<div id="toast"></div>
+<div id="toast" role="status" aria-live="polite"></div>
 
 <script>
 const BASE='';
@@ -595,7 +597,30 @@ const AUDIT_LIMIT=50;
 const ACCENT={txt:'#6c63ff',img:'#1D9E75',vid:'#f59e0b',bv:'#378ADD',kpi:'#4ade80',msg:'#6c63ff',aviso:'#f87171'};
 
 let toastTimer=null;
-function toast(msg,ms=2500){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),ms)}
+// ms=0 deixa o aviso na tela até a pessoa fechar. É o caso dos avisos que dizem o que falta:
+// sumindo em 2,5 s, o "agora coloque em um ambiente" passava despercebido e o conteúdo
+// ficava na biblioteca sem chegar a nenhuma TV (caso de 20/10).
+function toast(msg,ms=2500,acao){
+  const t=document.getElementById('toast');
+  const texto=document.createElement('span');texto.textContent=msg;
+  const partes=[texto];
+  if(acao){
+    const ir=document.createElement('button');ir.type='button';ir.className='btn btn-primary btn-sm';ir.textContent=acao.texto;
+    ir.onclick=()=>{fecharToast();acao.fazer();};
+    partes.push(ir);
+  }
+  if(!ms){
+    const fechar=document.createElement('button');fechar.type='button';fechar.className='btn btn-ghost btn-sm';fechar.textContent='Fechar';
+    fechar.onclick=fecharToast;
+    partes.push(fechar);
+  }
+  t.replaceChildren(...partes);
+  t.classList.toggle('fixo',!ms);
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  if(ms)toastTimer=setTimeout(()=>t.classList.remove('show'),ms);
+}
+function fecharToast(){clearTimeout(toastTimer);document.getElementById('toast').classList.remove('show');}
 // Botão que salva fica travado até a resposta. Sem isso, cliques repetidos criavam cópias
 // (06/10: o mesmo ambiente foi criado três vezes no mesmo segundo).
 async function emAndamento(botao,acao){
@@ -634,6 +659,8 @@ function goTo(p,btn){
   if(p==='rede')abrirRede();else fecharRede();
   if(p==='audit')loadAudit(true);
 }
+// Navega como se o item do menu tivesse sido clicado (usado pelos botões dos avisos).
+function irPara(p){const b=document.querySelector(`#panel-nav [onclick="goTo('${p}',this)"]`);if(b)goTo(p,b);}
 async function api(method,url,body,isForm=false){
   const opts={method,headers:{}};
   const controller=new AbortController();
@@ -1127,8 +1154,9 @@ async function addSlide(){
     cancelarArquivo();
     await load();
     toast(data.otimizacao
-      ? 'Vídeo recebido. O CorporTV está deixando ele leve para as TVs; ele entra no ar sozinho quando terminar. Já pode colocar em um ambiente.'
-      : 'Adicionado à biblioteca. Agora coloque em um ambiente.', data.otimizacao?9000:2500);
+      ? 'Vídeo recebido: o CorporTV está deixando ele leve para as TVs. Ainda não está em nenhuma TV — falta colocar em um ambiente.'
+      : 'Adicionado à biblioteca, mas ainda não está em nenhuma TV. Falta colocar em um ambiente.',
+      0,{texto:'Ir para Ambientes',fazer:()=>irPara('grupos')});
   }catch(e){
     if(comArquivo)mostrarEnvio('erro','Erro ao enviar. Verifique a conexão e tente de novo.','');
     toast('Erro ao enviar. Verifique o servidor.',6000);
@@ -1429,7 +1457,13 @@ async function addGroup(){
   const r=await api('POST','/api/groups',{name,color:document.getElementById('gr-color').value});
   if(r.error){toast(r.error);return;}
   document.getElementById('gr-name').value='';
-  await load();toast('Ambiente criado');
+  await load();toast('Ambiente criado. Falta colocar conteúdo nele (logo abaixo) e ter uma tela usando este ambiente.',0);
+}
+// Diz em quais telas o conteúdo vai aparecer — ou o que falta para aparecer em alguma.
+// O aviso antigo mandava "clicar em Agendar", como se agendar fosse obrigatório.
+function avisoNoAmbiente(nome,telas){
+  if(!telas.length)return 'Adicionado a "'+nome+'", mas nenhuma tela usa este ambiente: por enquanto não aparece em TV nenhuma. Falta ter uma tela usando este ambiente.';
+  return 'Pronto: vai aparecer em '+telas.map(t=>'"'+t.name+'"').join(', ')+' em alguns minutos. Se quiser escolher dias ou horário, use Agendar.';
 }
 async function addToGroup(gid,select){
   const sid=select.value;
@@ -1438,7 +1472,10 @@ async function addToGroup(gid,select){
   try{
     const r=await api('POST','/api/groups/'+gid+'/slides',{slide_id:sid});
     if(r&&r.error){toast(r.error);return;}
-    await load();toast('Adicionado — clique em Agendar para definir quando aparece');
+    await load();
+    const g=groups.find(x=>x.id===gid);
+    const telas=screens.filter(s=>s.group_id===gid);
+    toast(avisoNoAmbiente(g?g.name:'este ambiente',telas),0,telas.length?null:{texto:'Ir para Telas',fazer:()=>irPara('telas')});
   }finally{select.disabled=false;}
 }
 async function removeFromGroup(gid,sid){
@@ -1531,7 +1568,7 @@ async function addScreen(){
   if(r.error){toast(r.error);return;}
   document.getElementById('sc-name').value='';
   document.getElementById('slug-preview').style.display='none';
-  await load();toast('Tela adicionada!');
+  await load();toast('Tela adicionada. Falta escolher qual TV mostra esta tela, em "TVs com Raspberry" nesta página — ou peça ao TI.',0);
 }
 async function renderScreens(){
   // Não redesenha enquanto alguém mexe no volume: o load() de 30 em 30 s trocaria

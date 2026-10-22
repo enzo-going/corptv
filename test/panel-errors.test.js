@@ -152,7 +152,10 @@ test('cadastros bem-sucedidos continuam limpando campos e recarregando as listas
   assert.equal(campos['sc-name'].value, '');
   assert.equal(campos['slug-preview'].style.display, 'none');
   assert.equal(recargas, 2);
-  assert.deepEqual(mensagens, ['Ambiente criado', 'Tela adicionada!']);
+  // O aviso de sucesso diz o que ainda falta para o conteúdo chegar a uma TV.
+  assert.equal(mensagens.length, 2);
+  assert.match(mensagens[0], /^Ambiente criado\. Falta /);
+  assert.match(mensagens[1], /^Tela adicionada\. Falta /);
 });
 
 test('recarga mantém a consulta de aparelhos para perfis de edição e leitura', async () => {
