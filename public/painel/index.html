@@ -116,7 +116,7 @@
   .url-box span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--accent2)}
   .url-box .url-value{flex:1;min-width:0;border:0;outline:0;padding:0;background:transparent;color:var(--accent2);font:inherit;text-overflow:ellipsis}
   .slug-box{display:flex;align-items:center;gap:6px;background:rgba(108,99,255,.08);border:1px solid rgba(108,99,255,.2);border-radius:8px;padding:6px 12px;font-size:12px;font-family:'DM Mono',monospace;color:var(--accent-text);margin-top:6px}
-  .dropzone{border:1.5px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s}
+  .dropzone{border:1.5px dashed var(--border2);border-radius:10px;padding:28px;text-align:center;cursor:pointer;transition:all .2s;text-transform:none;letter-spacing:0}
   .dropzone:hover,.dropzone.drag{border-color:var(--accent);background:rgba(108,99,255,.05)}
   .dropzone input{display:none}
   .cdot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0}
@@ -131,6 +131,10 @@
   .preview-img{margin-top:8px;border-radius:8px;overflow:hidden;max-height:120px;background:#000;display:flex;align-items:center;justify-content:center}
   .field-label{font-size:11px;color:var(--muted);margin:12px 0 6px;text-transform:uppercase;letter-spacing:.5px}
   .field-hint{font-size:11px;color:var(--muted);margin-top:4px}
+  .modo-envio{display:flex;flex-wrap:wrap;gap:8px}
+  .modo-opcao{display:flex;align-items:center;gap:8px;min-height:44px;margin:0;padding:0 14px;border:1px solid var(--border2);border-radius:8px;background:var(--bg3);color:var(--text);font-size:13px;text-transform:none;letter-spacing:0;cursor:pointer}
+  .modo-opcao input{width:auto;margin:0;accent-color:var(--accent)}
+  .modo-opcao:has(input:checked){border-color:var(--accent);background:rgba(108,99,255,.15)}
   body:not(.admin) .admin-only{display:none!important}
   .screen-actions{flex-shrink:0}
   .screen-actions a.btn{text-decoration:none}
@@ -337,18 +341,28 @@
         <summary>Adicionar conteúdo</summary>
         <div class="card-title desktop-form-title" style="margin-bottom:14px">Novo conteúdo</div>
         <div class="form-grid">
-          <div><label for="sl-type">Tipo</label>
-            <select id="sl-type" onchange="slTypeChange()">
-              <option value="txt">Texto</option>
-              <option value="img">Imagem</option>
-              <option value="vid">Vídeo</option>
-            </select>
+          <div class="form-full">
+            <div class="field-label" id="sl-modo-label" style="margin-top:0">O que vai enviar</div>
+            <div class="modo-envio" role="radiogroup" aria-labelledby="sl-modo-label">
+              <label class="modo-opcao"><input type="radio" name="sl-modo" id="sl-modo-arquivo" value="arquivo" checked onchange="slModoChange()"> Vídeo ou foto</label>
+              <label class="modo-opcao"><input type="radio" name="sl-modo" id="sl-modo-texto" value="txt" onchange="slModoChange()"> Texto</label>
+            </div>
           </div>
-          <div id="sl-duration-wrap"><label for="sl-dur">Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300">
+          <div class="form-full" id="sl-file-wrap">
+            <label class="dropzone" id="sl-dropzone" ondragover="doDragOver(event)" ondragleave="doDragLeave()" ondrop="doDrop(event)">
+              <input type="file" id="sl-file" accept=".mp4,.jpg,.jpeg,.png,.webp,video/mp4,image/jpeg,image/png,image/webp" onchange="onFile(this)">
+              <div style="font-size:28px;margin-bottom:8px">⬆</div>
+              <div style="font-size:13px;color:var(--text)">Clique ou arraste o vídeo ou a foto</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:4px;text-transform:none;letter-spacing:0">MP4, JPG, PNG ou WEBP</div>
+            </label>
+            <div id="sl-preview" class="preview-img" style="display:none"></div>
+            <button class="btn btn-danger btn-sm" id="sl-cancel" style="display:none;margin-top:8px" onclick="cancelarArquivo()">✕ Trocar arquivo</button>
+          </div>
+          <div class="form-full"><label for="sl-title">Título</label><input type="text" id="sl-title" placeholder="Se ficar em branco, usa o nome do arquivo"></div>
+          <div class="form-full" id="sl-body-wrap" style="display:none"><label for="sl-body">Texto</label><input type="text" id="sl-body" placeholder="Ex: Reunião às 14h"></div>
+          <div id="sl-duration-wrap" style="display:none"><label for="sl-dur">Duração (segundos)</label><input type="number" id="sl-dur" value="8" min="3" max="300">
             <label class="checkbox-label" style="display:flex;align-items:center;gap:6px;margin-top:6px;text-transform:none;letter-spacing:0;font-size:12px;cursor:pointer"><input type="checkbox" id="sl-sem-tempo" onchange="semTempoChange()" style="width:auto;margin:0"> Sem tempo — fica na tela até ser tirado</label>
           </div>
-          <div class="form-full"><label for="sl-title">Título</label><input type="text" id="sl-title" placeholder="Ex: Bom dia, equipe!"></div>
-          <div class="form-full" id="sl-body-wrap"><label for="sl-body">Texto</label><input type="text" id="sl-body" placeholder="Ex: Reunião às 14h"></div>
           <div class="form-full" id="sl-video-text-wrap" style="display:none">
             <div class="form-grid" style="margin-bottom:0">
               <div><label for="sl-video-text-mode">Texto sobre o vídeo</label>
@@ -362,17 +376,7 @@
             </div>
             <div style="font-size:11px;color:var(--muted);margin-top:8px">O título acima identifica o conteúdo na biblioteca e, quando habilitado, aparece no centro do vídeo.</div>
           </div>
-          <div class="form-full" id="sl-file-wrap" style="display:none">
-            <label>Arquivo</label>
-            <label class="dropzone" id="sl-dropzone" ondragover="doDragOver(event)" ondragleave="doDragLeave()" ondrop="doDrop(event)">
-              <input type="file" id="sl-file" accept=".mp4,.jpg,.jpeg,.png,.webp,video/mp4,image/jpeg,image/png,image/webp" onchange="onFile(this)">
-              <div style="font-size:28px;margin-bottom:8px">⬆</div>
-              <div style="font-size:13px;color:var(--muted)">Clique ou arraste uma imagem ou vídeo</div>
-            </label>
-            <div id="sl-preview" class="preview-img" style="display:none"></div>
-            <button class="btn btn-danger btn-sm" id="sl-cancel" style="display:none;margin-top:8px" onclick="cancelFile()">✕ Cancelar arquivo</button>
-          </div>
-          <div><label for="sl-bg">Cor de fundo</label>
+          <div id="sl-bg-wrap" style="display:none"><label for="sl-bg">Cor de fundo</label>
             <select id="sl-bg">
               <option value="#0a0a1a">Azul escuro</option>
               <option value="#0a1a12">Verde escuro</option>
@@ -960,18 +964,40 @@ function previewSlug(name){
 }
 
 // SLIDES
-function slTypeChange(){
-  const t=document.getElementById('sl-type').value;
-  document.getElementById('sl-file-wrap').style.display=t!=='txt'?'block':'none';
-  document.getElementById('sl-body-wrap').style.display=t==='txt'?'block':'none';
-  document.getElementById('sl-duration-wrap').style.display=t==='vid'?'none':'block';
-  document.getElementById('sl-video-text-wrap').style.display=t==='vid'?'block':'none';
+// O formulário começa pronto para vídeo ou foto, e o tipo sai do próprio arquivo. Antes ele
+// abria em "Texto", com a área de envio escondida: em 20/10 um "INSTITUCIONAL" virou um
+// texto vazio, e o vídeo institucional já estava na biblioteca.
+function slModo(){const m=document.querySelector('input[name="sl-modo"]:checked');return m?m.value:'arquivo';}
+function tipoDoArquivo(f){
+  if(!f)return null;
+  if(/\.mp4$/i.test(f.name))return 'vid';
+  if(/\.(jpe?g|png|webp)$/i.test(f.name))return 'img';
+  return null;
+}
+function slTipo(){return slModo()==='txt'?'txt':tipoDoArquivo(pendingFile);}
+// Valores iniciais de tempo para cada tipo de conteúdo.
+function slPadroes(t){
   document.getElementById('sl-dur').value=t==='vid'?'0':'8';
   // Imagem quase sempre fica até alguém tirar; texto costuma entrar num rodízio.
   document.getElementById('sl-sem-tempo').checked=t==='img';
   semTempoChange();
+}
+// Mostra só os campos do que está sendo enviado. Sem arquivo escolhido ainda, não há tempo
+// nem texto do vídeo para perguntar.
+function slMostrarCampos(){
+  const texto=slModo()==='txt',t=slTipo();
+  const mostrar=(id,sim)=>{document.getElementById(id).style.display=sim?'':'none';};
+  mostrar('sl-file-wrap',!texto);
+  mostrar('sl-body-wrap',texto);
+  mostrar('sl-bg-wrap',texto);
+  mostrar('sl-duration-wrap',t==='txt'||t==='img');
+  mostrar('sl-video-text-wrap',t==='vid');
+  document.getElementById('sl-title').placeholder=texto?'Ex: Bom dia, equipe!':'Se ficar em branco, usa o nome do arquivo';
   videoTextModeChange('sl');
-  if(t==='txt') cancelFile();
+}
+function slModoChange(){
+  if(slModo()==='txt'){cancelarArquivo();slPadroes('txt');}
+  slMostrarCampos();
 }
 function semTempoChange(){
   document.getElementById('sl-dur').disabled=document.getElementById('sl-sem-tempo').checked;
@@ -1002,6 +1028,16 @@ function cancelFile(){
   document.getElementById('sl-cancel').style.display='none';
   document.getElementById('sl-file').value='';
 }
+// Nome posto sozinho a partir do arquivo: troca junto se a pessoa trocar o arquivo, mas
+// nunca apaga um título que ela mesma escreveu.
+let tituloAutomatico='';
+function cancelarArquivo(){
+  cancelFile();
+  const titulo=document.getElementById('sl-title');
+  if(tituloAutomatico&&titulo.value===tituloAutomatico)titulo.value='';
+  tituloAutomatico='';
+  slMostrarCampos();
+}
 function doDragOver(e){e.preventDefault();document.getElementById('sl-dropzone').classList.add('drag')}
 function doDragLeave(){document.getElementById('sl-dropzone').classList.remove('drag')}
 function doDrop(e){e.preventDefault();doDragLeave();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])}
@@ -1022,21 +1058,28 @@ function handleFile(f){
   const url=URL.createObjectURL(f);
   const wrap=document.getElementById('sl-preview');
   wrap.style.display='flex';
-  wrap.innerHTML=f.type.startsWith('video')?`<video src="${url}" style="max-height:120px" controls></video>`:`<img src="${url}" style="max-height:120px;object-fit:contain">`;
+  const tipo=tipoDoArquivo(f);
+  wrap.innerHTML=tipo==='vid'?`<video src="${url}" style="max-height:120px" controls></video>`:`<img src="${url}" style="max-height:120px;object-fit:contain">`;
   document.getElementById('sl-cancel').style.display='inline-flex';
-  document.getElementById('sl-type').value=f.type.startsWith('video')?'vid':'img';
-  slTypeChange();
-  // não chamar slTypeChange pra não limpar o arquivo
-  document.getElementById('sl-file-wrap').style.display='block';
-  document.getElementById('sl-body-wrap').style.display='none';
+  // Arquivo solto com o formulário em "Texto" volta para o modo de arquivo.
+  document.getElementById('sl-modo-arquivo').checked=true;
+  const titulo=document.getElementById('sl-title');
+  if(!titulo.value.trim()||titulo.value===tituloAutomatico){
+    // Mesmo nome que o servidor usaria (tituloPadrao), para a pessoa ver antes de enviar.
+    tituloAutomatico=f.name.replace(/\.[^.]+$/,'').replace(/[_-]+/g,' ').trim().slice(0,80);
+    titulo.value=tituloAutomatico;
+  }
+  slPadroes(tipo);
+  slMostrarCampos();
 }
 async function addSlide(){
-  const type=document.getElementById('sl-type').value;
+  const type=slTipo();
   const title=document.getElementById('sl-title').value.trim();
   const body=document.getElementById('sl-body').value.trim();
   const dur=type!=='vid'&&document.getElementById('sl-sem-tempo').checked?'0':document.getElementById('sl-dur').value;
   const bg=document.getElementById('sl-bg').value;
-  if(!title&&!pendingFile){toast('Adicione um título ou arquivo');return;}
+  if(slModo()==='arquivo'&&!pendingFile){toast('Escolha o vídeo ou a foto que vai para as TVs');return;}
+  if(type==='txt'&&!title){toast('Escreva o título do texto');return;}
 
   const btn=document.querySelector('[onclick="addSlide()"]');
   btn.disabled=true;
@@ -1071,8 +1114,7 @@ async function addSlide(){
     document.getElementById('sl-body').value='';
     document.getElementById('sl-video-text-mode').value='fixed';
     document.getElementById('sl-video-text-seconds').value='5';
-    videoTextModeChange('sl');
-    cancelFile();
+    cancelarArquivo();
     await load();
     toast(data.otimizacao
       ? 'Vídeo recebido. O CorporTV está deixando ele leve para as TVs; ele entra no ar sozinho quando terminar. Já pode colocar em um ambiente.'
