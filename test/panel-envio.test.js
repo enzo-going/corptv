@@ -100,3 +100,37 @@ test('escolher o arquivo volta para o modo de arquivo e sugere o nome sem apagar
   contexto.handleFile({ name: 'outro.mp4', size: 1000 });
   assert.equal(campos['sl-title'].value, 'Campanha de outubro');
 });
+
+test('botões que salvam ficam travados até a resposta, mesmo com erro', async () => {
+  const contexto = vm.createContext({});
+  vm.runInContext(trecho('async function emAndamento(', 'function esc(value)'), contexto);
+  const atributos = new Map();
+  const botao = { disabled: false, setAttribute: (k, v) => atributos.set(k, v), removeAttribute: k => atributos.delete(k) };
+  let chamadas = 0, terminar;
+  const acao = () => { chamadas++; return new Promise(resolve => { terminar = resolve; }); };
+
+  const primeiro = contexto.emAndamento(botao, acao);
+  assert.equal(botao.disabled, true);
+  assert.equal(atributos.get('aria-busy'), 'true');
+  await contexto.emAndamento(botao, acao); // segundo clique enquanto salva
+  assert.equal(chamadas, 1, 'o segundo clique não cria uma cópia');
+  terminar();
+  await primeiro;
+  assert.equal(botao.disabled, false);
+  assert.equal(atributos.has('aria-busy'), false);
+
+  await assert.rejects(contexto.emAndamento(botao, async () => { throw new Error('falhou'); }));
+  assert.equal(botao.disabled, false, 'erro não deixa o botão travado para sempre');
+});
+
+test('os botões de cadastro e de salvar usam a trava', () => {
+  for (const acao of ['addGroup', 'addScreen', 'addUser', 'changeOwnPassword', 'saveSched', 'clearSched', 'saveVideoText']) {
+    assert.ok(html.includes(`onclick="emAndamento(this,${acao})"`), 'sem trava: ' + acao);
+  }
+  // "Deixar sempre no ar" espera o salvamento terminar para soltar o botão.
+  assert.match(trecho('function clearSched(){', '// AMBIENTES'), /return saveSched\(\);/);
+  // Adicionar ao ambiente trava a lista enquanto salva.
+  const adicionar = trecho('async function addToGroup(', 'async function removeFromGroup(');
+  assert.match(adicionar, /select\.disabled=true;/);
+  assert.match(adicionar, /finally\{select\.disabled=false;\}/);
+});
