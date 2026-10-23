@@ -97,8 +97,10 @@ test('o cartão de tela é curto: Abrir à vista, o resto no menu', () => {
 test('o painel oferece "sem tempo" para imagem e texto, e deixa mudar depois', () => {
   assert.match(panel, /id="sl-sem-tempo"[^>]*onchange="semTempoChange\(\)"/);
   assert.match(panel, /Sem tempo — fica na tela até ser tirado/);
-  // Imagem nasce sem tempo: é o caso de quase sempre.
-  assert.match(panel, /getElementById\('sl-sem-tempo'\)\.checked=t==='img'/);
+  // "Sem tempo" é escolha, não padrão: como padrão da imagem, a TV parava nela e o resto do
+  // ambiente não voltava mais.
+  assert.match(panel, /getElementById\('sl-sem-tempo'\)\.checked=false;/);
+  assert.doesNotMatch(panel, /getElementById\('sl-sem-tempo'\)\.checked=t==='img'/);
   assert.match(panel, /const dur=type!=='vid'&&document\.getElementById\('sl-sem-tempo'\)\.checked\?'0':/);
   assert.match(panel, /return d===0\?'sem tempo':/);
   // Conteúdo que já existe muda sem precisar ser enviado de novo.

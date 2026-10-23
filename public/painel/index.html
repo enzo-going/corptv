@@ -1014,9 +1014,10 @@ function tipoDoArquivo(f){
 function slTipo(){return slModo()==='txt'?'txt':tipoDoArquivo(pendingFile);}
 // Valores iniciais de tempo para cada tipo de conteúdo.
 function slPadroes(t){
-  document.getElementById('sl-dur').value=t==='vid'?'0':'8';
-  // Imagem quase sempre fica até alguém tirar; texto costuma entrar num rodízio.
-  document.getElementById('sl-sem-tempo').checked=t==='img';
+  document.getElementById('sl-dur').value=t==='vid'?'0':t==='img'?'10':'8';
+  // "Sem tempo" fica só como escolha de quem publica. Como padrão da foto, a TV parava nela
+  // e o resto do ambiente não voltava mais enquanto ela estivesse no ar.
+  document.getElementById('sl-sem-tempo').checked=false;
   semTempoChange();
 }
 // Mostra só os campos do que está sendo enviado. Sem arquivo escolhido ainda, não há tempo
