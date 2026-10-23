@@ -166,7 +166,10 @@
   .state{font-size:11px;font-weight:500}
   .state-on{color:var(--accent2)}
   .state-off{color:var(--warning)}
-  .item-off{opacity:.62}
+  /* Fora do ar: só a miniatura fica apagada. Apagar a linha inteira deixava ilegível justo o
+     aviso "não está em nenhum ambiente" / "Oculto". */
+  .item-off{border-style:dashed}
+  .item-off .item-thumb{opacity:.5}
   .sched-hint{font-size:12px;line-height:1.5;border-radius:8px;padding:10px 12px;margin-top:10px;background:var(--bg3);border:1px solid var(--border);color:var(--muted)}
   .sched-hint.bad{background:rgba(248,113,113,.1);border-color:rgba(248,113,113,.3);color:var(--danger)}
   .sched-hint.warn{background:rgba(251,191,36,.1);border-color:rgba(251,191,36,.3);color:var(--warning)}
