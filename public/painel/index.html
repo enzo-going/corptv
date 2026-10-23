@@ -1170,8 +1170,8 @@ async function addSlide(){
 }
 function renderSlides(){
   const el=document.getElementById('slide-list');
-  if(!slides.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum conteúdo ainda.</div>';return;}
-  el.innerHTML=slides.map(s=>{
+  if(!slides.length){trocarHtml(el,'<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum conteúdo ainda.</div>');return;}
+  trocarHtml(el,slides.map(s=>{
     const meta=[s.body||'', s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem':'texto', tempoDe(s)]
       .filter(Boolean).join(' · ');
     const uso=s.em_uso
@@ -1190,7 +1190,14 @@ function renderSlides(){
         <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')" title="Remover da biblioteca">✕</button>
       </div>
     </div>`;
-  }).join('');
+  }).join(''));
+}
+// O painel redesenha as listas a cada 30 s. Trocar o HTML sem necessidade recriava as
+// miniaturas de vídeo e o navegador baixava os vídeos de novo (uns 2 MB por minuto com o
+// painel aberto). Só troca quando o conteúdo da lista mudou.
+function trocarHtml(el,html){
+  if(el._html===html)return;
+  el._html=html;el.innerHTML=html;
 }
 // Vídeo pesado é otimizado no servidor antes de ir para as TVs. Enquanto isso, quem
 // publicou vê o andamento aqui, e não um conteúdo que "não aparece" na TV.
@@ -1475,7 +1482,9 @@ async function addToGroup(gid,select){
   select.disabled=true;
   try{
     const r=await api('POST','/api/groups/'+gid+'/slides',{slide_id:sid});
-    if(r&&r.error){toast(r.error);return;}
+    // A lista não é mais redesenhada a cada 30 s: sem isto, ela ficaria mostrando o
+    // conteúdo recusado como se tivesse entrado.
+    if(r&&r.error){toast(r.error);select.value='';return;}
     await load();
     const g=groups.find(x=>x.id===gid);
     const telas=screens.filter(s=>s.group_id===gid);
@@ -1490,13 +1499,13 @@ async function removeFromGroup(gid,sid){
 
 async function renderGroups(){
   const el=document.getElementById('group-list');
-  if(!groups.length){el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum ambiente ainda.</div>';return;}
+  if(!groups.length){trocarHtml(el,'<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum ambiente ainda.</div>');return;}
   const pls=await Promise.all(groups.map(g=>api('GET','/api/groups/'+g.id+'/slides')));
   if(pls.some(pl=>!Array.isArray(pl))){toast('Não foi possível atualizar a programação. Tentando novamente em 30s');return;}
   playlistCache={};
   groups.forEach((g,i)=>{playlistCache[g.id]=pls[i];});
 
-  el.innerHTML=groups.map((g,i)=>{
+  trocarHtml(el,groups.map((g,i)=>{
     const pl=pls[i];
     const telas=screens.filter(s=>s.group_id===g.id);
     const noAr=pl.filter(x=>x.status&&x.status.active).length;
@@ -1553,7 +1562,7 @@ async function renderGroups(){
       <div class="item-list">${itens}</div>
       <div style="margin-top:12px">${seletor}</div>
     </div>`;
-  }).join('');
+  }).join(''));
 }
 async function delGroup(id){
   const g=groups.find(x=>x.id===id);
