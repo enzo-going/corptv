@@ -100,7 +100,9 @@ test('escolher o arquivo volta para o modo de arquivo e sugere o nome sem apagar
   contexto.handleFile({ name: 'cardapio_da-semana.png', size: 1000 });
   assert.equal(campos['sl-modo-arquivo'].checked, true);
   assert.equal(campos['sl-title'].value, 'cardapio da semana', 'mesmo nome que o servidor daria');
-  assert.equal(campos['sl-sem-tempo'].checked, true, 'imagem continua nascendo sem tempo');
+  // Foto entra no rodízio com 10 s; "sem tempo" só se a pessoa marcar.
+  assert.equal(campos['sl-sem-tempo'].checked, false, 'foto não nasce mais "sem tempo"');
+  assert.equal(campos['sl-dur'].value, '10');
 
   // Trocar o arquivo troca o nome sugerido...
   contexto.handleFile({ name: 'video_novo.mp4', size: 1000 });
