@@ -371,9 +371,9 @@
             <div class="form-grid" style="margin-bottom:0">
               <div><label for="sl-video-text-mode">Texto sobre o vídeo</label>
                 <select id="sl-video-text-mode" onchange="videoTextModeChange('sl')">
+                  <option value="none">Não exibir texto</option>
                   <option value="fixed">Fixo durante todo o vídeo</option>
                   <option value="timed">Temporário com fade</option>
-                  <option value="none">Não exibir texto</option>
                 </select>
               </div>
               <div id="sl-video-text-seconds-wrap" style="display:none"><label for="sl-video-text-seconds">Tempo visível antes do fade (segundos)</label><input type="number" id="sl-video-text-seconds" value="5" min="1" max="300"></div>
@@ -1149,7 +1149,9 @@ async function addSlide(){
     if(comArquivo)mostrarEnvio('ok',data.otimizacao?'Enviado. Preparando o vídeo para as TVs (acompanhe na lista abaixo).':'Enviado.','');
     document.getElementById('sl-title').value='';
     document.getElementById('sl-body').value='';
-    document.getElementById('sl-video-text-mode').value='fixed';
+    // Sem texto por padrão: com "fixo", o título (o nome do arquivo, se ninguém mudar) ficava
+    // escrito no meio do vídeo na TV — 3 dos 4 vídeos em produção já tinham sido trocados.
+    document.getElementById('sl-video-text-mode').value='none';
     document.getElementById('sl-video-text-seconds').value='5';
     cancelarArquivo();
     await load();

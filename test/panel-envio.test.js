@@ -24,6 +24,17 @@ test('o formulário de conteúdo abre pronto para enviar vídeo ou foto', () => 
   assert.doesNotMatch(html, /id="sl-type"/, 'não há mais o seletor de tipo antes do arquivo');
 });
 
+test('vídeo novo vai sem texto por cima, a não ser que a pessoa escolha', () => {
+  // Com "fixo" como padrão, o nome do arquivo ("videoplayback") ficava escrito no meio do
+  // vídeo na TV. A primeira opção do formulário é a que vale de saída.
+  const select = trecho('<select id="sl-video-text-mode"', '</select>');
+  assert.match(select, /^<select[^>]*>\s*<option value="none">Não exibir texto<\/option>/);
+  // Depois de um envio, o formulário volta para o mesmo padrão.
+  const envio = trecho('async function addSlide(){', 'function renderSlides(){');
+  assert.match(envio, /getElementById\('sl-video-text-mode'\)\.value='none';/);
+  assert.doesNotMatch(envio, /getElementById\('sl-video-text-mode'\)\.value='fixed'/);
+});
+
 test('o tipo do conteúdo sai do próprio arquivo', () => {
   const contexto = vm.createContext({});
   vm.runInContext(trecho('function tipoDoArquivo(f){', 'function slTipo('), contexto);
