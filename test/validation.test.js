@@ -71,3 +71,22 @@ test('valida os três modos de texto sobre vídeo', () => {
   assert.match(normalizeVideoText({ video_text_mode: 'timed', video_text_seconds: '0' }, 'vid').error, /1 e 300/);
   assert.match(normalizeVideoText({ video_text_mode: 'piscar' }, 'vid').error, /inválido/i);
 });
+
+test('imagem escolhe o texto por cima e, sem escolha, não mostra o título', () => {
+  // Caso real (29/10): uma foto chamada "." saía com o ponto escrito no meio da TV.
+  assert.deepEqual(normalizeVideoText({}, 'img').value, { video_text_mode: 'none', video_text_seconds: 0 });
+  assert.deepEqual(normalizeVideoText({ video_text_mode: 'fixed' }, 'img').value, {
+    video_text_mode: 'fixed', video_text_seconds: 0
+  });
+  assert.deepEqual(normalizeVideoText({ video_text_mode: 'timed', video_text_seconds: '4' }, 'img').value, {
+    video_text_mode: 'timed', video_text_seconds: 4
+  });
+  // Na edição sem o campo, mantém o que estava gravado.
+  assert.deepEqual(normalizeVideoText({}, 'img', { current: { video_text_mode: 'fixed' } }).value, {
+    video_text_mode: 'fixed', video_text_seconds: 0
+  });
+  // O aviso de texto continua sem modo: o texto é o próprio conteúdo.
+  assert.deepEqual(normalizeVideoText({ video_text_mode: 'fixed' }, 'txt').value, { video_text_mode: 'none', video_text_seconds: 0 });
+  // Vídeo antigo sem o campo segue mostrando o título, como sempre.
+  assert.deepEqual(normalizeVideoText({}, 'vid').value, { video_text_mode: 'fixed', video_text_seconds: 0 });
+});

@@ -39,13 +39,16 @@ function normalizeDuration(value, type) {
 function normalizeVideoText(body, type, options) {
   const settings = options || {};
   const current = settings.current || {};
-  if (type !== 'vid') return { value: { video_text_mode: 'none', video_text_seconds: 0 } };
+  // O aviso de texto é o próprio conteúdo, sem modo. Vídeo e imagem escolhem se o título
+  // aparece por cima; na imagem o padrão é não aparecer, porque o título serve para achar
+  // o conteúdo na biblioteca (uma foto chamada "." saía com o ponto no meio da TV).
+  if (type !== 'vid' && type !== 'img') return { value: { video_text_mode: 'none', video_text_seconds: 0 } };
 
   const rawMode = body.video_text_mode === undefined
-    ? (current.video_text_mode || 'fixed')
+    ? (current.video_text_mode || (type === 'vid' ? 'fixed' : 'none'))
     : body.video_text_mode;
   if (typeof rawMode !== 'string' || !VIDEO_TEXT_MODES.has(rawMode)) {
-    return { error: 'Modo do texto do vídeo inválido.' };
+    return { error: 'Modo do texto sobre o conteúdo inválido.' };
   }
 
   if (rawMode !== 'timed') {

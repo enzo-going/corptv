@@ -73,6 +73,28 @@ test('o player suporta texto oculto, fixo ou temporário com fade', () => {
   assert.match(activeScript, /video_text_seconds: list\[i\]\.video_text_seconds/);
 });
 
+test('imagem só mostra o título por cima quando escolhido; sem texto, aparece limpa', () => {
+  // Caso real (29/10): uma foto chamada "." saía com o ponto escrito no meio da TV.
+  const script = scriptAtivo();
+  const inicio = script.indexOf('var hasText = Boolean(slide.title || slide.body);');
+  const trecho = script.slice(inicio, script.indexOf('renderDots();', inicio));
+  const rodar = slide => {
+    const content = { style: {}, classList: { add() {} } };
+    const overlay = { style: { display: 'block' }, classList: { add() {} } };
+    const timers = [];
+    new Function('slide', 'content', 'overlay', 'setTimeout', 'current', 'currentAtRender',
+      'var videoTextTimer = null;\n' + trecho)(slide, content, overlay, (fn, ms) => { timers.push(ms); return 1; }, 0, 0);
+    return { texto: content.style.opacity, sombra: overlay.style.display, timers };
+  };
+  assert.deepEqual(rodar({ type: 'img', title: '.', video_text_mode: 'none' }), { texto: '0', sombra: 'none', timers: [] });
+  assert.deepEqual(rodar({ type: 'img', title: 'Cardápio' }), { texto: '0', sombra: 'none', timers: [] }, 'sem escolha gravada');
+  assert.deepEqual(rodar({ type: 'img', title: 'Cardápio', video_text_mode: 'fixed' }), { texto: '1', sombra: 'block', timers: [] });
+  assert.deepEqual(rodar({ type: 'img', title: 'Cardápio', video_text_mode: 'timed', video_text_seconds: 4 }).timers, [4000]);
+  // Vídeo antigo sem a escolha gravada segue mostrando o título; o aviso de texto sempre mostra.
+  assert.deepEqual(rodar({ type: 'vid', title: 'Integração' }), { texto: '1', sombra: 'block', timers: [] });
+  assert.equal(rodar({ type: 'txt', title: 'Bom dia', video_text_mode: 'none' }).texto, '1');
+});
+
 test('conteúdo sem tempo não liga o cronômetro: não troca e não redesenha', () => {
   const fonte = extrair(scriptAtivo(), 'startTimer');
   const montar = new Function('slides', 'current', 'setInterval', 'clearInterval', 'resetProgress', 'document',

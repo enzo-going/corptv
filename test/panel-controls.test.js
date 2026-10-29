@@ -17,13 +17,19 @@ test('o botão Copiar possui fallback para painel HTTP', () => {
   assert.match(panel, /Não foi possível copiar/);
 });
 
-test('o painel oferece os três modos de texto do vídeo', () => {
-  assert.match(panel, /value="fixed">Fixo durante todo o vídeo/);
+test('o painel oferece os três modos de texto sobre vídeo e imagem', () => {
+  assert.match(panel, /value="fixed">Fixo o tempo todo/);
   assert.match(panel, /value="timed">Temporário com fade/);
   assert.match(panel, /value="none">Não exibir texto/);
   assert.match(panel, /video_text_mode/);
   assert.match(panel, /video_text_seconds/);
   assert.match(panel, /Texto do vídeo/);
+  // Foto também escolhe (29/10: uma foto chamada "." saía com o ponto no meio da TV).
+  assert.match(panel, /onclick="openVideoText\('\$\{s\.id\}'\)">Texto da imagem<\/button>/);
+  assert.match(panel, /mostrar\('sl-video-text-wrap',t==='vid'\|\|t==='img'\);/);
+  assert.match(panel, /const comTexto=type==='vid'\|\|type==='img';/);
+  assert.match(panel, /if\(!s\|\|\(s\.type!=='vid'&&s\.type!=='img'\)\)return;/);
+  assert.match(panel, /function videoTextModeOf\(s\)\{return s\.video_text_mode\|\|\(s\.type==='vid'\?'fixed':'none'\)\}/);
 });
 
 test('o painel ajusta o volume de cada tela e não perde o ajuste no redesenho', () => {
