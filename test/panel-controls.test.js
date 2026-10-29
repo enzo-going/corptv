@@ -310,3 +310,11 @@ test('o painel dá a Raspberry como desligada depois de 1 minuto sem aviso', () 
   // O aviso vem a cada 15 s; 4 perdidos seguidos é aparelho desligado de verdade.
   assert.ok(panel.includes('(Date.now()-new Date(d.last_seen).getTime())<60000;}'));
 });
+
+test('a Visão geral mostra também o link para TV fora do domínio, quando configurado', () => {
+  // 29/10: uma smart TV LG não abria o link pelo nome; abriu pelo IP e porta do servidor.
+  assert.match(panel, /enderecoTvConfig=cfg\.endereco_tv\|\|null;/);
+  const dash = panel.slice(panel.indexOf('async function renderDash(){'), panel.indexOf('// "O que está tocando'));
+  assert.match(dash, /\$\{enderecoTvConfig\?`<div class="card-sub mt8">Para TV fora do domínio/);
+  assert.match(dash, /value="\$\{esc\(enderecoTvConfig\+'\/player\/'\+s\.id\)\}"/);
+});

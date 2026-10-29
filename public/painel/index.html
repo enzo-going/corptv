@@ -753,6 +753,7 @@ async function bootstrap(){
     try{
       const cfg=await api('GET','/api/config');
       enderecoPublicoConfig=cfg.endereco_publico||null;
+      enderecoTvConfig=cfg.endereco_tv||null;
       if(Number.isInteger(cfg.limite_upload_mb))limiteUploadMb=cfg.limite_upload_mb;
     }catch(e){}
     document.body.classList.toggle('readonly',!permissions.edit);
@@ -984,6 +985,9 @@ const NETWORK_ORIGIN=location.origin;
 // Endereço oficial configurado no servidor (CORPTV_ENDERECO_PUBLICO). Sem ele, o link
 // saía com o endereço pelo qual o painel foi aberto — pelo IP, virava IP:porta.
 let enderecoPublicoConfig=null;
+// Endereço para TV fora do domínio (CORPTV_ENDERECO_TV, IP e porta): smart TV não usa o DNS
+// interno e não abre o link pelo nome.
+let enderecoTvConfig=null;
 // Endereço oficial do servidor, mesmo no celular: o comando da Raspberry tira dele
 // o domínio que faz o corportv/ curto funcionar na Pi. Um IP ali não serviria.
 function officialOrigin(){return enderecoPublicoConfig||publicOrigin();}
@@ -1962,6 +1966,11 @@ async function renderDash(){
         <input class="url-value" value="${esc(origin+'/player/'+s.id)}" readonly aria-label="URL do player">
         <button class="btn btn-ghost btn-sm" onclick="copyUrl('${origin}/player/${s.id}',this)">Copiar</button>
       </div>
+      ${enderecoTvConfig?`<div class="card-sub mt8">Para TV fora do domínio (smart TV pelo navegador):</div>
+      <div class="url-box" style="font-size:11px;margin-top:4px">
+        <input class="url-value" value="${esc(enderecoTvConfig+'/player/'+s.id)}" readonly aria-label="URL do player para TV ${esc(s.name)}">
+        <button class="btn btn-ghost btn-sm" onclick="copyUrl('${esc(enderecoTvConfig)}/player/${s.id}',this)">Copiar</button>
+      </div>`:''}
     </div>`;
   }).join('')+'</div>';
 }

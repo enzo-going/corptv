@@ -711,11 +711,14 @@ function enderecoPublico(valor) {
   return achado ? achado[1] : null;
 }
 const ENDERECO_PUBLICO = enderecoPublico(process.env.CORPTV_ENDERECO_PUBLICO);
+// Endereço que uma TV fora do domínio consegue abrir (IP e porta). Smart TV não usa o DNS
+// interno, então o nome não resolve nela: o link pelo nome não abria numa LG (29/10).
+const ENDERECO_TV = enderecoPublico(process.env.CORPTV_ENDERECO_TV);
 
 app.get('/api/config', (req, res) => {
   // O painel confere o tamanho antes de enviar: um arquivo acima do limite avisa na
   // hora, em vez de subir por minutos e ser recusado.
-  res.json({ endereco_publico: ENDERECO_PUBLICO, limite_upload_mb: LIMITE_UPLOAD_MB, otimiza_videos: !!filaVideo });
+  res.json({ endereco_publico: ENDERECO_PUBLICO, endereco_tv: ENDERECO_TV, limite_upload_mb: LIMITE_UPLOAD_MB, otimiza_videos: !!filaVideo });
 });
 
 app.get('/api/screens', async (req, res) => {

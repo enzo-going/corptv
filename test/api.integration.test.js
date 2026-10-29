@@ -18,6 +18,7 @@ process.env.CORPTV_FFMPEG = 'desligado';
 process.env.CORPTV_MEDIA_REQUESTS_PER_MINUTE = '2';
 process.env.CORPTV_PAGE_REQUESTS_PER_MINUTE = '2';
 process.env.CORPTV_ENDERECO_PUBLICO = 'http://corportv/';
+process.env.CORPTV_ENDERECO_TV = 'http://192.0.2.10:3000/';
 
 const db = require('../src/db');
 const { app, enderecoPublico } = require('../src/server');
@@ -493,6 +494,8 @@ test('o painel recebe o endereço oficial para montar os links do player', async
   const cfg = await json('/api/config');
   assert.equal(cfg.response.status, 200);
   assert.equal(cfg.body.endereco_publico, 'http://corportv');   // barra final removida
+  // Smart TV fora do domínio não resolve o nome: o painel mostra também o link por IP e porta.
+  assert.equal(cfg.body.endereco_tv, 'http://192.0.2.10:3000');
 });
 
 test('o endereço oficial aceita só esquema, host e porta', () => {
