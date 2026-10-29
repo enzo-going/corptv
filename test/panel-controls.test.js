@@ -318,3 +318,12 @@ test('a Visão geral mostra também o link para TV fora do domínio, quando conf
   assert.match(dash, /\$\{enderecoTvConfig\?`<div class="card-sub mt8">Para TV fora do domínio/);
   assert.match(dash, /value="\$\{esc\(enderecoTvConfig\+'\/player\/'\+s\.id\)\}"/);
 });
+
+test('o painel avisa quando a imagem é pequena para TV, sem impedir o envio', () => {
+  // 29/10: um logo de 554×554 ficou borrado na LG; a TV amplia até 1920×1080.
+  assert.match(panel, /<div id="sl-aviso-imagem" class="sched-hint warn" role="status"/);
+  const aviso = panel.slice(panel.indexOf('function avisoImagemPequena(img){'), panel.indexOf('function handleFile(f){'));
+  assert.match(aviso, /Math\.min\(1920\/w,1080\/h\)<=1\.5/);
+  assert.doesNotMatch(aviso, /cancelFile|pendingFile=null/);
+  assert.match(panel, /img\.onload=\(\)=>\{if\(pendingFile===f\)avisoImagemPequena\(img\)\};/);
+});
