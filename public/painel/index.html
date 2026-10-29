@@ -372,16 +372,16 @@
           </div>
           <div class="form-full" id="sl-video-text-wrap" style="display:none">
             <div class="form-grid" style="margin-bottom:0">
-              <div><label for="sl-video-text-mode">Texto sobre o vídeo</label>
+              <div><label for="sl-video-text-mode" id="sl-video-text-label">Texto sobre o vídeo</label>
                 <select id="sl-video-text-mode" onchange="videoTextModeChange('sl')">
                   <option value="none">Não exibir texto</option>
-                  <option value="fixed">Fixo durante todo o vídeo</option>
+                  <option value="fixed">Fixo o tempo todo</option>
                   <option value="timed">Temporário com fade</option>
                 </select>
               </div>
               <div id="sl-video-text-seconds-wrap" style="display:none"><label for="sl-video-text-seconds">Tempo visível antes do fade (segundos)</label><input type="number" id="sl-video-text-seconds" value="5" min="1" max="300"></div>
             </div>
-            <div style="font-size:11px;color:var(--muted);margin-top:8px">O título acima identifica o conteúdo na biblioteca e, quando habilitado, aparece no centro do vídeo.</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:8px">O título acima identifica o conteúdo na biblioteca. Na TV, ele só aparece por cima se você escolher.</div>
           </div>
           <div id="sl-bg-wrap" style="display:none"><label for="sl-bg">Cor de fundo</label>
             <select id="sl-bg">
@@ -568,12 +568,12 @@
 </div>
 <div class="modal-back" id="video-text-modal">
   <div class="modal" style="max-width:520px">
-    <div class="card-title" style="margin-bottom:2px">Texto sobre o vídeo</div>
+    <div class="card-title" id="video-text-titulo" style="margin-bottom:2px">Texto sobre o vídeo</div>
     <div class="card-sub" id="video-text-name" style="margin-bottom:16px"></div>
     <div class="form-grid">
       <div class="form-full"><label for="video-text-mode">Como o texto deve aparecer</label>
         <select id="video-text-mode" onchange="videoTextModeChange('edit')">
-          <option value="fixed">Fixo durante todo o vídeo</option>
+          <option value="fixed">Fixo o tempo todo</option>
           <option value="timed">Temporário com fade</option>
           <option value="none">Não exibir texto</option>
         </select>
@@ -1032,7 +1032,9 @@ function slMostrarCampos(){
   mostrar('sl-body-wrap',texto);
   mostrar('sl-bg-wrap',texto);
   mostrar('sl-duration-wrap',t==='txt'||t==='img');
-  mostrar('sl-video-text-wrap',t==='vid');
+  // Foto também escolhe se o título aparece por cima; o padrão é não aparecer.
+  mostrar('sl-video-text-wrap',t==='vid'||t==='img');
+  document.getElementById('sl-video-text-label').textContent=t==='img'?'Texto sobre a imagem':'Texto sobre o vídeo';
   document.getElementById('sl-title').placeholder=texto?'Ex: Bom dia, equipe!':'Se ficar em branco, usa o nome do arquivo';
   videoTextModeChange('sl');
 }
@@ -1055,8 +1057,8 @@ function videoTextModeChange(scope){
   document.getElementById(editing?'video-text-seconds-wrap':'sl-video-text-seconds-wrap').style.display=mode==='timed'?'block':'none';
   if(editing){
     const hint=document.getElementById('video-text-hint');
-    if(mode==='none')hint.textContent='O nome continua na biblioteca, mas nenhum texto será mostrado sobre o vídeo.';
-    else if(mode==='fixed')hint.textContent='O título ficará visível no centro durante todo o vídeo.';
+    if(mode==='none')hint.textContent='O nome continua na biblioteca, mas nenhum texto aparece por cima na TV.';
+    else if(mode==='fixed')hint.textContent='O título fica visível no centro enquanto o conteúdo estiver na tela.';
     else hint.textContent='O título aparece no início e desaparece suavemente após o tempo escolhido.';
   }
 }
@@ -1132,8 +1134,9 @@ async function addSlide(){
   try{
     const fd=new FormData();
     fd.append('title',title);fd.append('body',body);fd.append('type',type);fd.append('duration',dur);fd.append('bg',bg);
-    fd.append('video_text_mode',type==='vid'?document.getElementById('sl-video-text-mode').value:'none');
-    fd.append('video_text_seconds',type==='vid'?document.getElementById('sl-video-text-seconds').value:'0');
+    const comTexto=type==='vid'||type==='img';
+    fd.append('video_text_mode',comTexto?document.getElementById('sl-video-text-mode').value:'none');
+    fd.append('video_text_seconds',comTexto?document.getElementById('sl-video-text-seconds').value:'0');
     if(pendingFile)fd.append('file',pendingFile);
     const data=await enviarComProgresso('/api/slides',fd,(enviado,total)=>{
       if(!comArquivo)return;
@@ -1175,7 +1178,7 @@ function renderSlides(){
   const el=document.getElementById('slide-list');
   if(!slides.length){trocarHtml(el,'<div style="text-align:center;padding:32px;color:var(--muted)">Nenhum conteúdo ainda.</div>');return;}
   trocarHtml(el,slides.map(s=>{
-    const meta=[s.body||'', s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem':'texto', tempoDe(s)]
+    const meta=[s.body||'', s.type==='vid'?'vídeo · '+videoTextLabel(s):s.type==='img'?'imagem · '+videoTextLabel(s):'texto', tempoDe(s)]
       .filter(Boolean).join(' · ');
     const uso=s.em_uso
       ? `<span class="state state-on">● em ${s.em_uso} ambiente${s.em_uso>1?'s':''}</span>`
@@ -1189,6 +1192,7 @@ function renderSlides(){
       </div>
       <div class="item-actions editor-only">
         ${s.type==='vid'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto do vídeo</button>`:`<button class="btn btn-ghost btn-sm" onclick="editDuration('${s.id}')">Tempo</button>`}
+        ${s.type==='img'?`<button class="btn btn-ghost btn-sm" onclick="openVideoText('${s.id}')">Texto da imagem</button>`:''}
         <button class="btn btn-ghost btn-sm" onclick="renameSlide('${s.id}')">Renomear</button>
         <button class="btn btn-danger btn-sm btn-icon" onclick="delSlide('${s.id}')" title="Remover da biblioteca">✕</button>
       </div>
@@ -1224,7 +1228,8 @@ function acompanharPreparo(){
     },5000);
   }
 }
-function videoTextModeOf(s){return s.video_text_mode||'fixed'}
+// Sem o campo gravado, vídeo antigo mostrava o título e imagem não mostra (como no player).
+function videoTextModeOf(s){return s.video_text_mode||(s.type==='vid'?'fixed':'none')}
 function videoTextLabel(s){
   const mode=videoTextModeOf(s);
   if(mode==='none')return 'sem texto';
@@ -1233,8 +1238,9 @@ function videoTextLabel(s){
 }
 function openVideoText(id){
   const s=slides.find(x=>x.id===id);
-  if(!s||s.type!=='vid')return;
+  if(!s||(s.type!=='vid'&&s.type!=='img'))return;
   videoTextEditId=id;
+  document.getElementById('video-text-titulo').textContent=s.type==='img'?'Texto sobre a imagem':'Texto sobre o vídeo';
   document.getElementById('video-text-name').textContent=nomeDe(s);
   document.getElementById('video-text-mode').value=videoTextModeOf(s);
   document.getElementById('video-text-seconds').value=parseInt(s.video_text_seconds,10)||5;

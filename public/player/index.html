@@ -742,11 +742,17 @@
     document.getElementById('slide-title').innerText = slide.title || '';
     document.getElementById('slide-body').innerText = slide.body || '';
     var hasText = Boolean(slide.title || slide.body);
-    var textMode = slide.type === 'vid' ? (slide.video_text_mode || 'fixed') : 'fixed';
+    // Vídeo e imagem seguem a escolha de texto por cima; o aviso de texto sempre mostra.
+    // Imagem sem a escolha gravada não mostra o título: ele é o nome na biblioteca, e uma
+    // foto chamada "." saía com o ponto escrito no meio da TV.
+    var temMidia = slide.type === 'vid' || slide.type === 'img';
+    var textMode = slide.type === 'vid' ? (slide.video_text_mode || 'fixed')
+      : slide.type === 'img' ? (slide.video_text_mode || 'none') : 'fixed';
     var showText = hasText && textMode !== 'none';
     content.style.opacity = showText ? '1' : '0';
-    if (slide.type === 'vid') overlay.style.display = showText ? 'block' : 'none';
-    if (slide.type === 'vid' && textMode === 'timed' && showText) {
+    // Sem texto, a mídia aparece limpa (sem a sombra que só existe para dar leitura ao texto).
+    if (temMidia) overlay.style.display = showText ? 'block' : 'none';
+    if (temMidia && textMode === 'timed' && showText) {
       var visibleSeconds = parseInt(slide.video_text_seconds, 10);
       if (!visibleSeconds || visibleSeconds < 1) visibleSeconds = 5;
       videoTextTimer = setTimeout(function () {
