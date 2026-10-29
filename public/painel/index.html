@@ -363,6 +363,7 @@
               <div style="font-size:12px;color:var(--muted);margin-top:4px;text-transform:none;letter-spacing:0">MP4, JPG, PNG ou WEBP</div>
             </label>
             <div id="sl-preview" class="preview-img" style="display:none"></div>
+            <div id="sl-aviso-imagem" class="sched-hint warn" role="status" style="display:none"></div>
             <button class="btn btn-danger btn-sm" id="sl-cancel" style="display:none;margin-top:8px" onclick="cancelarArquivo()">✕ Trocar arquivo</button>
           </div>
           <div class="form-full"><label for="sl-title">Título</label><input type="text" id="sl-title" placeholder="Se ficar em branco, usa o nome do arquivo"></div>
@@ -1072,6 +1073,7 @@ function cancelFile(){
   const preview=document.getElementById('sl-preview');
   preview.style.display='none';
   preview.innerHTML='';
+  avisoImagemPequena(null);
   document.getElementById('sl-cancel').style.display='none';
   document.getElementById('sl-file').value='';
 }
@@ -1089,6 +1091,16 @@ function doDragOver(e){e.preventDefault();document.getElementById('sl-dropzone')
 function doDragLeave(){document.getElementById('sl-dropzone').classList.remove('drag')}
 function doDrop(e){e.preventDefault();doDragLeave();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])}
 function onFile(inp){if(inp.files[0])handleFile(inp.files[0])}
+// A TV amplia a imagem até ocupar a tela (Full HD, 1920×1080), e o que falta de pixel vira
+// borrão: o logo de 554×554 saiu borrado na LG (29/10). Só avisa; quem decide é a pessoa.
+function avisoImagemPequena(img){
+  const aviso=document.getElementById('sl-aviso-imagem');
+  if(!img){aviso.style.display='none';aviso.textContent='';return;}
+  const w=img.naturalWidth,h=img.naturalHeight;
+  if(!w||!h||Math.min(1920/w,1080/h)<=1.5){aviso.style.display='none';return;}
+  aviso.textContent=`Imagem pequena para TV (${w} × ${h}): ela vai aparecer ampliada e borrada. Se tiver, envie uma versão maior — o ideal é 1920 × 1080 (ou 1080 de altura para logo).`;
+  aviso.style.display='block';
+}
 function handleFile(f){
   // Confere antes de enviar: um arquivo acima do limite subia por minutos para só
   // então ser recusado (o caso real: 641 MB contra 256 MB, e o painel "enviando" sem fim).
@@ -1107,6 +1119,11 @@ function handleFile(f){
   wrap.style.display='flex';
   const tipo=tipoDoArquivo(f);
   wrap.innerHTML=tipo==='vid'?`<video src="${url}" style="max-height:120px" controls></video>`:`<img src="${url}" style="max-height:120px;object-fit:contain">`;
+  avisoImagemPequena(null);
+  if(tipo==='img'){
+    const img=wrap.querySelector('img');
+    img.onload=()=>{if(pendingFile===f)avisoImagemPequena(img)};
+  }
   document.getElementById('sl-cancel').style.display='inline-flex';
   // Arquivo solto com o formulário em "Texto" volta para o modo de arquivo.
   document.getElementById('sl-modo-arquivo').checked=true;

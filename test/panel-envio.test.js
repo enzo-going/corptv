@@ -82,13 +82,13 @@ test('texto sem título é recusado antes de enviar', async () => {
 
 test('escolher o arquivo volta para o modo de arquivo e sugere o nome sem apagar o que foi escrito', () => {
   const campos = {
-    'sl-preview': { style: {}, innerHTML: '' }, 'sl-cancel': { style: {} }, 'sl-modo-arquivo': { checked: false },
+    'sl-preview': { style: {}, innerHTML: '', querySelector: () => ({}) }, 'sl-cancel': { style: {} }, 'sl-modo-arquivo': { checked: false },
     'sl-title': { value: '' }, 'sl-dur': { value: '8' }, 'sl-sem-tempo': { checked: false }
   };
   const contexto = vm.createContext({
     document: { getElementById: id => campos[id] },
     URL: { createObjectURL: () => 'blob:teste' }, limiteUploadMb: 2048, mb: () => 1,
-    toast: () => {}, mostrarEnvio: () => {}, semTempoChange: () => {}, slMostrarCampos: () => {}, cancelFile: () => {}
+    toast: () => {}, mostrarEnvio: () => {}, semTempoChange: () => {}, slMostrarCampos: () => {}, cancelFile: () => {}, avisoImagemPequena: () => {}
   });
   vm.runInContext(
     trecho('function tipoDoArquivo(f){', 'function slTipo(') +
