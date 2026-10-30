@@ -319,11 +319,18 @@ test('a Visão geral mostra também o link para TV fora do domínio, quando conf
   assert.match(dash, /value="\$\{esc\(enderecoTvConfig\+'\/player\/'\+s\.id\)\}"/);
 });
 
-test('o painel avisa quando a imagem é pequena para TV, sem impedir o envio', () => {
+test('imagem pequena para TV não vai como está: troca pelo original ou o painel amplia antes', () => {
   // 29/10: um logo de 554×554 ficou borrado na LG; a TV amplia até 1920×1080.
   assert.match(panel, /<div id="sl-aviso-imagem" class="sched-hint warn" role="status"/);
   const aviso = panel.slice(panel.indexOf('function avisoImagemPequena(img){'), panel.indexOf('function handleFile(f){'));
-  assert.match(aviso, /Math\.min\(1920\/w,1080\/h\)<=1\.5/);
-  assert.doesNotMatch(aviso, /cancelFile|pendingFile=null/);
-  assert.match(panel, /img\.onload=\(\)=>\{if\(pendingFile===f\)avisoImagemPequena\(img\)\};/);
+  assert.ok(aviso.includes('imagemOk=!w||!h||Math.min(1920/w,1080/h)<=1.5;'));
+  assert.ok(aviso.includes('onclick="melhorarImagem(this)">Melhorar automaticamente</button>'));
+  // A ampliação cabe em 1920×1080 e volta pelo mesmo caminho de um arquivo escolhido.
+  assert.ok(aviso.includes('escala=Math.min(1920/w,1080/h)'));
+  assert.ok(aviso.includes("ctx.imageSmoothingQuality='high';"));
+  assert.ok(aviso.includes('handleFile(new File([blob]'));
+  const envio = panel.slice(panel.indexOf('async function addSlide(){'), panel.indexOf("const btn=document.querySelector('[onclick=\"addSlide()\"]');"));
+  assert.ok(envio.includes("imagemOk===false){toast('Imagem pequena para TV"), 'imagem pequena não pode sair como está');
+  assert.ok(envio.includes("imagemOk===null){toast('Aguarde a prévia"));
+  assert.ok(panel.includes('img.onload=()=>{if(pendingFile===f)avisoImagemPequena(img)};'));
 });

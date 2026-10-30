@@ -1074,6 +1074,7 @@ function cancelFile(){
   preview.style.display='none';
   preview.innerHTML='';
   avisoImagemPequena(null);
+  imagemOk=true;
   document.getElementById('sl-cancel').style.display='none';
   document.getElementById('sl-file').value='';
 }
@@ -1092,14 +1093,40 @@ function doDragLeave(){document.getElementById('sl-dropzone').classList.remove('
 function doDrop(e){e.preventDefault();doDragLeave();if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0])}
 function onFile(inp){if(inp.files[0])handleFile(inp.files[0])}
 // A TV amplia a imagem até ocupar a tela (Full HD, 1920×1080), e o que falta de pixel vira
-// borrão: o logo de 554×554 saiu borrado na LG (29/10). Só avisa; quem decide é a pessoa.
+// borrão: o logo de 554×554 saiu borrado na LG (29/10). Imagem assim não vai como está:
+// ou a pessoa troca pelo original, ou o painel amplia com qualidade antes de enviar.
+// imagemOk: null enquanto a imagem carrega, false se pequena demais, true se pode ir.
+let imagemOk=true;
 function avisoImagemPequena(img){
   const aviso=document.getElementById('sl-aviso-imagem');
-  if(!img){aviso.style.display='none';aviso.textContent='';return;}
+  if(!img){aviso.style.display='none';aviso.innerHTML='';return;}
   const w=img.naturalWidth,h=img.naturalHeight;
-  if(!w||!h||Math.min(1920/w,1080/h)<=1.5){aviso.style.display='none';return;}
-  aviso.textContent=`Imagem pequena para TV (${w} × ${h}): ela vai aparecer ampliada e borrada. Se tiver, envie uma versão maior — o ideal é 1920 × 1080 (ou 1080 de altura para logo).`;
+  imagemOk=!w||!h||Math.min(1920/w,1080/h)<=1.5;
+  if(imagemOk){aviso.style.display='none';return;}
+  aviso.innerHTML=`Imagem pequena para TV (${w} × ${h}): como está, ela sairia borrada. O melhor é enviar o arquivo original (1920 × 1080, ou 1080 de altura para logo). Se não tiver, o painel amplia com a melhor qualidade possível e mostra o resultado aqui antes de enviar.
+    <div class="mt8"><button type="button" class="btn btn-ghost btn-sm" onclick="melhorarImagem(this)">Melhorar automaticamente</button></div>`;
   aviso.style.display='block';
+}
+// Amplia no próprio navegador até caber em 1920×1080 (suavização alta) e troca o arquivo
+// pendente pelo PNG ampliado. Não cria detalhe que não existe: tira o serrilhado e a
+// ampliação grosseira do navegador da TV.
+function melhorarImagem(btn){
+  const img=document.querySelector('#sl-preview img');
+  const f=pendingFile;
+  if(!img||!f)return;
+  const w=img.naturalWidth,h=img.naturalHeight,escala=Math.min(1920/w,1080/h);
+  const canvas=document.createElement('canvas');
+  canvas.width=Math.round(w*escala);canvas.height=Math.round(h*escala);
+  const ctx=canvas.getContext('2d');
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  btn.disabled=true;btn.textContent='Melhorando...';
+  canvas.toBlob(blob=>{
+    if(pendingFile!==f)return;
+    if(!blob){btn.disabled=false;btn.textContent='Melhorar automaticamente';toast('Não deu para melhorar esta imagem. Envie o arquivo original.',6000);return;}
+    handleFile(new File([blob],f.name.replace(/\.[^.]+$/,'')+'.png',{type:'image/png'}));
+    toast(`Imagem ampliada para ${canvas.width} × ${canvas.height}. Confira a prévia antes de enviar.`,6000);
+  },'image/png');
 }
 function handleFile(f){
   // Confere antes de enviar: um arquivo acima do limite subia por minutos para só
@@ -1120,9 +1147,12 @@ function handleFile(f){
   const tipo=tipoDoArquivo(f);
   wrap.innerHTML=tipo==='vid'?`<video src="${url}" style="max-height:120px" controls></video>`:`<img src="${url}" style="max-height:120px;object-fit:contain">`;
   avisoImagemPequena(null);
+  imagemOk=tipo==='img'?null:true;
   if(tipo==='img'){
     const img=wrap.querySelector('img');
     img.onload=()=>{if(pendingFile===f)avisoImagemPequena(img)};
+    // Imagem que o navegador não abre: quem responde é o servidor, não fica presa aqui.
+    img.onerror=()=>{if(pendingFile===f)imagemOk=true};
   }
   document.getElementById('sl-cancel').style.display='inline-flex';
   // Arquivo solto com o formulário em "Texto" volta para o modo de arquivo.
@@ -1144,6 +1174,8 @@ async function addSlide(){
   const bg=document.getElementById('sl-bg').value;
   if(slModo()==='arquivo'&&!pendingFile){toast('Escolha o vídeo ou a foto que vai para as TVs');return;}
   if(type==='txt'&&!title){toast('Escreva o título do texto');return;}
+  if(slModo()==='arquivo'&&imagemOk===null){toast('Aguarde a prévia da imagem carregar');return;}
+  if(slModo()==='arquivo'&&imagemOk===false){toast('Imagem pequena para TV: envie o original ou use "Melhorar automaticamente".',7000);return;}
 
   const btn=document.querySelector('[onclick="addSlide()"]');
   btn.disabled=true;
